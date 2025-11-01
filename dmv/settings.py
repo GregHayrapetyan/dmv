@@ -140,3 +140,4 @@ SPECTACULAR_SETTINGS = {
 "DESCRIPTION": "Auth + Onboarding backend for DMV prep app",
 "VERSION": "1.0.0",
 }
+EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"

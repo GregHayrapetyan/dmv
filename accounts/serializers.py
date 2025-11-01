@@ -5,8 +5,42 @@ from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 import secrets
+from .models import EmailOTP
 
 User = get_user_model()
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+    repeat_password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name", "username", "email", "password", "repeat_password")
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["repeat_password"]:
+            raise serializers.ValidationError({"repeat_password": "Passwords do not match"})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("repeat_password")
+        user = User.objects.create_user(**validated_data)
+        # Send verify email code
+        code = f"{secrets.randbelow(10**6):06d}"
+        EmailOTP.objects.create(
+            user=user,
+            code=code,
+            purpose="verify_email",
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        send_mail(
+            "Verify your email",
+            f"Your verification code is: {code}",
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+        )
+        print(code)
+        return user
 
 class LoginSerializer(serializers.Serializer):
     identifier = serializers.CharField(help_text="Email or phone")
@@ -39,3 +73,33 @@ class LoginSerializer(serializers.Serializer):
 
         attrs["user"] = user
         return attrs
+
+
+class ConfirmEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(email=attrs["email"])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        try:
+            otp = EmailOTP.objects.filter(user=user, purpose="verify_email").latest("created_at")
+        except EmailOTP.DoesNotExist:
+            raise serializers.ValidationError("No verification code found")
+        if otp.code != attrs["code"] or not otp.is_valid():
+            raise serializers.ValidationError("Invalid or expired code")
+        attrs["user"] = user
+        attrs["otp"] = otp
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.validated_data["user"]
+        otp = self.validated_data["otp"]
+        user.is_email_verified = True
+        user.save(update_fields=["is_email_verified"])
+        otp.is_used = True
+        otp.save(update_fields=["is_used"])
+        return user
+
