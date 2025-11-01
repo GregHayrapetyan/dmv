@@ -15,7 +15,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "username", "email", "password", "repeat_password")
+        fields = ("first_name", "last_name", "username", "phone", "email", "password", "repeat_password")
 
     def validate(self, attrs):
         if attrs["password"] != attrs["repeat_password"]:
@@ -103,3 +103,55 @@ class ConfirmEmailSerializer(serializers.Serializer):
         otp.save(update_fields=["is_used"])
         return user
 
+class RequestPasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(email=attrs["email"])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Email not found")
+        attrs["user"] = user
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.validated_data["user"]
+        code = f"{secrets.randbelow(10**6):06d}"
+        print(code)
+        EmailOTP.objects.create(
+            user=user,
+            code=code,
+            purpose="reset_password",
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        send_mail("Reset password", f"Code: {code}", settings.DEFAULT_FROM_EMAIL, [user.email])
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(min_length=8)
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(email=attrs["email"])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        try:
+            otp = EmailOTP.objects.filter(user=user, purpose="reset_password").latest("created_at")
+        except EmailOTP.DoesNotExist:
+            raise serializers.ValidationError("No reset code found")
+        if otp.code != attrs["code"] or not otp.is_valid():
+            raise serializers.ValidationError("Invalid or expired code")
+        attrs["user"] = user
+        attrs["otp"] = otp
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.validated_data["user"]
+        otp = self.validated_data["otp"]
+        user.set_password(self.validated_data["new_password"])
+        user.save()
+        otp.is_used = True
+        otp.save(update_fields=["is_used"])
+        return user

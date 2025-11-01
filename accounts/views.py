@@ -3,7 +3,8 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import (
-    LoginSerializer, RegisterSerializer, ConfirmEmailSerializer,
+    LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
+    ResetPasswordSerializer,
 
 )
 from django.conf import settings
@@ -28,6 +29,16 @@ class LoginView(generics.GenericAPIView):
             "refresh": str(tokens),
         })
 
+class RequestPasswordResetView(generics.GenericAPIView):
+    serializer_class = RequestPasswordResetSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response({"detail": "Reset code sent"})
+
 class ConfirmEmailView(generics.GenericAPIView):
     serializer_class = ConfirmEmailSerializer
     permission_classes = [permissions.AllowAny]
@@ -37,3 +48,13 @@ class ConfirmEmailView(generics.GenericAPIView):
         ser.is_valid(raise_exception=True)
         ser.save()
         return Response({"detail": "Email confirmed"})
+
+class ResetPasswordView(generics.GenericAPIView):
+    serializer_class = ResetPasswordSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response({"detail": "Password updated"})
