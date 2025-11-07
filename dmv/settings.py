@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-9vfi!a_qq$n8y360_fj&z%^3vi_g1diuaj0f)sbp*ny^fu4k8j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 INSTALLED_APPS = [
@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "accounts",
+    "onboarding",
 ]
 # Application definition
 
