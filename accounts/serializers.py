@@ -36,8 +36,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         send_mail(
             "Verify your email",
             f"Your verification code is: {code}",
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
         )
         print(code)
         return user
@@ -155,3 +156,6 @@ class ResetPasswordSerializer(serializers.Serializer):
         otp.is_used = True
         otp.save(update_fields=["is_used"])
         return user
+
+class GoogleLoginSerializer(serializers.Serializer):
+    id_token = serializers.CharField()

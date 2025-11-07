@@ -140,4 +140,12 @@ SPECTACULAR_SETTINGS = {
 "DESCRIPTION": "Auth + Onboarding backend for DMV prep app",
 "VERSION": "1.0.0",
 }
-EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"
+EMAIL_HOST ="smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = "hayrapetyan.greg@gmail.com"
+EMAIL_HOST_PASSWORD = "udcx saqh bhwr ewvp"
+DEFAULT_FROM_EMAIL = "hayrapetyan.greg@gmail.com"
+EMAIL_TIMEOUT = 30
+GOOGLE_OAUTH_CLIENT_ID = ""
