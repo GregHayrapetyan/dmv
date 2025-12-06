@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "accounts",
     "onboarding",
+    "learning",
 ]
 # Application definition
 
