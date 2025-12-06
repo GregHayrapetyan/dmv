@@ -81,9 +81,7 @@ class GoogleLoginView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        """Accepts a Google id_token and returns app JWTs. Verifies token locally.
-        On real deployment, also check aud == GOOGLE_OAUTH_CLIENT_ID.
-        """
+        """Accepts a Google id_token and returns app JWTs. Verifies token locally."""
         from google.oauth2 import id_token
         from google.auth.transport import requests as grequests
         from google.auth.exceptions import GoogleAuthError
@@ -100,36 +98,75 @@ class GoogleLoginView(generics.GenericAPIView):
             )
         
         try:
+            # Verify the token with Google
             info = id_token.verify_oauth2_token(
                 token, 
                 grequests.Request(), 
                 settings.GOOGLE_OAUTH_CLIENT_ID
             )
+            
+            # Validate required fields
             email = info.get("email")
+            email_verified = info.get("email_verified", False)
+            
             if not email:
                 return Response(
                     {"detail": "Email not provided by Google."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            first = info.get("given_name", "")
-            last = info.get("family_name", "")
+            # Check if email is verified by Google
+            if not email_verified:
+                logger.warning(f"Unverified email attempted Google login: {email}")
+                return Response(
+                    {"detail": "Email not verified by Google."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Extract user information
+            first_name = info.get("given_name", "")
+            last_name = info.get("family_name", "")
+            
+            # Get or create user
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
-                    "first_name": first,
-                    "last_name": last,
+                    "first_name": first_name,
+                    "last_name": last_name,
                     "is_email_verified": True  # Google emails are pre-verified
                 }
             )
+            
+            # Update existing user's email verification status if not already verified
+            if not created and not user.is_email_verified:
+                user.is_email_verified = True
+                user.save(update_fields=["is_email_verified"])
+                logger.info(f"Email verified via Google OAuth for existing user: {email}")
+            
             if created:
                 logger.info(f"New user created via Google OAuth: {email}")
             
+            # Generate JWT tokens
             tokens = RefreshToken.for_user(user)
             return Response({
                 "access": str(tokens.access_token),
-                "refresh": str(tokens)
-            })
+                "refresh": str(tokens),
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "is_email_verified": user.is_email_verified
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            # Token is expired or invalid format
+            logger.error(f"Invalid token format: {str(e)}")
+            return Response(
+                {"detail": "Invalid or expired Google token."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         except GoogleAuthError as e:
             logger.error(f"Google authentication error: {str(e)}")
             return Response(

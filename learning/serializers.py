@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption
+from .models import (
+    LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
+    LessonProgress, TestAttempt, TestAnswer
+)
 
 
 class LessonCategorySerializer(serializers.ModelSerializer):
@@ -14,7 +17,7 @@ class LessonListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'slug', 'category', 'category_name', 'lesson_type')
+        fields = ('id', 'title', 'slug', 'category', 'category_name', 'lesson_type', 'order', 'duration_minutes', 'is_published')
 
 
 class LessonDetailSerializer(serializers.ModelSerializer):
@@ -24,7 +27,7 @@ class LessonDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
         fields = ('id', 'title', 'slug', 'category', 'category_name', 
-                  'lesson_type', 'content', 'video_url')
+                  'lesson_type', 'content', 'video_url', 'order', 'duration_minutes', 'created_at')
 
 
 class TestCategorySerializer(serializers.ModelSerializer):
@@ -54,7 +57,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'order', 'points', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'order', 'points', 'answer_options')
 
 
 class QuestionDetailSerializer(serializers.ModelSerializer):
@@ -63,7 +66,7 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'order', 'points', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'order', 'points', 'answer_options')
 
 
 class TestListSerializer(serializers.ModelSerializer):
@@ -75,7 +78,8 @@ class TestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = ('id', 'title', 'lesson', 'lesson_title', 'test_category', 
-                  'test_category_name', 'is_demo', 'time_limit_seconds', 'question_count')
+                  'test_category_name', 'is_demo', 'time_limit_seconds', 'question_count',
+                  'passing_percentage', 'max_attempts')
     
     def get_question_count(self, obj):
         return obj.questions.count()
@@ -91,7 +95,7 @@ class TestDetailSerializer(serializers.ModelSerializer):
         model = Test
         fields = ('id', 'title', 'description', 'lesson', 'lesson_title', 
                   'test_category', 'test_category_name', 'time_limit_seconds', 
-                  'is_demo', 'questions')
+                  'is_demo', 'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers')
 
 
 class TestSubmissionSerializer(serializers.Serializer):
@@ -115,3 +119,48 @@ class TestResultSerializer(serializers.Serializer):
     passed = serializers.BooleanField()
     questions = QuestionDetailSerializer(many=True)
     user_answers = serializers.DictField()
+
+
+class LessonProgressSerializer(serializers.ModelSerializer):
+    """Serializer for lesson progress tracking"""
+    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+    
+    class Meta:
+        model = LessonProgress
+        fields = ('id', 'user', 'lesson', 'lesson_title', 'completed', 'completed_at', 'started_at', 'updated_at')
+        read_only_fields = ('user', 'started_at', 'updated_at')
+
+
+class TestAnswerSerializer(serializers.ModelSerializer):
+    """Serializer for individual test answers"""
+    question_text = serializers.CharField(source='question.text', read_only=True)
+    selected_option_text = serializers.CharField(source='selected_option.text', read_only=True)
+    
+    class Meta:
+        model = TestAnswer
+        fields = ('id', 'question', 'question_text', 'selected_option', 'selected_option_text', 'is_correct')
+
+
+class TestAttemptSerializer(serializers.ModelSerializer):
+    """Serializer for test attempts"""
+    test_title = serializers.CharField(source='test.title', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    answers = TestAnswerSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = TestAttempt
+        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'score', 'total_points', 
+                  'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at', 'answers')
+        read_only_fields = ('user', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')
+
+
+class TestAttemptListSerializer(serializers.ModelSerializer):
+    """Serializer for listing test attempts (without detailed answers)"""
+    test_title = serializers.CharField(source='test.title', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = TestAttempt
+        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'score', 'total_points', 
+                  'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at')
+        read_only_fields = ('user', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')

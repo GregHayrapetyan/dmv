@@ -80,6 +80,8 @@ A comprehensive Django REST API for a DMV (Department of Motor Vehicles) test pr
    # Google OAuth (optional)
    GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
    ```
+   
+   **For detailed Google OAuth setup instructions, see [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md)**
 
 5. **Run migrations**
    ```bash
@@ -252,12 +254,22 @@ curl -X GET http://localhost:8000/api/learning/lessons/ \
 ```bash
 curl -X POST http://localhost:8000/api/learning/tests/1/submit/ \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-access-token>" \
   -d '{
     "answers": {
       "1": 3,
       "2": 7,
       "3": 11
     }
+  }'
+```
+
+### Google OAuth Login
+```bash
+curl -X POST http://localhost:8000/api/accounts/google/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
   }'
 ```
 

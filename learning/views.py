@@ -2,11 +2,17 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from .models import LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption
+from django.utils import timezone
+from decimal import Decimal
+from .models import (
+    LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
+    LessonProgress, TestAttempt, TestAnswer
+)
 from .serializers import (
     LessonCategorySerializer, LessonListSerializer, LessonDetailSerializer,
     TestCategorySerializer, TestListSerializer, TestDetailSerializer,
-    TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer
+    TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
+    LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer
 )
 import logging
 
@@ -80,7 +86,7 @@ class TestDetailView(generics.RetrieveAPIView):
 
 class TestSubmitView(APIView):
     """Submit answers for a test and get results"""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request, pk):
         test = get_object_or_404(
@@ -88,44 +94,156 @@ class TestSubmitView(APIView):
             pk=pk
         )
         
+        # Check max attempts if configured
+        if test.max_attempts:
+            attempt_count = TestAttempt.objects.filter(user=request.user, test=test).count()
+            if attempt_count >= test.max_attempts:
+                return Response(
+                    {'error': f'Maximum attempts ({test.max_attempts}) reached for this test'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
         serializer = TestSubmissionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         answers = serializer.validated_data['answers']
+        time_taken = request.data.get('time_taken_seconds', None)
         
         # Calculate score
         score = 0
         total_points = 0
-        results = []
+        answer_records = []
         
         questions = test.questions.all()
         for question in questions:
             total_points += question.points
             user_answer_id = answers.get(str(question.id))
             
+            selected_option = None
+            is_correct = False
+            
             if user_answer_id:
                 try:
-                    selected_answer = question.answer_options.get(id=user_answer_id)
-                    if selected_answer.is_correct:
+                    selected_option = question.answer_options.get(id=user_answer_id)
+                    is_correct = selected_option.is_correct
+                    if is_correct:
                         score += question.points
                 except AnswerOption.DoesNotExist:
                     logger.warning(f"Invalid answer option {user_answer_id} for question {question.id}")
+            
+            answer_records.append({
+                'question': question,
+                'selected_option': selected_option,
+                'is_correct': is_correct
+            })
         
-        percentage = (score / total_points * 100) if total_points > 0 else 0
-        passed = percentage >= 70  # 70% passing grade
+        percentage = Decimal(score / total_points * 100) if total_points > 0 else Decimal(0)
+        passed = percentage >= test.passing_percentage
+        
+        # Create test attempt record
+        test_attempt = TestAttempt.objects.create(
+            user=request.user,
+            test=test,
+            score=score,
+            total_points=total_points,
+            percentage=percentage,
+            passed=passed,
+            time_taken_seconds=time_taken,
+            completed_at=timezone.now()
+        )
+        
+        # Create answer records
+        for answer_data in answer_records:
+            TestAnswer.objects.create(
+                attempt=test_attempt,
+                question=answer_data['question'],
+                selected_option=answer_data['selected_option'],
+                is_correct=answer_data['is_correct']
+            )
         
         # Prepare detailed results
         question_serializer = QuestionDetailSerializer(questions, many=True)
         
         result_data = {
+            'attempt_id': test_attempt.id,
             'score': score,
             'total_points': total_points,
-            'percentage': round(percentage, 2),
+            'percentage': float(percentage),
             'passed': passed,
             'questions': question_serializer.data,
             'user_answers': answers
         }
         
-        logger.info(f"Test {test.id} submitted. Score: {score}/{total_points} ({percentage:.2f}%)")
+        logger.info(f"Test {test.id} submitted by {request.user.email}. Score: {score}/{total_points} ({percentage:.2f}%)")
         
         return Response(result_data, status=status.HTTP_200_OK)
+
+
+class LessonProgressView(APIView):
+    """Mark a lesson as started or completed"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, lesson_id):
+        lesson = get_object_or_404(Lesson, pk=lesson_id)
+        completed = request.data.get('completed', False)
+        
+        progress, created = LessonProgress.objects.get_or_create(
+            user=request.user,
+            lesson=lesson,
+            defaults={'completed': completed}
+        )
+        
+        if not created:
+            progress.completed = completed
+            if completed and not progress.completed_at:
+                progress.completed_at = timezone.now()
+            progress.save()
+        elif completed:
+            progress.completed_at = timezone.now()
+            progress.save()
+        
+        serializer = LessonProgressSerializer(progress)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserLessonProgressListView(generics.ListAPIView):
+    """List all lesson progress for the authenticated user"""
+    serializer_class = LessonProgressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        return LessonProgress.objects.filter(user=self.request.user).select_related('lesson', 'lesson__category')
+
+
+class UserTestAttemptsListView(generics.ListAPIView):
+    """List all test attempts for the authenticated user"""
+    serializer_class = TestAttemptListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = TestAttempt.objects.filter(user=self.request.user).select_related('test', 'test__lesson')
+        
+        # Optional filter by test
+        test_id = self.request.query_params.get('test', None)
+        if test_id:
+            queryset = queryset.filter(test_id=test_id)
+        
+        # Optional filter by passed status
+        passed = self.request.query_params.get('passed', None)
+        if passed is not None:
+            queryset = queryset.filter(passed=passed.lower() == 'true')
+        
+        return queryset.order_by('-started_at')
+
+
+class TestAttemptDetailView(generics.RetrieveAPIView):
+    """Get detailed results of a specific test attempt"""
+    serializer_class = TestAttemptSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        # Users can only view their own attempts
+        return TestAttempt.objects.filter(user=self.request.user).prefetch_related(
+            'answers__question',
+            'answers__selected_option'
+        ).select_related('test')
