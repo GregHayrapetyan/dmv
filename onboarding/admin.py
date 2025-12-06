@@ -1,8 +1,16 @@
 from django.contrib import admin
-
-from django.contrib import admin
 from .models import State, Profile
 
 
-admin.site.register(State)
-admin.site.register(Profile)
+@admin.register(State)
+class StateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'state', 'vehicle', 'knowledge')
+    list_filter = ('vehicle', 'knowledge', 'state')
+    search_fields = ('user__email',)
+    raw_id_fields = ('user',)

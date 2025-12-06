@@ -11,8 +11,10 @@ class StateListView(generics.ListAPIView):
 
 class ProfileRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = ProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
+        # Profile should already exist via signals, but get_or_create as fallback
         profile, _ = Profile.objects.get_or_create(user=self.request.user)
         return profile
 

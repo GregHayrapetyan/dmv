@@ -1,5 +1,42 @@
 __pycache__/
-*.pyc\.venv
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
 venv/
+.venv
+env/
+ENV/
+
+# Environment variables
+.env
 .envrc
+
+# Database
+db.sqlite3
+*.db
+
+# IDE
 .idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Static and Media files
+/staticfiles/
+/media/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

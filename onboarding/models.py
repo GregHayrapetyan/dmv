@@ -1,7 +1,5 @@
 from django.db import models
-
 from django.conf import settings
-from django.db import models
 
 class State(models.Model):
     name = models.CharField(max_length=80, unique=True)
@@ -24,3 +22,6 @@ class Profile(models.Model):
     state = models.ForeignKey(State, null=True, blank=True, on_delete=models.SET_NULL)
     vehicle = models.CharField(max_length=20, choices=Vehicle.choices, null=True, blank=True)
     knowledge = models.CharField(max_length=20, choices=Knowledge.choices, null=True, blank=True)
+
+    def __str__(self):
+        return f"Profile for {self.user.email}"

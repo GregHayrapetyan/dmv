@@ -5,7 +5,10 @@ from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 import secrets
+import logging
 from .models import EmailOTP
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -15,11 +18,17 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "username", "phone", "email", "password", "repeat_password")
+        fields = ("first_name", "last_name", "phone", "email", "password", "repeat_password")
 
     def validate(self, attrs):
         if attrs["password"] != attrs["repeat_password"]:
             raise serializers.ValidationError({"repeat_password": "Passwords do not match"})
+        
+        # Check if email already exists and is verified
+        email = attrs.get("email")
+        if email and User.objects.filter(email=email, is_email_verified=True).exists():
+            raise serializers.ValidationError({"email": "This email is already registered and verified."})
+        
         return attrs
 
     def create(self, validated_data):
@@ -33,14 +42,18 @@ class RegisterSerializer(serializers.ModelSerializer):
             purpose="verify_email",
             expires_at=timezone.now() + timedelta(minutes=10),
         )
-        send_mail(
-            "Verify your email",
-            f"Your verification code is: {code}",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-        print(code)
+        try:
+            send_mail(
+                "Verify your email",
+                f"Your verification code is: {code}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            logger.info(f"Verification email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+            raise serializers.ValidationError("Failed to send verification email. Please try again.")
         return user
 
 class LoginSerializer(serializers.Serializer):
@@ -84,11 +97,11 @@ class ConfirmEmailSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=attrs["email"])
         except User.DoesNotExist:
-            raise serializers.ValidationError("User not found")
+            raise serializers.ValidationError("Invalid email or code")
         try:
             otp = EmailOTP.objects.filter(user=user, purpose="verify_email").latest("created_at")
         except EmailOTP.DoesNotExist:
-            raise serializers.ValidationError("No verification code found")
+            raise serializers.ValidationError("Invalid email or code")
         if otp.code != attrs["code"] or not otp.is_valid():
             raise serializers.ValidationError("Invalid or expired code")
         attrs["user"] = user
@@ -111,21 +124,32 @@ class RequestPasswordResetSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=attrs["email"])
         except User.DoesNotExist:
-            raise serializers.ValidationError("Email not found")
+            # Don't reveal if email exists or not for security
+            raise serializers.ValidationError("If this email exists, a reset code will be sent.")
         attrs["user"] = user
         return attrs
 
     def save(self, **kwargs):
         user = self.validated_data["user"]
         code = f"{secrets.randbelow(10**6):06d}"
-        print(code)
         EmailOTP.objects.create(
             user=user,
             code=code,
             purpose="reset_password",
             expires_at=timezone.now() + timedelta(minutes=10),
         )
-        send_mail("Reset password", f"Code: {code}", settings.DEFAULT_FROM_EMAIL, [user.email])
+        try:
+            send_mail(
+                "Reset password",
+                f"Your password reset code is: {code}",
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+            logger.info(f"Password reset email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
+            raise serializers.ValidationError("Failed to send reset email. Please try again.")
 
 
 class ResetPasswordSerializer(serializers.Serializer):
@@ -137,11 +161,11 @@ class ResetPasswordSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=attrs["email"])
         except User.DoesNotExist:
-            raise serializers.ValidationError("User not found")
+            raise serializers.ValidationError("Invalid email or code")
         try:
             otp = EmailOTP.objects.filter(user=user, purpose="reset_password").latest("created_at")
         except EmailOTP.DoesNotExist:
-            raise serializers.ValidationError("No reset code found")
+            raise serializers.ValidationError("Invalid email or code")
         if otp.code != attrs["code"] or not otp.is_valid():
             raise serializers.ValidationError("Invalid or expired code")
         attrs["user"] = user
