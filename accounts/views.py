@@ -441,7 +441,7 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
 
     @extend_schema(
         summary="Update current user",
-        description="Update the authenticated user's profile. Can update first_name, last_name, and phone.",
+        description="Update the authenticated user's profile. Can update first_name, last_name, and phone. Supports partial updates.",
         request=UserSerializer,
         responses={
             200: UserSerializer,
@@ -451,21 +451,8 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
         tags=["User Profile"],
     )
     def put(self, request, *args, **kwargs):
-        return super().put(request, *args, **kwargs)
-
-    @extend_schema(
-        summary="Partially update current user",
-        description="Partially update the authenticated user's profile.",
-        request=UserSerializer,
-        responses={
-            200: UserSerializer,
-            400: OpenApiResponse(description="Validation error"),
-            401: OpenApiResponse(description="Authentication required"),
-        },
-        tags=["User Profile"],
-    )
-    def patch(self, request, *args, **kwargs):
-        return super().patch(request, *args, **kwargs)
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
 
     def get_object(self):
         return self.request.user
