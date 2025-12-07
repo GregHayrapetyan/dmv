@@ -205,12 +205,12 @@ SIMPLE_JWT = {
 }
 
 # CORS settings (adjust for production)
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv()
-)
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "https://mytestdmv.com",
+    "https://www.mytestdmv.com",
+    "https://api.mytestdmv.com",
+]
+CORS_ALLOW_ALL_ORIGINS=True
 
 # Cookie security settings
 SESSION_COOKIE_SECURE = DEBUG  # HTTPS only in production
