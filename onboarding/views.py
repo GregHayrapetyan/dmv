@@ -81,7 +81,7 @@ class ProfileRetrieveUpdateView(StandardizedResponseMixin, generics.RetrieveUpda
     Profile is automatically created when user registers.
     """
     serializer_class = ProfileSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
         summary="Get user profile",
