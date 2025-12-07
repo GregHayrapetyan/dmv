@@ -25,10 +25,8 @@ class StandardizedResponseMixin:
                 return response
             
             # Wrap the response
-            message = self.get_success_message(request, response)
             wrapped_response = APIResponse.success(
                 data=response.data,
-                message=message,
                 status_code=response.status_code
             )
             
@@ -37,23 +35,3 @@ class StandardizedResponseMixin:
             response.status_code = wrapped_response.status_code
         
         return response
-    
-    def get_success_message(self, request, response):
-        """
-        Get the success message for the response.
-        Override this method in views to customize messages.
-        """
-        # Default messages based on HTTP method and status
-        if request.method == 'GET':
-            if response.status_code == status.HTTP_200_OK:
-                return "Data retrieved successfully"
-        elif request.method == 'POST':
-            if response.status_code == status.HTTP_201_CREATED:
-                return "Resource created successfully"
-            return "Operation completed successfully"
-        elif request.method in ['PUT', 'PATCH']:
-            return "Resource updated successfully"
-        elif request.method == 'DELETE':
-            return "Resource deleted successfully"
-        
-        return "Success"

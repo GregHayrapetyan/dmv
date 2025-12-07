@@ -7,18 +7,8 @@ All API responses should use these utilities to ensure uniformity across the app
 Response Structure:
 {
     "success": true/false,
-    "message": "Human-readable message",
-    "data": {...} or [...],  # Only present on success
-    "error": {               # Only present on failure
-        "code": "ERROR_CODE",
-        "message": "Error message",
-        "details": {...}     # Optional additional error details
-    },
-    "meta": {                # Optional metadata
-        "timestamp": "ISO 8601 timestamp",
-        "version": "v1",
-        ...
-    }
+    "error": null or "Error message string",
+    "data": {...} or [...] or null
 }
 """
 
@@ -30,8 +20,6 @@ from typing import Any, Dict, Optional
 
 class APIResponse:
     """Standardized API response builder"""
-    
-    API_VERSION = "v1"
     
     @staticmethod
     def success(
@@ -45,35 +33,23 @@ class APIResponse:
         
         Args:
             data: The response data (dict, list, or serializer data)
-            message: Success message
+            message: Success message (deprecated, kept for backward compatibility)
             status_code: HTTP status code (default: 200)
-            meta: Optional metadata dictionary
+            meta: Optional metadata dictionary (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with standardized success structure
             
         Example:
             return APIResponse.success(
-                data={"user": user_data},
-                message="User retrieved successfully"
+                data={"user": user_data}
             )
         """
         response_data = {
             "success": True,
-            "message": message,
+            "error": None,
             "data": data,
         }
-        
-        # Add metadata
-        if meta is None:
-            meta = {}
-        
-        meta.update({
-            "timestamp": timezone.now().isoformat(),
-            "version": APIResponse.API_VERSION,
-        })
-        
-        response_data["meta"] = meta
         
         return Response(response_data, status=status_code)
     
@@ -90,10 +66,10 @@ class APIResponse:
         
         Args:
             message: Error message
-            error_code: Machine-readable error code (e.g., "VALIDATION_ERROR", "NOT_FOUND")
+            error_code: Machine-readable error code (deprecated, kept for backward compatibility)
             status_code: HTTP status code (default: 400)
-            details: Optional additional error details (e.g., field-specific errors)
-            meta: Optional metadata dictionary
+            details: Optional additional error details (deprecated, kept for backward compatibility)
+            meta: Optional metadata dictionary (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with standardized error structure
@@ -101,32 +77,14 @@ class APIResponse:
         Example:
             return APIResponse.error(
                 message="Invalid credentials",
-                error_code="INVALID_CREDENTIALS",
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
         """
         response_data = {
             "success": False,
-            "message": message,
-            "error": {
-                "code": error_code,
-                "message": message,
-            }
+            "error": message,
+            "data": None,
         }
-        
-        if details:
-            response_data["error"]["details"] = details
-        
-        # Add metadata
-        if meta is None:
-            meta = {}
-        
-        meta.update({
-            "timestamp": timezone.now().isoformat(),
-            "version": APIResponse.API_VERSION,
-        })
-        
-        response_data["meta"] = meta
         
         return Response(response_data, status=status_code)
     
@@ -141,17 +99,15 @@ class APIResponse:
         
         Args:
             data: The created resource data
-            message: Success message
-            meta: Optional metadata dictionary
+            message: Success message (deprecated, kept for backward compatibility)
+            meta: Optional metadata dictionary (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 201 status
         """
         return APIResponse.success(
             data=data,
-            message=message,
-            status_code=status.HTTP_201_CREATED,
-            meta=meta
+            status_code=status.HTTP_201_CREATED
         )
     
     @staticmethod
@@ -163,17 +119,15 @@ class APIResponse:
         Create a 204 No Content response.
         
         Args:
-            message: Success message
-            meta: Optional metadata dictionary
+            message: Success message (deprecated, kept for backward compatibility)
+            meta: Optional metadata dictionary (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 204 status
         """
         return APIResponse.success(
             data=None,
-            message=message,
-            status_code=status.HTTP_204_NO_CONTENT,
-            meta=meta
+            status_code=status.HTTP_204_NO_CONTENT
         )
     
     @staticmethod
@@ -186,16 +140,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            details: Field-specific validation errors
+            details: Field-specific validation errors (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 400 status
         """
         return APIResponse.error(
             message=message,
-            error_code="VALIDATION_ERROR",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details=details
+            status_code=status.HTTP_400_BAD_REQUEST
         )
     
     @staticmethod
@@ -208,17 +160,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            resource_type: Type of resource that wasn't found
+            resource_type: Type of resource that wasn't found (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 404 status
         """
-        details = {"resource_type": resource_type} if resource_type else None
         return APIResponse.error(
             message=message,
-            error_code="NOT_FOUND",
-            status_code=status.HTTP_404_NOT_FOUND,
-            details=details
+            status_code=status.HTTP_404_NOT_FOUND
         )
     
     @staticmethod
@@ -231,16 +180,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            details: Optional additional details
+            details: Optional additional details (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 401 status
         """
         return APIResponse.error(
             message=message,
-            error_code="UNAUTHORIZED",
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            details=details
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
     
     @staticmethod
@@ -253,16 +200,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            details: Optional additional details
+            details: Optional additional details (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 403 status
         """
         return APIResponse.error(
             message=message,
-            error_code="FORBIDDEN",
-            status_code=status.HTTP_403_FORBIDDEN,
-            details=details
+            status_code=status.HTTP_403_FORBIDDEN
         )
     
     @staticmethod
@@ -275,16 +220,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            details: Optional additional details
+            details: Optional additional details (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 500 status
         """
         return APIResponse.error(
             message=message,
-            error_code="INTERNAL_SERVER_ERROR",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            details=details
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
     @staticmethod
@@ -297,16 +240,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            details: Optional additional details
+            details: Optional additional details (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 503 status
         """
         return APIResponse.error(
             message=message,
-            error_code="SERVICE_UNAVAILABLE",
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            details=details
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE
         )
     
     @staticmethod
@@ -319,16 +260,14 @@ class APIResponse:
         
         Args:
             message: Error message
-            details: Optional additional details (e.g., retry_after)
+            details: Optional additional details (deprecated, kept for backward compatibility)
             
         Returns:
             Response object with 429 status
         """
         return APIResponse.error(
             message=message,
-            error_code="TOO_MANY_REQUESTS",
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            details=details
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS
         )
 
 
