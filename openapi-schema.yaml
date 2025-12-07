@@ -1,0 +1,1811 @@
+openapi: 3.0.3
+info:
+  title: MyTest DMV API
+  version: 1.0.0
+  description: Auth + Onboarding + Learning backend for DMV prep app
+paths:
+  /api/accounts/email/confirm/:
+    post:
+      operationId: accounts_email_confirm_create
+      description: Verify email with the 6-digit code sent during registration. Code
+        expires in 10 minutes.
+      summary: Confirm email address
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmEmail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfirmEmail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfirmEmail'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Email confirmed successfully
+        '400':
+          description: Invalid or expired code
+  /api/accounts/google/:
+    post:
+      operationId: accounts_google_create
+      description: Authenticate using Google ID token. Creates new user if doesn't
+        exist. Email is automatically verified.
+      summary: Google OAuth login
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleLogin'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GoogleLogin'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GoogleLogin'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Authentication successful
+        '400':
+          description: Invalid token or email not verified by Google
+        '401':
+          description: Invalid or expired Google token
+        '503':
+          description: Google OAuth not configured on server
+  /api/accounts/login/:
+    post:
+      operationId: accounts_login_create
+      description: Authenticate with email/phone and password. Returns JWT access
+        and refresh tokens.
+      summary: Login user
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Login'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Login'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Login successful
+        '400':
+          description: Invalid credentials or inactive user
+  /api/accounts/me/:
+    get:
+      operationId: accounts_me_retrieve
+      description: Retrieve the authenticated user's profile information.
+      summary: Get current user
+      tags:
+      - User Profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '401':
+          description: Authentication required
+    put:
+      operationId: accounts_me_update
+      description: Update the authenticated user's profile. Can update first_name,
+        last_name, and phone.
+      summary: Update current user
+      tags:
+      - User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '400':
+          description: Validation error
+        '401':
+          description: Authentication required
+    patch:
+      operationId: accounts_me_partial_update
+      description: Partially update the authenticated user's profile.
+      summary: Partially update current user
+      tags:
+      - User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '400':
+          description: Validation error
+        '401':
+          description: Authentication required
+  /api/accounts/password/forgot/:
+    post:
+      operationId: accounts_password_forgot_create
+      description: Send a password reset code to the user's email. Rate limited to
+        5 requests per hour.
+      summary: Request password reset
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Reset code sent (or email doesn't exist - security measure)
+        '429':
+          description: Too many requests - rate limit exceeded
+  /api/accounts/password/reset/:
+    post:
+      operationId: accounts_password_reset_create
+      description: Reset password using the verification code sent to email. Code
+        expires in 10 minutes.
+      summary: Reset password
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Password updated successfully
+        '400':
+          description: Invalid or expired code, or password validation failed
+  /api/accounts/register/:
+    post:
+      operationId: accounts_register_create
+      description: |-
+        Register a new user account.
+
+        Creates a new user and sends a verification code to their email.
+        The user must verify their email before they can log in.
+      tags:
+      - accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Register'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Register'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Register'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+  /api/accounts/subscription/cancel/:
+    post:
+      operationId: accounts_subscription_cancel_create
+      description: Cancel the subscription at the end of the current billing period.
+        Access continues until period end.
+      summary: Cancel subscription
+      tags:
+      - Subscriptions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Subscription cancelled
+        '400':
+          description: No active subscription
+        '401':
+          description: Authentication required
+  /api/accounts/subscription/checkout/:
+    post:
+      operationId: accounts_subscription_checkout_create
+      description: Create a Stripe Checkout session to subscribe to premium content.
+      summary: Create subscription checkout session
+      tags:
+      - Subscriptions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price_id:
+                  type: string
+                  description: Stripe price ID
+                success_url:
+                  type: string
+                  description: URL to redirect after success
+                cancel_url:
+                  type: string
+                  description: URL to redirect if cancelled
+              required:
+              - price_id
+              - success_url
+              - cancel_url
+              example:
+                price_id: price_1234567890
+                success_url: https://yourapp.com/success
+                cancel_url: https://yourapp.com/cancel
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Checkout session created
+        '400':
+          description: Invalid request
+        '401':
+          description: Authentication required
+  /api/accounts/subscription/portal/:
+    post:
+      operationId: accounts_subscription_portal_create
+      description: Create a Stripe billing portal session to manage subscription (cancel,
+        update payment method, etc.).
+      summary: Create billing portal session
+      tags:
+      - Subscriptions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  description: URL to return to after portal session
+              required:
+              - return_url
+              example:
+                return_url: https://yourapp.com/account
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Portal session created
+        '400':
+          description: Invalid request or no subscription
+        '401':
+          description: Authentication required
+  /api/accounts/subscription/status/:
+    get:
+      operationId: accounts_subscription_status_retrieve
+      description: Retrieve the current subscription status for the authenticated
+        user.
+      summary: Get subscription status
+      tags:
+      - Subscriptions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+        '404':
+          description: No subscription found
+        '401':
+          description: Authentication required
+  /api/accounts/token/refresh/:
+    post:
+      operationId: accounts_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/learning/categories/:
+    get:
+      operationId: learning_categories_list
+      description: Retrieve all lesson categories. Used for filtering lessons by category.
+      summary: List lesson categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Lessons
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLessonCategoryList'
+          description: ''
+  /api/learning/lessons/:
+    get:
+      operationId: learning_lessons_list
+      description: Retrieve all lessons. Optionally filter by category ID.
+      summary: List lessons
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: integer
+        description: Filter lessons by category ID
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Lessons
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLessonListList'
+          description: ''
+  /api/learning/lessons/{lesson_id}/progress/:
+    post:
+      operationId: learning_lessons_progress_create
+      description: Mark a lesson as started or completed. Creates progress record
+        if it doesn't exist.
+      summary: Update lesson progress
+      parameters:
+      - in: path
+        name: lesson_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Progress
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                completed:
+                  type: boolean
+                  description: Whether the lesson is completed
+              example:
+                completed: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonProgress'
+          description: ''
+        '401':
+          description: Authentication required
+        '404':
+          description: Lesson not found
+  /api/learning/lessons/{slug}/:
+    get:
+      operationId: learning_lessons_retrieve
+      description: Retrieve full details of a specific lesson by its slug. Requires
+        active subscription.
+      summary: Get lesson detail
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - Lessons
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDetail'
+          description: ''
+        '403':
+          description: Active subscription required
+        '404':
+          description: Lesson not found
+  /api/learning/my-attempts/:
+    get:
+      operationId: learning_my_attempts_list
+      description: Retrieve all test attempts for the authenticated user. Can filter
+        by test ID or pass/fail status.
+      summary: Get my test attempts
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: passed
+        schema:
+          type: boolean
+        description: Filter by pass/fail status (true/false)
+      - in: query
+        name: test
+        schema:
+          type: integer
+        description: Filter by specific test ID
+      tags:
+      - Progress
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTestAttemptListList'
+          description: ''
+        '401':
+          description: Authentication required
+  /api/learning/my-attempts/{id}/:
+    get:
+      operationId: learning_my_attempts_retrieve
+      description: Retrieve detailed results of a specific test attempt. Includes
+        all answers and correctness. Users can only view their own attempts.
+      summary: Get test attempt details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Progress
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestAttempt'
+          description: ''
+        '401':
+          description: Authentication required
+        '404':
+          description: Attempt not found or doesn't belong to user
+  /api/learning/my-progress/:
+    get:
+      operationId: learning_my_progress_list
+      description: Retrieve all lesson progress records for the authenticated user.
+      summary: Get my lesson progress
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Progress
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLessonProgressList'
+          description: ''
+        '401':
+          description: Authentication required
+  /api/learning/test-categories/:
+    get:
+      operationId: learning_test_categories_list
+      description: Retrieve all test categories. Used for filtering tests by category.
+      summary: List test categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Tests
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTestCategoryList'
+          description: ''
+  /api/learning/tests/:
+    get:
+      operationId: learning_tests_list
+      description: Retrieve all tests. Can filter by category or demo status.
+      summary: List tests
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: integer
+        description: Filter tests by category ID
+      - in: query
+        name: demo
+        schema:
+          type: boolean
+        description: Filter by demo status (true/false)
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Tests
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTestListList'
+          description: ''
+  /api/learning/tests/{id}/:
+    get:
+      operationId: learning_tests_retrieve
+      description: Retrieve full test details with all questions and answer options.
+        Demo tests are free, premium tests require subscription.
+      summary: Get test detail
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Tests
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestDetail'
+          description: ''
+        '403':
+          description: Active subscription required for premium tests
+        '404':
+          description: Test not found
+  /api/learning/tests/{id}/submit/:
+    post:
+      operationId: learning_tests_submit_create
+      description: Submit answers for a test. Returns score, percentage, pass/fail
+        status, and correct answers. Requires authentication.
+      summary: Submit test answers
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Tests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestSubmission'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TestSubmission'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TestSubmission'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Test submitted successfully
+        '400':
+          description: Max attempts exceeded or validation error
+        '401':
+          description: Authentication required
+        '404':
+          description: Test not found
+  /api/onboarding/profile/:
+    get:
+      operationId: onboarding_profile_retrieve
+      description: Retrieve the authenticated user's onboarding profile. Profile is
+        auto-created if it doesn't exist.
+      summary: Get user profile
+      tags:
+      - Onboarding
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+          description: ''
+        '401':
+          description: Authentication required
+    put:
+      operationId: onboarding_profile_update
+      description: Update the authenticated user's onboarding profile. Can update
+        state, vehicle type, and knowledge level.
+      summary: Update user profile
+      tags:
+      - Onboarding
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Profile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Profile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Profile'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+          description: ''
+        '400':
+          description: Validation error
+        '401':
+          description: Authentication required
+    patch:
+      operationId: onboarding_profile_partial_update
+      description: Partially update the authenticated user's onboarding profile.
+      summary: Partially update user profile
+      tags:
+      - Onboarding
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProfile'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+          description: ''
+        '400':
+          description: Validation error
+        '401':
+          description: Authentication required
+  /api/onboarding/states/:
+    get:
+      operationId: onboarding_states_list
+      description: Retrieve a list of all US states available for user profile selection.
+      summary: List all states
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Onboarding
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStateList'
+          description: ''
+components:
+  schemas:
+    AnswerOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        text:
+          type: string
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Display order of the answer option
+      required:
+      - id
+      - text
+    BlankEnum:
+      enum:
+      - ''
+    ConfirmEmail:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          maxLength: 6
+      required:
+      - code
+      - email
+    GoogleLogin:
+      type: object
+      properties:
+        id_token:
+          type: string
+      required:
+      - id_token
+    KnowledgeEnum:
+      enum:
+      - very_well
+      - some_details
+      - average
+      - barely
+      type: string
+      description: |-
+        * `very_well` - I know them very well
+        * `some_details` - I know them but forgot some details
+        * `average` - I know them at an average level
+        * `barely` - I barely know them
+    LessonCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+      required:
+      - id
+      - name
+      - slug
+    LessonDetail:
+      type: object
+      description: Serializer for lesson detail view (with full content)
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        category:
+          type: integer
+        category_name:
+          type: string
+          readOnly: true
+        lesson_type:
+          $ref: '#/components/schemas/LessonTypeEnum'
+        content:
+          type: string
+        video_url:
+          type: string
+          format: uri
+          maxLength: 200
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Display order within category
+        duration_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Estimated duration in minutes
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - category
+      - category_name
+      - created_at
+      - id
+      - slug
+      - title
+    LessonList:
+      type: object
+      description: Serializer for listing lessons (without full content)
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        category:
+          type: integer
+        category_name:
+          type: string
+          readOnly: true
+        lesson_type:
+          $ref: '#/components/schemas/LessonTypeEnum'
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Display order within category
+        duration_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Estimated duration in minutes
+        is_published:
+          type: boolean
+      required:
+      - category
+      - category_name
+      - id
+      - slug
+      - title
+    LessonProgress:
+      type: object
+      description: Serializer for lesson progress tracking
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        lesson:
+          type: integer
+        lesson_title:
+          type: string
+          readOnly: true
+        completed:
+          type: boolean
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - lesson
+      - lesson_title
+      - started_at
+      - updated_at
+      - user
+    LessonTypeEnum:
+      enum:
+      - video
+      - theory
+      - mixed
+      type: string
+      description: |-
+        * `video` - Video
+        * `theory` - Theory
+        * `mixed` - Video + theory
+    Login:
+      type: object
+      properties:
+        identifier:
+          type: string
+          description: Email or phone
+        password:
+          type: string
+      required:
+      - identifier
+      - password
+    NullEnum:
+      enum:
+      - null
+    PaginatedLessonCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonCategory'
+    PaginatedLessonListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonList'
+    PaginatedLessonProgressList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonProgress'
+    PaginatedStateList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/State'
+    PaginatedTestAttemptListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestAttemptList'
+    PaginatedTestCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestCategory'
+    PaginatedTestListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestList'
+    PatchedProfile:
+      type: object
+      properties:
+        state:
+          type: integer
+          nullable: true
+        vehicle:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/VehicleEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        knowledge:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/KnowledgeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+    PatchedUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          nullable: true
+          pattern: ^[+0-9()\-\s]{7,20}$
+          maxLength: 20
+        is_email_verified:
+          type: boolean
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        has_active_subscription:
+          type: string
+          readOnly: true
+    Profile:
+      type: object
+      properties:
+        state:
+          type: integer
+          nullable: true
+        vehicle:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/VehicleEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        knowledge:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/KnowledgeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+    Question:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        text:
+          type: string
+        image:
+          type: string
+          format: uri
+          nullable: true
+          description: Image for the question (if any)
+        question_type:
+          $ref: '#/components/schemas/QuestionTypeEnum'
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Display order of the question in the test
+        points:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: How many points this question is worth
+        answer_options:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnswerOption'
+          readOnly: true
+      required:
+      - answer_options
+      - id
+      - text
+    QuestionTypeEnum:
+      enum:
+      - multiple_choice
+      - true_false
+      type: string
+      description: |-
+        * `multiple_choice` - Multiple Choice
+        * `true_false` - True/False
+    Register:
+      type: object
+      properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          nullable: true
+          pattern: ^[+0-9()\-\s]{7,20}$
+          maxLength: 20
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        repeat_password:
+          type: string
+          writeOnly: true
+      required:
+      - email
+      - password
+      - repeat_password
+    RequestPasswordReset:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+      - email
+    ResetPassword:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          maxLength: 6
+        new_password:
+          type: string
+          minLength: 8
+      required:
+      - code
+      - email
+      - new_password
+    State:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 80
+      required:
+      - id
+      - name
+    StatusEnum:
+      enum:
+      - active
+      - canceled
+      - past_due
+      - trialing
+      - incomplete
+      - incomplete_expired
+      - unpaid
+      type: string
+      description: |-
+        * `active` - Active
+        * `canceled` - Canceled
+        * `past_due` - Past Due
+        * `trialing` - Trialing
+        * `incomplete` - Incomplete
+        * `incomplete_expired` - Incomplete Expired
+        * `unpaid` - Unpaid
+    Subscription:
+      type: object
+      description: Serializer for subscription information.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        current_period_start:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        current_period_end:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        cancel_at_period_end:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cancel_at_period_end
+      - created_at
+      - current_period_end
+      - current_period_start
+      - id
+      - status
+      - updated_at
+    TestAnswer:
+      type: object
+      description: Serializer for individual test answers
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        question:
+          type: integer
+        question_text:
+          type: string
+          readOnly: true
+        selected_option:
+          type: integer
+          nullable: true
+          description: The answer option selected by the user (null if skipped)
+        selected_option_text:
+          type: string
+          readOnly: true
+        is_correct:
+          type: boolean
+      required:
+      - id
+      - is_correct
+      - question
+      - question_text
+      - selected_option_text
+    TestAttempt:
+      type: object
+      description: Serializer for test attempts
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        user_email:
+          type: string
+          readOnly: true
+        test:
+          type: integer
+        test_title:
+          type: string
+          readOnly: true
+        score:
+          type: integer
+          readOnly: true
+        total_points:
+          type: integer
+          readOnly: true
+        percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        passed:
+          type: boolean
+          readOnly: true
+        time_taken_seconds:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Time taken to complete the test in seconds
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestAnswer'
+          readOnly: true
+      required:
+      - answers
+      - completed_at
+      - id
+      - passed
+      - percentage
+      - score
+      - started_at
+      - test
+      - test_title
+      - total_points
+      - user
+      - user_email
+    TestAttemptList:
+      type: object
+      description: Serializer for listing test attempts (without detailed answers)
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        user_email:
+          type: string
+          readOnly: true
+        test:
+          type: integer
+        test_title:
+          type: string
+          readOnly: true
+        score:
+          type: integer
+          readOnly: true
+        total_points:
+          type: integer
+          readOnly: true
+        percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        passed:
+          type: boolean
+          readOnly: true
+        time_taken_seconds:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Time taken to complete the test in seconds
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - completed_at
+      - id
+      - passed
+      - percentage
+      - score
+      - started_at
+      - test
+      - test_title
+      - total_points
+      - user
+      - user_email
+    TestCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        lesson_category:
+          type: integer
+        lesson_category_name:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - lesson_category
+      - lesson_category_name
+      - name
+      - slug
+    TestDetail:
+      type: object
+      description: Serializer for taking a test
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        lesson:
+          type: integer
+        lesson_title:
+          type: string
+          readOnly: true
+        test_category:
+          type: integer
+        test_category_name:
+          type: string
+          readOnly: true
+        time_limit_seconds:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Time limit in seconds (if any)
+        is_demo:
+          type: boolean
+          description: Marks this test as a demo test
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+          readOnly: true
+        passing_percentage:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Percentage needed to pass (0-100)
+        shuffle_questions:
+          type: boolean
+          description: Randomize question order for each attempt
+        shuffle_answers:
+          type: boolean
+          description: Randomize answer order for each attempt
+      required:
+      - id
+      - lesson
+      - lesson_title
+      - questions
+      - test_category
+      - test_category_name
+      - title
+    TestList:
+      type: object
+      description: Serializer for listing tests
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        lesson:
+          type: integer
+        lesson_title:
+          type: string
+          readOnly: true
+        test_category:
+          type: integer
+        test_category_name:
+          type: string
+          readOnly: true
+        is_demo:
+          type: boolean
+          description: Marks this test as a demo test
+        time_limit_seconds:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Time limit in seconds (if any)
+        question_count:
+          type: string
+          readOnly: true
+        passing_percentage:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Percentage needed to pass (0-100)
+        max_attempts:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          description: Maximum allowed attempts (null = unlimited)
+      required:
+      - id
+      - lesson
+      - lesson_title
+      - question_count
+      - test_category
+      - test_category_name
+      - title
+    TestSubmission:
+      type: object
+      description: Serializer for submitting test answers
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Dictionary mapping question_id to selected answer_option_id
+      required:
+      - answers
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          nullable: true
+          pattern: ^[+0-9()\-\s]{7,20}$
+          maxLength: 20
+        is_email_verified:
+          type: boolean
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        has_active_subscription:
+          type: string
+          readOnly: true
+      required:
+      - date_joined
+      - email
+      - has_active_subscription
+      - id
+      - is_email_verified
+    VehicleEnum:
+      enum:
+      - car
+      - motorcycle
+      - cdl
+      type: string
+      description: |-
+        * `car` - Car
+        * `motorcycle` - Motorcycle
+        * `cdl` - CDL
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

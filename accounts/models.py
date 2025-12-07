@@ -64,3 +64,65 @@ class EmailOTP(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.purpose} - {self.code}"
+
+
+class Subscription(models.Model):
+    """User subscription model for managing Stripe subscriptions."""
+    
+    STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('canceled', 'Canceled'),
+        ('past_due', 'Past Due'),
+        ('trialing', 'Trialing'),
+        ('incomplete', 'Incomplete'),
+        ('incomplete_expired', 'Incomplete Expired'),
+        ('unpaid', 'Unpaid'),
+    )
+    
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='subscription'
+    )
+    stripe_customer_id = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Stripe customer ID"
+    )
+    stripe_subscription_id = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Stripe subscription ID"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='incomplete'
+    )
+    current_period_start = models.DateTimeField(null=True, blank=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    cancel_at_period_end = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Subscription"
+        verbose_name_plural = "Subscriptions"
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['stripe_customer_id']),
+            models.Index(fields=['stripe_subscription_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.status}"
+    
+    def is_active(self):
+        """Check if subscription is active or trialing."""
+        return self.status in ['active', 'trialing']
+    
+    def has_access(self):
+        """Check if user has access to premium content."""
+        return self.is_active() and self.current_period_end and self.current_period_end > timezone.now()

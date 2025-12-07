@@ -17,6 +17,8 @@ from .serializers import (
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer
 )
+from .permissions import HasActiveSubscriptionOrDemo
+from accounts.models import Subscription
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,23 +90,40 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     Get details of a specific lesson.
     
     Returns full lesson content including text, video URL, and metadata.
-    Accessed by lesson slug.
+    Accessed by lesson slug. Requires active subscription.
     """
     queryset = Lesson.objects.all().select_related('category')
     serializer_class = LessonDetailSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'slug'
 
     @extend_schema(
         summary="Get lesson detail",
-        description="Retrieve full details of a specific lesson by its slug.",
+        description="Retrieve full details of a specific lesson by its slug. Requires active subscription.",
         responses={
             200: LessonDetailSerializer,
+            403: OpenApiResponse(description="Active subscription required"),
             404: OpenApiResponse(description="Lesson not found"),
         },
         tags=["Lessons"],
     )
     def get(self, request, *args, **kwargs):
+        # Check if user has active subscription
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            if not subscription.has_access():
+                return APIResponse.error(
+                    message="Active subscription required to access lessons",
+                    error_code=ErrorCodes.PERMISSION_DENIED,
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
+        except Subscription.DoesNotExist:
+            return APIResponse.error(
+                message="Active subscription required to access lessons",
+                error_code=ErrorCodes.PERMISSION_DENIED,
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+        
         return super().get(request, *args, **kwargs)
 
 
@@ -190,6 +209,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     
     Returns complete test details including all questions and answer options.
     Used when a user starts taking a test. Correct answers are not revealed.
+    Demo tests are free, premium tests require subscription.
     """
     queryset = Test.objects.all().prefetch_related(
         'questions__answer_options'
@@ -199,14 +219,41 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
     @extend_schema(
         summary="Get test detail",
-        description="Retrieve full test details with all questions and answer options. Correct answers are not included.",
+        description="Retrieve full test details with all questions and answer options. Demo tests are free, premium tests require subscription.",
         responses={
             200: TestDetailSerializer,
+            403: OpenApiResponse(description="Active subscription required for premium tests"),
             404: OpenApiResponse(description="Test not found"),
         },
         tags=["Tests"],
     )
     def get(self, request, *args, **kwargs):
+        test = self.get_object()
+        
+        # Check if test is demo or user has subscription
+        if not test.is_demo:
+            if not request.user.is_authenticated:
+                return APIResponse.error(
+                    message="Authentication required for premium tests",
+                    error_code=ErrorCodes.AUTHENTICATION_REQUIRED,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            try:
+                subscription = Subscription.objects.get(user=request.user)
+                if not subscription.has_access():
+                    return APIResponse.error(
+                        message="Active subscription required to access this test",
+                        error_code=ErrorCodes.PERMISSION_DENIED,
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+            except Subscription.DoesNotExist:
+                return APIResponse.error(
+                    message="Active subscription required to access this test",
+                    error_code=ErrorCodes.PERMISSION_DENIED,
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
+        
         return super().get(request, *args, **kwargs)
 
 
@@ -262,6 +309,23 @@ class TestSubmitView(APIView):
             Test.objects.prefetch_related('questions__answer_options'),
             pk=pk
         )
+        
+        # Check if test is demo or user has subscription
+        if not test.is_demo:
+            try:
+                subscription = Subscription.objects.get(user=request.user)
+                if not subscription.has_access():
+                    return APIResponse.error(
+                        message="Active subscription required to submit this test",
+                        error_code=ErrorCodes.PERMISSION_DENIED,
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+            except Subscription.DoesNotExist:
+                return APIResponse.error(
+                    message="Active subscription required to submit this test",
+                    error_code=ErrorCodes.PERMISSION_DENIED,
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
         
         # Check max attempts if configured
         if test.max_attempts:

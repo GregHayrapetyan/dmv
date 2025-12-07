@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 import secrets
 import logging
-from .models import EmailOTP
+from .models import EmailOTP, Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,28 @@ class GoogleLoginSerializer(serializers.Serializer):
     id_token = serializers.CharField()
 
 class UserSerializer(serializers.ModelSerializer):
+    has_active_subscription = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined")
-        read_only_fields = ("id", "email", "is_email_verified", "date_joined")
+        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription")
+        read_only_fields = ("id", "email", "is_email_verified", "date_joined", "has_active_subscription")
+    
+    def get_has_active_subscription(self, obj):
+        """Check if user has an active subscription."""
+        try:
+            return obj.subscription.has_access()
+        except Subscription.DoesNotExist:
+            return False
+
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    """Serializer for subscription information."""
+    
+    class Meta:
+        model = Subscription
+        fields = (
+            'id', 'status', 'current_period_start', 'current_period_end',
+            'cancel_at_period_end', 'created_at', 'updated_at'
+        )
+        read_only_fields = fields
