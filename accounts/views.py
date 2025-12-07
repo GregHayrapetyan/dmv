@@ -488,52 +488,55 @@ class CookieTokenRefreshView(TokenRefreshView):
         tags=["Authentication"],
     )
     def post(self, request, *args, **kwargs):
-        # Get refresh token from cookie
-        refresh_token = request.COOKIES.get('refresh_token')
-        
-        if not refresh_token:
-            return APIResponse.error(
-                message="Refresh token not found",
-                error_code=ErrorCodes.AUTHENTICATION_FAILED,
-                status_code=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Add refresh token to request data
-        request.data._mutable = True if hasattr(request.data, '_mutable') else None
-        request.data['refresh'] = refresh_token
-        if request.data._mutable is not None:
-            request.data._mutable = False
-        
-        serializer = self.get_serializer(data=request.data)
-        
         try:
-            serializer.is_valid(raise_exception=True)
-        except InvalidToken:
-            return APIResponse.error(
-                message="Invalid or expired refresh token",
-                error_code=ErrorCodes.AUTHENTICATION_FAILED,
-                status_code=status.HTTP_401_UNAUTHORIZED
+            # Get refresh token from cookie
+            refresh_token = request.COOKIES.get('refresh_token')
+            
+            if not refresh_token:
+                return APIResponse.error(
+                    message="Refresh token not found",
+                    error_code=ErrorCodes.AUTHENTICATION_FAILED,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Create a new data dict with the refresh token
+            data = {'refresh': refresh_token}
+            
+            serializer = self.get_serializer(data=data)
+            
+            try:
+                serializer.is_valid(raise_exception=True)
+            except InvalidToken:
+                return APIResponse.error(
+                    message="Invalid or expired refresh token",
+                    error_code=ErrorCodes.AUTHENTICATION_FAILED,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Get new tokens
+            response = APIResponse.success(
+                data={"access": serializer.validated_data['access']},
+                message="Token refreshed successfully"
             )
-        
-        # Get new tokens
-        response = APIResponse.success(
-            data={"access": serializer.validated_data['access']},
-            message="Token refreshed successfully"
-        )
-        
-        # If rotation is enabled, update the refresh token cookie
-        if 'refresh' in serializer.validated_data:
-            response.set_cookie(
-                key='refresh_token',
-                value=serializer.validated_data['refresh'],
-                httponly=True,
-                secure=not settings.DEBUG,
-                samesite='Lax',
-                max_age=7*24*60*60,
-                path='/api/accounts/token/refresh/'
+            
+            # If rotation is enabled, update the refresh token cookie
+            if 'refresh' in serializer.validated_data:
+                response.set_cookie(
+                    key='refresh_token',
+                    value=serializer.validated_data['refresh'],
+                    httponly=True,
+                    secure=not settings.DEBUG,
+                    samesite='Lax',
+                    max_age=7*24*60*60,
+                    path='/api/accounts/token/refresh/'
+                )
+            
+            return response
+        except Exception as e:
+            logger.error(f"Unexpected error in token refresh: {str(e)}")
+            return APIResponse.server_error(
+                message="An unexpected error occurred"
             )
-        
-        return response
 
 
 class LogoutView(generics.GenericAPIView):
