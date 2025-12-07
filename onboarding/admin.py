@@ -1,9 +1,21 @@
 from django.contrib import admin
-from .models import State, Profile
+from .models import State, Vehicle, Knowledge, Profile
 
 
 @admin.register(State)
 class StateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
+@admin.register(Vehicle)
+class VehicleAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
+@admin.register(Knowledge)
+class KnowledgeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
 
