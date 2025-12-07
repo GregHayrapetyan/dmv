@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from decimal import Decimal
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from .models import (
     LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer
@@ -20,16 +21,57 @@ logger = logging.getLogger(__name__)
 
 
 class LessonCategoryListView(generics.ListAPIView):
-    """List all lesson categories"""
+    """
+    List all lesson categories.
+    
+    Returns all available lesson categories for organizing learning content.
+    No authentication required.
+    """
     queryset = LessonCategory.objects.all().order_by('name')
     serializer_class = LessonCategorySerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        summary="List lesson categories",
+        description="Retrieve all lesson categories. Used for filtering lessons by category.",
+        responses={
+            200: LessonCategorySerializer(many=True),
+        },
+        tags=["Lessons"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class LessonListView(generics.ListAPIView):
-    """List all lessons, optionally filtered by category"""
+    """
+    List all lessons, optionally filtered by category.
+    
+    Returns a list of lessons with basic information.
+    Can be filtered by category using query parameter.
+    """
     serializer_class = LessonListSerializer
     permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        summary="List lessons",
+        description="Retrieve all lessons. Optionally filter by category ID.",
+        parameters=[
+            OpenApiParameter(
+                name='category',
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description='Filter lessons by category ID',
+                required=False,
+            ),
+        ],
+        responses={
+            200: LessonListSerializer(many=True),
+        },
+        tags=["Lessons"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
         queryset = Lesson.objects.all().select_related('category')
@@ -40,24 +82,89 @@ class LessonListView(generics.ListAPIView):
 
 
 class LessonDetailView(generics.RetrieveAPIView):
-    """Get details of a specific lesson"""
+    """
+    Get details of a specific lesson.
+    
+    Returns full lesson content including text, video URL, and metadata.
+    Accessed by lesson slug.
+    """
     queryset = Lesson.objects.all().select_related('category')
     serializer_class = LessonDetailSerializer
     permission_classes = [permissions.AllowAny]
     lookup_field = 'slug'
 
+    @extend_schema(
+        summary="Get lesson detail",
+        description="Retrieve full details of a specific lesson by its slug.",
+        responses={
+            200: LessonDetailSerializer,
+            404: OpenApiResponse(description="Lesson not found"),
+        },
+        tags=["Lessons"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class TestCategoryListView(generics.ListAPIView):
-    """List all test categories"""
+    """
+    List all test categories.
+    
+    Returns all available test categories for organizing tests.
+    No authentication required.
+    """
     queryset = TestCategory.objects.all().select_related('lesson_category').order_by('name')
     serializer_class = TestCategorySerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        summary="List test categories",
+        description="Retrieve all test categories. Used for filtering tests by category.",
+        responses={
+            200: TestCategorySerializer(many=True),
+        },
+        tags=["Tests"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class TestListView(generics.ListAPIView):
-    """List all tests, optionally filtered by category or demo status"""
+    """
+    List all tests, optionally filtered by category or demo status.
+    
+    Returns a list of tests with metadata including passing percentage,
+    max attempts, and question count.
+    """
     serializer_class = TestListSerializer
     permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        summary="List tests",
+        description="Retrieve all tests. Can filter by category or demo status.",
+        parameters=[
+            OpenApiParameter(
+                name='category',
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description='Filter tests by category ID',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='demo',
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description='Filter by demo status (true/false)',
+                required=False,
+            ),
+        ],
+        responses={
+            200: TestListSerializer(many=True),
+        },
+        tags=["Tests"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
         queryset = Test.objects.all().select_related('lesson', 'test_category')
@@ -76,18 +183,78 @@ class TestListView(generics.ListAPIView):
 
 
 class TestDetailView(generics.RetrieveAPIView):
-    """Get a test with all its questions (for taking the test)"""
+    """
+    Get a test with all its questions.
+    
+    Returns complete test details including all questions and answer options.
+    Used when a user starts taking a test. Correct answers are not revealed.
+    """
     queryset = Test.objects.all().prefetch_related(
         'questions__answer_options'
     ).select_related('lesson', 'test_category')
     serializer_class = TestDetailSerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        summary="Get test detail",
+        description="Retrieve full test details with all questions and answer options. Correct answers are not included.",
+        responses={
+            200: TestDetailSerializer,
+            404: OpenApiResponse(description="Test not found"),
+        },
+        tags=["Tests"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class TestSubmitView(APIView):
-    """Submit answers for a test and get results"""
+    """
+    Submit answers for a test and get results.
+    
+    Accepts a dictionary of answers (question_id: answer_option_id),
+    calculates the score, and returns detailed results including correct answers.
+    Enforces max attempts limit if configured.
+    """
     permission_classes = [permissions.IsAuthenticated]
     
+    @extend_schema(
+        summary="Submit test answers",
+        description="Submit answers for a test. Returns score, percentage, pass/fail status, and correct answers. Requires authentication.",
+        request=TestSubmissionSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Test submitted successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "attempt_id": 1,
+                            "score": 8,
+                            "total_points": 10,
+                            "percentage": 80.0,
+                            "passed": True,
+                            "questions": [
+                                {
+                                    "id": 1,
+                                    "text": "What does a red octagon sign mean?",
+                                    "answer_options": [
+                                        {"id": 1, "text": "Stop", "is_correct": True, "explanation": "Red octagon always means stop"},
+                                        {"id": 2, "text": "Yield", "is_correct": False, "explanation": ""}
+                                    ]
+                                }
+                            ],
+                            "user_answers": {"1": 1, "2": 5}
+                        },
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Max attempts exceeded or validation error"),
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Test not found"),
+        },
+        tags=["Tests"],
+    )
     def post(self, request, pk):
         test = get_object_or_404(
             Test.objects.prefetch_related('questions__answer_options'),
@@ -180,9 +347,33 @@ class TestSubmitView(APIView):
 
 
 class LessonProgressView(APIView):
-    """Mark a lesson as started or completed"""
+    """
+    Mark a lesson as started or completed.
+    
+    Creates or updates lesson progress for the authenticated user.
+    Used to track which lessons a user has started or completed.
+    """
     permission_classes = [permissions.IsAuthenticated]
     
+    @extend_schema(
+        summary="Update lesson progress",
+        description="Mark a lesson as started or completed. Creates progress record if it doesn't exist.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "completed": {"type": "boolean", "description": "Whether the lesson is completed"}
+                },
+                "example": {"completed": True}
+            }
+        },
+        responses={
+            200: LessonProgressSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Lesson not found"),
+        },
+        tags=["Progress"],
+    )
     def post(self, request, lesson_id):
         lesson = get_object_or_404(Lesson, pk=lesson_id)
         completed = request.data.get('completed', False)
@@ -207,18 +398,68 @@ class LessonProgressView(APIView):
 
 
 class UserLessonProgressListView(generics.ListAPIView):
-    """List all lesson progress for the authenticated user"""
+    """
+    List all lesson progress for the authenticated user.
+    
+    Returns all lessons the user has started or completed,
+    including completion status and timestamps.
+    """
     serializer_class = LessonProgressSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get my lesson progress",
+        description="Retrieve all lesson progress records for the authenticated user.",
+        responses={
+            200: LessonProgressSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Progress"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
         return LessonProgress.objects.filter(user=self.request.user).select_related('lesson', 'lesson__category')
 
 
 class UserTestAttemptsListView(generics.ListAPIView):
-    """List all test attempts for the authenticated user"""
+    """
+    List all test attempts for the authenticated user.
+    
+    Returns a history of all test attempts with scores and pass/fail status.
+    Can be filtered by specific test or pass/fail status.
+    """
     serializer_class = TestAttemptListSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get my test attempts",
+        description="Retrieve all test attempts for the authenticated user. Can filter by test ID or pass/fail status.",
+        parameters=[
+            OpenApiParameter(
+                name='test',
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description='Filter by specific test ID',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='passed',
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description='Filter by pass/fail status (true/false)',
+                required=False,
+            ),
+        ],
+        responses={
+            200: TestAttemptListSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Progress"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
         queryset = TestAttempt.objects.filter(user=self.request.user).select_related('test', 'test__lesson')
@@ -237,9 +478,28 @@ class UserTestAttemptsListView(generics.ListAPIView):
 
 
 class TestAttemptDetailView(generics.RetrieveAPIView):
-    """Get detailed results of a specific test attempt"""
+    """
+    Get detailed results of a specific test attempt.
+    
+    Returns complete details of a past test attempt including all questions,
+    user's answers, and whether each answer was correct.
+    Users can only view their own attempts.
+    """
     serializer_class = TestAttemptSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get test attempt details",
+        description="Retrieve detailed results of a specific test attempt. Includes all answers and correctness. Users can only view their own attempts.",
+        responses={
+            200: TestAttemptSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Attempt not found or doesn't belong to user"),
+        },
+        tags=["Progress"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
         # Users can only view their own attempts
