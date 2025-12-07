@@ -454,6 +454,14 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
 
+    @extend_schema(exclude=True)
+    def patch(self, request, *args, **kwargs):
+        return APIResponse.error(
+            message="PATCH method not allowed. Use PUT instead.",
+            error_code=ErrorCodes.METHOD_NOT_ALLOWED,
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
     def get_object(self):
         return self.request.user
 
