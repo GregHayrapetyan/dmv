@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
@@ -72,7 +75,7 @@ class LoginView(generics.GenericAPIView):
 
     @extend_schema(
         summary="Login user",
-        description="Authenticate with email/phone and password. Returns JWT access and refresh tokens.",
+        description="Authenticate with email/phone and password. Returns JWT access token and sets refresh token as httpOnly cookie.",
         request=LoginSerializer,
         responses={
             200: OpenApiResponse(
@@ -82,7 +85,13 @@ class LoginView(generics.GenericAPIView):
                         "Success",
                         value={
                             "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                            "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                            "user": {
+                                "id": 1,
+                                "email": "user@example.com",
+                                "first_name": "John",
+                                "last_name": "Doe",
+                                "is_email_verified": True
+                            }
                         },
                     )
                 ]
@@ -103,10 +112,10 @@ class LoginView(generics.GenericAPIView):
         user = ser.validated_data["user"]
         tokens = RefreshToken.for_user(user)
         logger.info(f"User logged in: {user.email}")
-        return APIResponse.success(
+        
+        response = APIResponse.success(
             data={
                 "access": str(tokens.access_token),
-                "refresh": str(tokens),
                 "user": {
                     "id": user.id,
                     "email": user.email,
@@ -117,6 +126,19 @@ class LoginView(generics.GenericAPIView):
             },
             message="Login successful"
         )
+        
+        # Set refresh token as httpOnly cookie
+        response.set_cookie(
+            key='refresh_token',
+            value=str(tokens),
+            httponly=True,
+            secure=not settings.DEBUG,  # True in production (HTTPS only)
+            samesite='Lax',
+            max_age=7*24*60*60,  # 7 days (match JWT_REFRESH_TOKEN_LIFETIME)
+            path='/api/accounts/token/refresh/'
+        )
+        
+        return response
 
 class RequestPasswordResetView(generics.GenericAPIView):
     """
@@ -347,10 +369,9 @@ class GoogleLoginView(generics.GenericAPIView):
             
             # Generate JWT tokens
             tokens = RefreshToken.for_user(user)
-            return APIResponse.success(
+            response = APIResponse.success(
                 data={
                     "access": str(tokens.access_token),
-                    "refresh": str(tokens),
                     "user": {
                         "id": user.id,
                         "email": user.email,
@@ -361,6 +382,19 @@ class GoogleLoginView(generics.GenericAPIView):
                 },
                 message="Google authentication successful"
             )
+            
+            # Set refresh token as httpOnly cookie
+            response.set_cookie(
+                key='refresh_token',
+                value=str(tokens),
+                httponly=True,
+                secure=not settings.DEBUG,
+                samesite='Lax',
+                max_age=7*24*60*60,
+                path='/api/accounts/token/refresh/'
+            )
+            
+            return response
             
         except ValueError as e:
             # Token is expired or invalid format
@@ -435,3 +469,118 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class CookieTokenRefreshView(TokenRefreshView):
+    """
+    Custom token refresh view that reads refresh token from httpOnly cookie.
+    
+    The refresh token is automatically sent via cookie, so clients don't need
+    to include it in the request body.
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        summary="Refresh access token",
+        description="Refresh the access token using the refresh token stored in httpOnly cookie. Returns a new access token and optionally a new refresh token (if rotation is enabled).",
+        request=None,  # No request body needed
+        responses={
+            200: OpenApiResponse(
+                description="Token refreshed successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                        },
+                    )
+                ]
+            ),
+            401: OpenApiResponse(description="Refresh token not found or invalid"),
+        },
+        tags=["Authentication"],
+    )
+    def post(self, request, *args, **kwargs):
+        # Get refresh token from cookie
+        refresh_token = request.COOKIES.get('refresh_token')
+        
+        if not refresh_token:
+            return APIResponse.error(
+                message="Refresh token not found",
+                error_code=ErrorCodes.AUTHENTICATION_FAILED,
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Add refresh token to request data
+        request.data._mutable = True if hasattr(request.data, '_mutable') else None
+        request.data['refresh'] = refresh_token
+        if request.data._mutable is not None:
+            request.data._mutable = False
+        
+        serializer = self.get_serializer(data=request.data)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except InvalidToken:
+            return APIResponse.error(
+                message="Invalid or expired refresh token",
+                error_code=ErrorCodes.AUTHENTICATION_FAILED,
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Get new tokens
+        response = APIResponse.success(
+            data={"access": serializer.validated_data['access']},
+            message="Token refreshed successfully"
+        )
+        
+        # If rotation is enabled, update the refresh token cookie
+        if 'refresh' in serializer.validated_data:
+            response.set_cookie(
+                key='refresh_token',
+                value=serializer.validated_data['refresh'],
+                httponly=True,
+                secure=not settings.DEBUG,
+                samesite='Lax',
+                max_age=7*24*60*60,
+                path='/api/accounts/token/refresh/'
+            )
+        
+        return response
+
+
+class LogoutView(generics.GenericAPIView):
+    """
+    Logout user by clearing the refresh token cookie.
+    
+    This invalidates the refresh token stored in the httpOnly cookie.
+    The client should also discard the access token.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Logout user",
+        description="Clear the refresh token cookie to logout the user. Client should also discard the access token.",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Logged out successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={"detail": "Logged out successfully"},
+                    )
+                ]
+            ),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Authentication"],
+    )
+    def post(self, request):
+        response = APIResponse.success(
+            data=None,
+            message="Logged out successfully"
+        )
+        response.delete_cookie('refresh_token', path='/api/accounts/token/refresh/')
+        logger.info(f"User logged out: {request.user.email}")
+        return response

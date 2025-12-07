@@ -212,6 +212,12 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# Cookie security settings
+SESSION_COOKIE_SECURE = DEBUG  # HTTPS only in production
+CSRF_COOKIE_SECURE = DEBUG  # HTTPS only in production
+SESSION_COOKIE_SAMESITE = 'Lax'  # or 'Strict' for more security
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 # Logging configuration
 LOGGING = {
     'version': 1,
