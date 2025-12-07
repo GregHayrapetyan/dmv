@@ -36,38 +36,77 @@ def custom_exception_handler(exc, context):
             message="An unexpected error occurred"
         )
     
+    # Extract clean error message from response data
+    error_message = _extract_error_message(response.data, exc)
+    
     # Now customize the response format for DRF exceptions
     if isinstance(exc, ValidationError):
         return APIResponse.validation_error(
-            message="Validation error",
-            details=response.data
+            message=error_message
         )
     
     elif isinstance(exc, NotFound):
         return APIResponse.not_found(
-            message=str(exc) if str(exc) else "Resource not found"
+            message=error_message
         )
     
     elif isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
         return APIResponse.unauthorized(
-            message=str(exc) if str(exc) else "Authentication required"
+            message=error_message
         )
     
     elif isinstance(exc, PermissionDenied):
         return APIResponse.forbidden(
-            message=str(exc) if str(exc) else "Permission denied"
+            message=error_message
         )
     
     elif isinstance(exc, Throttled):
         return APIResponse.too_many_requests(
-            message="Too many requests. Please try again later.",
-            details={"retry_after": exc.wait} if hasattr(exc, 'wait') else None
+            message=error_message
         )
     
     # For any other DRF exception, use generic error response
     return APIResponse.error(
-        message=str(exc) if str(exc) else "An error occurred",
-        error_code="ERROR",
-        status_code=response.status_code,
-        details=response.data if isinstance(response.data, dict) else {"detail": response.data}
+        message=error_message,
+        status_code=response.status_code
     )
+
+
+def _extract_error_message(data, exc):
+    """
+    Extract a clean error message from DRF response data.
+    
+    Handles various error formats including:
+    - Simple strings
+    - {'detail': 'message'}
+    - JWT token errors with nested structure
+    - Validation errors with field-specific messages
+    """
+    # If data is a string, return it
+    if isinstance(data, str):
+        return data
+    
+    # If data is a dict, try to extract the main message
+    if isinstance(data, dict):
+        # JWT token errors have a 'detail' field with the main message
+        if 'detail' in data:
+            detail = data['detail']
+            # Handle ErrorDetail objects (convert to string)
+            return str(detail)
+        
+        # For validation errors, try to create a meaningful message
+        if len(data) == 1:
+            key, value = next(iter(data.items()))
+            if isinstance(value, list) and len(value) > 0:
+                return f"{key}: {str(value[0])}"
+            return str(value)
+        
+        # Multiple field errors - return generic message
+        return "Validation error"
+    
+    # If data is a list, get the first error
+    if isinstance(data, list) and len(data) > 0:
+        return str(data[0])
+    
+    # Fallback to exception string
+    return str(exc) if str(exc) else "An error occurred"
