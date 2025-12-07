@@ -10,7 +10,6 @@ from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
     ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer,
 )
-from .throttling import OTPRateThrottle
 from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
@@ -29,11 +28,10 @@ class RegisterView(generics.CreateAPIView):
     """
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [OTPRateThrottle]
 
     @extend_schema(
         summary="Register new user",
-        description="Create a new user account and send email verification code. Rate limited to 5 requests per hour.",
+        description="Create a new user account and send email verification code.",
         request=RegisterSerializer,
         responses={
             201: OpenApiResponse(
@@ -46,7 +44,6 @@ class RegisterView(generics.CreateAPIView):
                 ]
             ),
             400: OpenApiResponse(description="Validation error (e.g., passwords don't match, email already exists)"),
-            429: OpenApiResponse(description="Too many requests - rate limit exceeded"),
         },
         tags=["Authentication"],
     )
@@ -149,11 +146,10 @@ class RequestPasswordResetView(generics.GenericAPIView):
     """
     serializer_class = RequestPasswordResetSerializer
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [OTPRateThrottle]
 
     @extend_schema(
         summary="Request password reset",
-        description="Send a password reset code to the user's email. Rate limited to 5 requests per hour.",
+        description="Send a password reset code to the user's email.",
         request=RequestPasswordResetSerializer,
         responses={
             200: OpenApiResponse(
@@ -165,7 +161,6 @@ class RequestPasswordResetView(generics.GenericAPIView):
                     )
                 ]
             ),
-            429: OpenApiResponse(description="Too many requests - rate limit exceeded"),
         },
         tags=["Authentication"],
     )
