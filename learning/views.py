@@ -5,6 +5,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from decimal import Decimal
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
+from dmv.api_response import APIResponse, ErrorCodes
+from dmv.api_mixins import StandardizedResponseMixin
 from .models import (
     LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer
@@ -20,7 +22,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class LessonCategoryListView(generics.ListAPIView):
+class LessonCategoryListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all lesson categories.
     
@@ -43,7 +45,7 @@ class LessonCategoryListView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class LessonListView(generics.ListAPIView):
+class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all lessons, optionally filtered by category.
     
@@ -81,7 +83,7 @@ class LessonListView(generics.ListAPIView):
         return queryset.order_by('category', 'id')
 
 
-class LessonDetailView(generics.RetrieveAPIView):
+class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     """
     Get details of a specific lesson.
     
@@ -106,7 +108,7 @@ class LessonDetailView(generics.RetrieveAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class TestCategoryListView(generics.ListAPIView):
+class TestCategoryListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all test categories.
     
@@ -129,7 +131,7 @@ class TestCategoryListView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class TestListView(generics.ListAPIView):
+class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all tests, optionally filtered by category or demo status.
     
@@ -182,7 +184,7 @@ class TestListView(generics.ListAPIView):
         return queryset.order_by('test_category', 'id')
 
 
-class TestDetailView(generics.RetrieveAPIView):
+class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     """
     Get a test with all its questions.
     
@@ -265,13 +267,18 @@ class TestSubmitView(APIView):
         if test.max_attempts:
             attempt_count = TestAttempt.objects.filter(user=request.user, test=test).count()
             if attempt_count >= test.max_attempts:
-                return Response(
-                    {'error': f'Maximum attempts ({test.max_attempts}) reached for this test'},
-                    status=status.HTTP_400_BAD_REQUEST
+                return APIResponse.error(
+                    message=f'Maximum attempts ({test.max_attempts}) reached for this test',
+                    error_code=ErrorCodes.MAX_ATTEMPTS_EXCEEDED,
+                    status_code=status.HTTP_400_BAD_REQUEST
                 )
         
         serializer = TestSubmissionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Invalid test submission",
+                details=serializer.errors
+            )
         
         answers = serializer.validated_data['answers']
         time_taken = request.data.get('time_taken_seconds', None)
@@ -343,7 +350,10 @@ class TestSubmitView(APIView):
         
         logger.info(f"Test {test.id} submitted by {request.user.email}. Score: {score}/{total_points} ({percentage:.2f}%)")
         
-        return Response(result_data, status=status.HTTP_200_OK)
+        return APIResponse.success(
+            data=result_data,
+            message="Test submitted successfully"
+        )
 
 
 class LessonProgressView(APIView):
@@ -394,10 +404,13 @@ class LessonProgressView(APIView):
             progress.save()
         
         serializer = LessonProgressSerializer(progress)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return APIResponse.success(
+            data=serializer.data,
+            message="Lesson progress updated successfully"
+        )
 
 
-class UserLessonProgressListView(generics.ListAPIView):
+class UserLessonProgressListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all lesson progress for the authenticated user.
     
@@ -423,7 +436,7 @@ class UserLessonProgressListView(generics.ListAPIView):
         return LessonProgress.objects.filter(user=self.request.user).select_related('lesson', 'lesson__category')
 
 
-class UserTestAttemptsListView(generics.ListAPIView):
+class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all test attempts for the authenticated user.
     
@@ -477,7 +490,7 @@ class UserTestAttemptsListView(generics.ListAPIView):
         return queryset.order_by('-started_at')
 
 
-class TestAttemptDetailView(generics.RetrieveAPIView):
+class TestAttemptDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     """
     Get detailed results of a specific test attempt.
     

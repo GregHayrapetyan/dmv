@@ -160,6 +160,7 @@ REST_FRAMEWORK = {
         "user": "1000/hour",
         "otp": "5/hour",  # Custom throttle for OTP endpoints
     },
+    "EXCEPTION_HANDLER": "dmv.exception_handler.custom_exception_handler",
 }
 
 

@@ -2,10 +2,11 @@ from django.shortcuts import render
 
 from rest_framework import generics, permissions
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+from dmv.api_mixins import StandardizedResponseMixin
 from .models import State, Profile
 from .serializers import StateSerializer, ProfileSerializer
 
-class StateListView(generics.ListAPIView):
+class StateListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all US states.
     
@@ -27,7 +28,7 @@ class StateListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-class ProfileRetrieveUpdateView(generics.RetrieveUpdateAPIView):
+class ProfileRetrieveUpdateView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     """
     Get or update user profile.
     

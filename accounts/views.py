@@ -9,6 +9,8 @@ from .serializers import (
 )
 from .throttling import OTPRateThrottle
 from django.conf import settings
+from dmv.api_response import APIResponse, ErrorCodes
+from dmv.api_mixins import StandardizedResponseMixin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,13 +49,15 @@ class RegisterView(generics.CreateAPIView):
     )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Registration validation failed",
+                details=serializer.errors
+            )
         self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(
-            {"detail": "Registration successful. Please check your email for verification code."},
-            status=status.HTTP_201_CREATED,
-            headers=headers
+        return APIResponse.created(
+            data=None,
+            message="Registration successful. Please check your email for verification code."
         )
 
 class LoginView(generics.GenericAPIView):
@@ -89,14 +93,30 @@ class LoginView(generics.GenericAPIView):
     )
     def post(self, request):
         ser = self.get_serializer(data=request.data)
-        ser.is_valid(raise_exception=True)
+        if not ser.is_valid():
+            return APIResponse.error(
+                message="Invalid credentials",
+                error_code=ErrorCodes.INVALID_CREDENTIALS,
+                status_code=status.HTTP_400_BAD_REQUEST,
+                details=ser.errors
+            )
         user = ser.validated_data["user"]
         tokens = RefreshToken.for_user(user)
         logger.info(f"User logged in: {user.email}")
-        return Response({
-            "access": str(tokens.access_token),
-            "refresh": str(tokens),
-        })
+        return APIResponse.success(
+            data={
+                "access": str(tokens.access_token),
+                "refresh": str(tokens),
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "is_email_verified": user.is_email_verified
+                }
+            },
+            message="Login successful"
+        )
 
 class RequestPasswordResetView(generics.GenericAPIView):
     """
@@ -129,9 +149,16 @@ class RequestPasswordResetView(generics.GenericAPIView):
     )
     def post(self, request):
         ser = self.get_serializer(data=request.data)
-        ser.is_valid(raise_exception=True)
+        if not ser.is_valid():
+            return APIResponse.validation_error(
+                message="Validation failed",
+                details=ser.errors
+            )
         ser.save()
-        return Response({"detail": "If this email exists, a reset code has been sent."})
+        return APIResponse.success(
+            data=None,
+            message="If this email exists, a reset code has been sent."
+        )
 
 class ConfirmEmailView(generics.GenericAPIView):
     """
@@ -162,9 +189,16 @@ class ConfirmEmailView(generics.GenericAPIView):
     )
     def post(self, request):
         ser = self.get_serializer(data=request.data)
-        ser.is_valid(raise_exception=True)
+        if not ser.is_valid():
+            return APIResponse.validation_error(
+                message="Email confirmation failed",
+                details=ser.errors
+            )
         ser.save()
-        return Response({"detail": "Email confirmed"})
+        return APIResponse.success(
+            data=None,
+            message="Email confirmed successfully"
+        )
 
 class ResetPasswordView(generics.GenericAPIView):
     """
@@ -195,9 +229,16 @@ class ResetPasswordView(generics.GenericAPIView):
     )
     def post(self, request):
         ser = self.get_serializer(data=request.data)
-        ser.is_valid(raise_exception=True)
+        if not ser.is_valid():
+            return APIResponse.validation_error(
+                message="Password reset failed",
+                details=ser.errors
+            )
         ser.save()
-        return Response({"detail": "Password updated"})
+        return APIResponse.success(
+            data=None,
+            message="Password updated successfully"
+        )
 
 class GoogleLoginView(generics.GenericAPIView):
     """
@@ -251,9 +292,8 @@ class GoogleLoginView(generics.GenericAPIView):
         
         if not settings.GOOGLE_OAUTH_CLIENT_ID:
             logger.error("Google OAuth Client ID not configured")
-            return Response(
-                {"detail": "Google authentication is not configured."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            return APIResponse.service_unavailable(
+                message="Google authentication is not configured."
             )
         
         try:
@@ -269,17 +309,17 @@ class GoogleLoginView(generics.GenericAPIView):
             email_verified = info.get("email_verified", False)
             
             if not email:
-                return Response(
-                    {"detail": "Email not provided by Google."},
-                    status=status.HTTP_400_BAD_REQUEST
+                return APIResponse.validation_error(
+                    message="Email not provided by Google."
                 )
             
             # Check if email is verified by Google
             if not email_verified:
                 logger.warning(f"Unverified email attempted Google login: {email}")
-                return Response(
-                    {"detail": "Email not verified by Google."},
-                    status=status.HTTP_400_BAD_REQUEST
+                return APIResponse.error(
+                    message="Email not verified by Google.",
+                    error_code=ErrorCodes.EMAIL_NOT_VERIFIED,
+                    status_code=status.HTTP_400_BAD_REQUEST
                 )
             
             # Extract user information
@@ -307,39 +347,43 @@ class GoogleLoginView(generics.GenericAPIView):
             
             # Generate JWT tokens
             tokens = RefreshToken.for_user(user)
-            return Response({
-                "access": str(tokens.access_token),
-                "refresh": str(tokens),
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "is_email_verified": user.is_email_verified
-                }
-            }, status=status.HTTP_200_OK)
+            return APIResponse.success(
+                data={
+                    "access": str(tokens.access_token),
+                    "refresh": str(tokens),
+                    "user": {
+                        "id": user.id,
+                        "email": user.email,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "is_email_verified": user.is_email_verified
+                    }
+                },
+                message="Google authentication successful"
+            )
             
         except ValueError as e:
             # Token is expired or invalid format
             logger.error(f"Invalid token format: {str(e)}")
-            return Response(
-                {"detail": "Invalid or expired Google token."},
-                status=status.HTTP_401_UNAUTHORIZED
+            return APIResponse.error(
+                message="Invalid or expired Google token.",
+                error_code=ErrorCodes.INVALID_TOKEN,
+                status_code=status.HTTP_401_UNAUTHORIZED
             )
         except GoogleAuthError as e:
             logger.error(f"Google authentication error: {str(e)}")
-            return Response(
-                {"detail": "Invalid Google token."},
-                status=status.HTTP_401_UNAUTHORIZED
+            return APIResponse.error(
+                message="Invalid Google token.",
+                error_code=ErrorCodes.INVALID_TOKEN,
+                status_code=status.HTTP_401_UNAUTHORIZED
             )
         except Exception as e:
             logger.error(f"Unexpected error in Google login: {str(e)}")
-            return Response(
-                {"detail": "An error occurred during authentication."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return APIResponse.server_error(
+                message="An error occurred during authentication."
             )
 
-class MeView(generics.RetrieveUpdateAPIView):
+class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     """
     Get or update current user profile.
     
