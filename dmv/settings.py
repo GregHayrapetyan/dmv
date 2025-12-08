@@ -218,10 +218,20 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # Cookie security settings
-SESSION_COOKIE_SECURE = DEBUG  # HTTPS only in production
-CSRF_COOKIE_SECURE = DEBUG  # HTTPS only in production
+SESSION_COOKIE_SECURE = not DEBUG  # HTTPS only in production
+CSRF_COOKIE_SECURE = not DEBUG  # HTTPS only in production
 SESSION_COOKIE_SAMESITE = 'Lax'  # or 'Strict' for more security
 CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Trust proxy headers (required for production behind reverse proxy/load balancer)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# CSRF trusted origins for production
+CSRF_TRUSTED_ORIGINS = [
+    "https://mytestdmv.com",
+    "https://www.mytestdmv.com",
+    "https://api.mytestdmv.com",
+]
 
 # Logging configuration
 LOGGING = {
