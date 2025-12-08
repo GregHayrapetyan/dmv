@@ -196,10 +196,11 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     has_active_subscription = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    state = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar")
+        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state")
         read_only_fields = ("id", "email", "is_email_verified", "date_joined")
     
     @extend_schema_field(serializers.BooleanField())
@@ -219,6 +220,16 @@ class UserSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.avatar.url)
             return obj.avatar.url
         return None
+    
+    @extend_schema_field(serializers.CharField(allow_null=True, required=False))
+    def get_state(self, obj):
+        """Return user's state from profile if exists."""
+        try:
+            if obj.profile and obj.profile.state:
+                return obj.profile.state.name
+            return None
+        except Exception:
+            return None
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):

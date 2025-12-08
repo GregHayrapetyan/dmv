@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "accounts",
     "onboarding",
     "learning",
+    "site_details",
 ]
 # Application definition
 

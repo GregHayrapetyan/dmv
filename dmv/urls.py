@@ -20,6 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from site_details.views import PricingView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,6 +29,7 @@ urlpatterns = [
     path("api/accounts/", include("accounts.urls")),
     path("api/onboarding/", include("onboarding.urls")),
     path("api/learning/", include("learning.urls")),
+    path("api/pricing/", PricingView.as_view(), name="pricing"),
 ]
 
 # Serve media files in development
