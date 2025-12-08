@@ -1,112 +1,228 @@
-# pricing/models.py
+# site_details/models.py
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
-class IconChoices(models.TextChoices):
-    CHECK = "fa-solid fa-check", "Check"
-    XMARK = "fa-solid fa-xmark", "Cross"
-    STAR  = "fa-solid fa-star", "Star"
-    CAR   = "fa-solid fa-car", "Car"
-    # Add your own options if needed
-
-
-class Plan(models.Model):
+class PricingPlan(models.Model):
+    """
+    Pricing plan model for DMV test preparation packages.
+    Represents different subscription tiers (e.g., 7-Day Express, 30-Day All-Access).
+    """
+    
+    # Plan identification
     subtitle = models.CharField(
         max_length=100,
         blank=True,
-    )  # e.g. "STATE-SPECIFIC"
-
+        help_text="Plan category (e.g., 'STATE-SPECIFIC')",
+    )
+    
     title = models.CharField(
         max_length=100,
-    )  # e.g. "7-Day Express"
-
+        help_text="Plan name (e.g., '7-Day Express', '30-Day All-Access')",
+    )
+    
     description = models.TextField(
         blank=True,
-    )  # Small text under the title
-
+        help_text="Brief description of the plan",
+    )
+    
+    # Pricing details
     price_old = models.DecimalField(
         max_digits=6,
         decimal_places=2,
         null=True,
         blank=True,
-    )  # Old price, e.g. 49
-
-    price_new = models.DecimalField(
-        max_digits=6,
-        decimal_places=2,
-    )  # New price, e.g. 39
-
+        help_text="Old/original price (crossed out, e.g., $49)",
+    )
+    
     price_period = models.CharField(
         max_length=50,
         default="/month",
-    )  # e.g. "/month"
-
-    save_text = models.CharField(
-        max_length=50,
-        blank=True,
-    )  # e.g. "Save $10"
-
-    badge_text = models.CharField(
-        max_length=100,
-        blank=True,
-    )  # e.g. "Pass Guarantee ..."
-
+        help_text="Price period text (e.g., '/month')",
+    )
+    
+    price_new = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        help_text="New/current price (e.g., $39)",
+    )
+    
+    discount_amount = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        help_text="Discount amount shown in badge (e.g., 10 for 'Save $10')",
+    )
+    
+    # CTA button
     button_text = models.CharField(
         max_length=50,
         default="Start my plan",
-    )  # Button label
-
-    button_url = models.URLField(
+        help_text="Call-to-action button text",
+    )
+    
+    button_url = models.CharField(
+        max_length=255,
         blank=True,
-    )  # URL for CTA button
-
+        help_text="URL or route for the CTA button",
+    )
+    
+    # Display settings
     is_featured = models.BooleanField(
         default=False,
-    )  # Highlight this plan visually
-
+        help_text="Highlight this plan with a border/special styling",
+    )
+    
     order = models.PositiveIntegerField(
         default=0,
-    )  # Sort order from left to right
-
+        help_text="Display order (lower numbers appear first)",
+    )
+    
     is_active = models.BooleanField(
         default=True,
-    )  # If False, plan is hidden on the public pricing page
-
+        help_text="Whether this plan is visible on the site",
+    )
+    
+    # Stripe integration
+    stripe_price_id_monthly = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Stripe Price ID for monthly subscription",
+    )
+    
+    stripe_price_id_one_time = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Stripe Price ID for one-time payment",
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
     class Meta:
         ordering = ("order",)
-
+        verbose_name = "Pricing Plan"
+        verbose_name_plural = "Pricing Plans"
+    
     def __str__(self):
-        return self.title
+        return f"{self.title} - ${self.price_new}"
 
 
-class Feature(models.Model):
+class PlanFeature(models.Model):
+    """
+    Individual features/benefits included in a pricing plan.
+    Each feature can be marked as included or not included (grayed out).
+    """
+    
+    ICON_CHOICES = [
+        ("check", "Check Mark (✓)"),
+        ("star", "Star (⭐)"),
+        ("document", "Document (📄)"),
+        ("car", "Car (🚗)"),
+        ("trophy", "Trophy (🏆)"),
+        ("lock", "Lock (🔒)"),
+        ("unlock", "Unlock (🔓)"),
+    ]
+    
     plan = models.ForeignKey(
-        Plan,
-        related_name="features",
+        PricingPlan,
         on_delete=models.CASCADE,
-    )  # Parent plan
-
+        related_name="features",
+        help_text="The pricing plan this feature belongs to",
+    )
+    
     text = models.CharField(
         max_length=255,
-    )  # Feature text
-
+        help_text="Feature description (e.g., 'All 650 exam-like questions for your state')",
+    )
+    
     is_included = models.BooleanField(
         default=True,
-    )  # Included in this plan or not
-
+        help_text="Whether this feature is included (unchecked = grayed out)",
+    )
+    
+    icon_type = models.CharField(
+        max_length=20,
+        choices=ICON_CHOICES,
+        default="check",
+        help_text="Icon to display next to the feature",
+    )
+    
     order = models.PositiveIntegerField(
         default=0,
-    )  # Sort order within the plan
-
-    icon = models.CharField(
-        max_length=50,
-        choices=IconChoices.choices,
-        default=IconChoices.CHECK,
-        help_text="CSS class for the icon (e.g. FontAwesome)",
-    )  # Icon CSS class
-
+        help_text="Display order within the plan",
+    )
+    
+    # Additional details for expandable features
+    detail_text = models.TextField(
+        blank=True,
+        help_text="Optional detailed description (shown on hover/click)",
+    )
+    
     class Meta:
         ordering = ("order",)
-
+        verbose_name = "Plan Feature"
+        verbose_name_plural = "Plan Features"
+    
     def __str__(self):
-        return f"{self.plan.title}: {self.text[:40]}"
+        status = "✓" if self.is_included else "✗"
+        return f"{status} {self.plan.title}: {self.text[:50]}"
+
+
+class ClientReview(models.Model):
+    """
+    Client testimonial/review model.
+    Stores customer reviews with avatar, name, job title, rating, and review text.
+    """
+    avatar = models.ImageField(
+        upload_to="reviews/avatars/",
+        help_text="Client avatar/profile image",
+    )
+    
+    name = models.CharField(
+        max_length=100,
+        help_text="Client name (e.g., 'Bimosaurus')",
+    )
+    
+    job_title = models.CharField(
+        max_length=100,
+        help_text="Client job title (e.g., 'Graphic Designer')",
+    )
+    
+    rating = models.PositiveSmallIntegerField(
+        default=5,
+        help_text="Rating out of 5 stars (1-5)",
+        choices=[(i, f"{i} Stars") for i in range(1, 6)],
+    )
+    
+    review_text = models.TextField(
+        help_text="The review/testimonial text",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this review is displayed on the site",
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+    
+    class Meta:
+        ordering = ("order", "-created_at")
+        verbose_name = "Client Review"
+        verbose_name_plural = "Client Reviews"
+    
+    def __str__(self):
+        return f"{self.name} - {self.rating} stars"

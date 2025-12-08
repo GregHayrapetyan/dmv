@@ -1,41 +1,208 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Plan, Feature
+from .models import PricingPlan, PlanFeature, ClientReview
 
 
-class FeatureInline(admin.TabularInline):
-    model = Feature
+class PlanFeatureInline(admin.TabularInline):
+    """
+    Inline admin for managing plan features within the pricing plan admin.
+    """
+    model = PlanFeature
     extra = 1
-    fields = ("text", "is_included", "icon", "icon_preview", "order")
-    readonly_fields = ("icon_preview",)
-
-    def icon_preview(self, obj):
-        """
-        Render a small icon preview in the admin interface.
-        """
-        if not obj.icon:
-            return ""
-        return format_html('<i class="{}"></i>', obj.icon)
-
-    icon_preview.short_description = "Icon preview"
+    fields = ("text", "is_included", "icon_type", "detail_text", "order")
+    ordering = ("order",)
 
 
-@admin.register(Plan)
-class PlanAdmin(admin.ModelAdmin):
+@admin.register(PricingPlan)
+class PricingPlanAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing pricing plans.
+    Allows editing plan details and features inline.
+    """
     list_display = (
         "title",
         "subtitle",
-        "price_new",
+        "price_display",
+        "discount_display",
         "is_featured",
         "order",
         "is_active",
-    )  # Columns in the list view
-
+        "feature_count",
+    )
+    
     list_editable = (
         "is_featured",
         "order",
         "is_active",
-    )  # Editable fields directly in the list view
+    )
+    
+    list_filter = (
+        "is_featured",
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "title",
+        "subtitle",
+        "description",
+    )
+    
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Plan Information", {
+            "fields": ("subtitle", "title", "description")
+        }),
+        ("Pricing", {
+            "fields": (
+                ("price_old", "price_period"),
+                "price_new",
+                "discount_amount",
+            ),
+            "description": "Price old is crossed out (e.g., $49 /month). Price new is the current price (e.g., $39)."
+        }),
+        ("Call to Action", {
+            "fields": ("button_text", "button_url")
+        }),
+        ("Stripe Integration", {
+            "fields": (
+                "stripe_price_id_monthly",
+                "stripe_price_id_one_time",
+            ),
+            "classes": ("collapse",)
+        }),
+        ("Display Settings", {
+            "fields": ("is_featured", "order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    inlines = [PlanFeatureInline]
+    
+    def price_display(self, obj):
+        """
+        Display formatted pricing information.
+        Shows old price (crossed out) and new price.
+        """
+        if obj.price_old:
+            return format_html(
+                '<span style="text-decoration: line-through; color: #999;">${}</span> {} → <strong style="color: #2e7d32;">${}</strong>',
+                obj.price_old,
+                obj.price_period,
+                obj.price_new
+            )
+        return format_html(
+            '<strong>${}</strong> {}',
+            obj.price_new,
+            obj.price_period
+        )
+    
+    price_display.short_description = "Pricing"
+    
+    def discount_display(self, obj):
+        """
+        Display discount amount if available.
+        """
+        if obj.discount_amount > 0:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">Save ${}</span>',
+                int(obj.discount_amount)
+            )
+        return "-"
+    
+    discount_display.short_description = "Discount"
+    
+    def feature_count(self, obj):
+        """
+        Display the number of features in this plan.
+        """
+        count = obj.features.count()
+        return format_html(
+            '<span style="color: #666;">{} feature{}</span>',
+            count,
+            "s" if count != 1 else ""
+        )
+    
+    feature_count.short_description = "Features"
 
-    inlines = [FeatureInline]  # Manage features on the same page as the plan
+
+@admin.register(ClientReview)
+class ClientReviewAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "job_title",
+        "rating_display",
+        "avatar_preview",
+        "order",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "order",
+        "is_active",
+    )
+    
+    list_filter = (
+        "rating",
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "name",
+        "job_title",
+        "review_text",
+    )
+    
+    readonly_fields = (
+        "avatar_preview",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Client Information", {
+            "fields": ("name", "job_title", "avatar", "avatar_preview")
+        }),
+        ("Review Details", {
+            "fields": ("rating", "review_text")
+        }),
+        ("Display Settings", {
+            "fields": ("order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def avatar_preview(self, obj):
+        """
+        Display a thumbnail preview of the avatar image.
+        """
+        if obj.avatar:
+            return format_html(
+                '<img src="{}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" />',
+                obj.avatar.url
+            )
+        return "No avatar"
+    
+    avatar_preview.short_description = "Avatar Preview"
+    
+    def rating_display(self, obj):
+        """
+        Display rating as stars.
+        """
+        stars = "⭐" * obj.rating
+        return format_html('<span style="font-size: 16px;">{}</span>', stars)
+    
+    rating_display.short_description = "Rating"
 
