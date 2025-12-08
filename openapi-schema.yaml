@@ -68,7 +68,7 @@ paths:
     post:
       operationId: accounts_login_create
       description: Authenticate with email/phone and password. Returns JWT access
-        and refresh tokens.
+        token and sets refresh token as httpOnly cookie.
       summary: Login user
       tags:
       - Authentication
@@ -92,6 +92,21 @@ paths:
           description: Login successful
         '400':
           description: Invalid credentials or inactive user
+  /api/accounts/logout/:
+    post:
+      operationId: accounts_logout_create
+      description: Clear the refresh token cookie to logout the user. Client should
+        also discard the access token.
+      summary: Logout user
+      tags:
+      - Authentication
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+        '401':
+          description: Authentication required
   /api/accounts/me/:
     get:
       operationId: accounts_me_retrieve
@@ -113,7 +128,7 @@ paths:
     put:
       operationId: accounts_me_update
       description: Update the authenticated user's profile. Can update first_name,
-        last_name, and phone.
+        last_name, and phone. Supports partial updates.
       summary: Update current user
       tags:
       - User Profile
@@ -121,43 +136,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/UserUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/UserUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/User'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-          description: ''
-        '400':
-          description: Validation error
-        '401':
-          description: Authentication required
-    patch:
-      operationId: accounts_me_partial_update
-      description: Partially update the authenticated user's profile.
-      summary: Partially update current user
-      tags:
-      - User Profile
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedUser'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedUser'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/UserUpdate'
       security:
       - jwtAuth: []
       responses:
@@ -174,8 +159,7 @@ paths:
   /api/accounts/password/forgot/:
     post:
       operationId: accounts_password_forgot_create
-      description: Send a password reset code to the user's email. Rate limited to
-        5 requests per hour.
+      description: Send a password reset code to the user's email.
       summary: Request password reset
       tags:
       - Authentication
@@ -197,8 +181,6 @@ paths:
       responses:
         '200':
           description: Reset code sent (or email doesn't exist - security measure)
-        '429':
-          description: Too many requests - rate limit exceeded
   /api/accounts/password/reset/:
     post:
       operationId: accounts_password_reset_create
@@ -259,6 +241,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/Register'
           description: ''
+  /api/accounts/set_avatar/:
+    post:
+      operationId: accounts_set_avatar_create
+      description: "Upload and set the user's avatar image. \n        \n        **Important:**\
+        \ This endpoint requires multipart/form-data content type.\n        \n   \
+        \     - Accepts JPEG, PNG, GIF, or WebP images\n        - Maximum file size:\
+        \ 5MB\n        - Field name: `avatar` (file upload)\n        \n        Example\
+        \ using curl:\n        ```\n        curl -X POST /api/accounts/set_avatar/\
+        \ \\\n          -H \"Authorization: Bearer YOUR_TOKEN\" \\\n          -F \"\
+        avatar=@/path/to/image.jpg\"\n        ```\n        "
+      summary: Set user avatar
+      tags:
+      - User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAvatar'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SetAvatar'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SetAvatar'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Avatar updated successfully
+        '400':
+          description: Validation error (e.g., file too large, invalid format)
+        '401':
+          description: Authentication required
   /api/accounts/subscription/cancel/:
     post:
       operationId: accounts_subscription_cancel_create
@@ -369,30 +385,19 @@ paths:
   /api/accounts/token/refresh/:
     post:
       operationId: accounts_token_refresh_create
-      description: |-
-        Takes a refresh type JSON web token and returns an access type JSON web
-        token if the refresh token is valid.
+      description: Refresh the access token using the refresh token stored in httpOnly
+        cookie. Returns a new access token and optionally a new refresh token (if
+        rotation is enabled).
+      summary: Refresh access token
       tags:
-      - accounts
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-        required: true
+      - Authentication
+      security:
+      - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenRefresh'
-          description: ''
+          description: Token refreshed successfully
+        '401':
+          description: Refresh token not found or invalid
   /api/learning/categories/:
     get:
       operationId: learning_categories_list
@@ -722,6 +727,31 @@ paths:
           description: Authentication required
         '404':
           description: Test not found
+  /api/onboarding/knowledge/:
+    get:
+      operationId: onboarding_knowledge_list
+      description: Retrieve a list of all knowledge levels available for user profile
+        selection.
+      summary: List all knowledge levels
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Onboarding
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedKnowledgeList'
+          description: ''
   /api/onboarding/profile/:
     get:
       operationId: onboarding_profile_retrieve
@@ -772,36 +802,6 @@ paths:
           description: Validation error
         '401':
           description: Authentication required
-    patch:
-      operationId: onboarding_profile_partial_update
-      description: Partially update the authenticated user's onboarding profile.
-      summary: Partially update user profile
-      tags:
-      - Onboarding
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedProfile'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedProfile'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedProfile'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Profile'
-          description: ''
-        '400':
-          description: Validation error
-        '401':
-          description: Authentication required
   /api/onboarding/states/:
     get:
       operationId: onboarding_states_list
@@ -826,6 +826,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedStateList'
           description: ''
+  /api/onboarding/vehicles/:
+    get:
+      operationId: onboarding_vehicles_list
+      description: Retrieve a list of all vehicle types available for user profile
+        selection.
+      summary: List all vehicle types
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Onboarding
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVehicleList'
+          description: ''
 components:
   schemas:
     AnswerOption:
@@ -838,16 +863,12 @@ components:
           type: string
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: Display order of the answer option
       required:
       - id
       - text
-    BlankEnum:
-      enum:
-      - ''
     ConfirmEmail:
       type: object
       properties:
@@ -867,18 +888,18 @@ components:
           type: string
       required:
       - id_token
-    KnowledgeEnum:
-      enum:
-      - very_well
-      - some_details
-      - average
-      - barely
-      type: string
-      description: |-
-        * `very_well` - I know them very well
-        * `some_details` - I know them but forgot some details
-        * `average` - I know them at an average level
-        * `barely` - I barely know them
+    Knowledge:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+      required:
+      - id
+      - name
     LessonCategory:
       type: object
       properties:
@@ -927,15 +948,13 @@ components:
           maxLength: 200
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: Display order within category
         duration_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Estimated duration in minutes
         created_at:
@@ -973,15 +992,13 @@ components:
           $ref: '#/components/schemas/LessonTypeEnum'
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: Display order within category
         duration_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Estimated duration in minutes
         is_published:
@@ -1049,9 +1066,29 @@ components:
       required:
       - identifier
       - password
-    NullEnum:
-      enum:
-      - null
+    PaginatedKnowledgeList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Knowledge'
     PaginatedLessonCategoryList:
       type: object
       required:
@@ -1213,55 +1250,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TestList'
-    PatchedProfile:
+    PaginatedVehicleList:
       type: object
+      required:
+      - count
+      - results
       properties:
-        state:
+        count:
           type: integer
-          nullable: true
-        vehicle:
-          nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/VehicleEnum'
-          - $ref: '#/components/schemas/BlankEnum'
-          - $ref: '#/components/schemas/NullEnum'
-        knowledge:
-          nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/KnowledgeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
-          - $ref: '#/components/schemas/NullEnum'
-    PatchedUser:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        email:
-          type: string
-          format: email
-          readOnly: true
-        first_name:
-          type: string
-          maxLength: 150
-        last_name:
-          type: string
-          maxLength: 150
-        phone:
+          example: 123
+        next:
           type: string
           nullable: true
-          pattern: ^[+0-9()\-\s]{7,20}$
-          maxLength: 20
-        is_email_verified:
-          type: boolean
-          readOnly: true
-        date_joined:
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
           type: string
-          format: date-time
-          readOnly: true
-        has_active_subscription:
-          type: string
-          readOnly: true
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vehicle'
     Profile:
       type: object
       properties:
@@ -1269,17 +1280,11 @@ components:
           type: integer
           nullable: true
         vehicle:
+          type: integer
           nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/VehicleEnum'
-          - $ref: '#/components/schemas/BlankEnum'
-          - $ref: '#/components/schemas/NullEnum'
         knowledge:
+          type: integer
           nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/KnowledgeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
-          - $ref: '#/components/schemas/NullEnum'
     Question:
       type: object
       properties:
@@ -1297,15 +1302,13 @@ components:
           $ref: '#/components/schemas/QuestionTypeEnum'
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: Display order of the question in the test
         points:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: How many points this question is worth
         answer_options:
           type: array
@@ -1333,11 +1336,6 @@ components:
         last_name:
           type: string
           maxLength: 150
-        phone:
-          type: string
-          nullable: true
-          pattern: ^[+0-9()\-\s]{7,20}$
-          maxLength: 20
         email:
           type: string
           format: email
@@ -1377,6 +1375,16 @@ components:
       - code
       - email
       - new_password
+    SetAvatar:
+      type: object
+      description: Serializer for setting user avatar.
+      properties:
+        avatar:
+          type: string
+          format: binary
+          description: Upload an image file (JPEG, PNG, GIF, or WebP, max 5MB)
+      required:
+      - avatar
     State:
       type: object
       properties:
@@ -1508,9 +1516,8 @@ components:
           readOnly: true
         time_taken_seconds:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Time taken to complete the test in seconds
         started_at:
@@ -1574,9 +1581,8 @@ components:
           readOnly: true
         time_taken_seconds:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Time taken to complete the test in seconds
         started_at:
@@ -1648,9 +1654,8 @@ components:
           readOnly: true
         time_limit_seconds:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Time limit in seconds (if any)
         is_demo:
@@ -1663,9 +1668,8 @@ components:
           readOnly: true
         passing_percentage:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: Percentage needed to pass (0-100)
         shuffle_questions:
           type: boolean
@@ -1706,9 +1710,8 @@ components:
           description: Marks this test as a demo test
         time_limit_seconds:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Time limit in seconds (if any)
         question_count:
@@ -1716,15 +1719,13 @@ components:
           readOnly: true
         passing_percentage:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           description: Percentage needed to pass (0-100)
         max_attempts:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           description: Maximum allowed attempts (null = unlimited)
       required:
@@ -1746,17 +1747,6 @@ components:
           description: Dictionary mapping question_id to selected answer_option_id
       required:
       - answers
-    TokenRefresh:
-      type: object
-      properties:
-        access:
-          type: string
-          readOnly: true
-        refresh:
-          type: string
-      required:
-      - access
-      - refresh
     User:
       type: object
       properties:
@@ -1786,24 +1776,46 @@ components:
           format: date-time
           readOnly: true
         has_active_subscription:
+          type: boolean
+          readOnly: true
+        avatar:
           type: string
+          nullable: true
           readOnly: true
       required:
+      - avatar
       - date_joined
       - email
       - has_active_subscription
       - id
       - is_email_verified
-    VehicleEnum:
-      enum:
-      - car
-      - motorcycle
-      - cdl
-      type: string
-      description: |-
-        * `car` - Car
-        * `motorcycle` - Motorcycle
-        * `cdl` - CDL
+    UserUpdate:
+      type: object
+      description: Serializer for updating user profile (excludes avatar).
+      properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          nullable: true
+          pattern: ^[+0-9()\-\s]{7,20}$
+          maxLength: 20
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 80
+      required:
+      - id
+      - name
   securitySchemes:
     jwtAuth:
       type: http

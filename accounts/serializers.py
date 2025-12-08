@@ -4,6 +4,7 @@ from rest_framework import serializers
 from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
+from drf_spectacular.utils import extend_schema_field
 import secrets
 import logging
 from .models import EmailOTP, Subscription
@@ -184,20 +185,40 @@ class ResetPasswordSerializer(serializers.Serializer):
 class GoogleLoginSerializer(serializers.Serializer):
     id_token = serializers.CharField()
 
-class UserSerializer(serializers.ModelSerializer):
-    has_active_subscription = serializers.SerializerMethodField()
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating user profile (excludes avatar)."""
     
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription")
-        read_only_fields = ("id", "email", "is_email_verified", "date_joined", "has_active_subscription")
+        fields = ("first_name", "last_name", "phone")
+
+
+class UserSerializer(serializers.ModelSerializer):
+    has_active_subscription = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
     
+    class Meta:
+        model = User
+        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar")
+        read_only_fields = ("id", "email", "is_email_verified", "date_joined")
+    
+    @extend_schema_field(serializers.BooleanField())
     def get_has_active_subscription(self, obj):
         """Check if user has an active subscription."""
         try:
             return obj.subscription.has_access()
         except Subscription.DoesNotExist:
             return False
+    
+    @extend_schema_field(serializers.CharField(allow_null=True, required=False))
+    def get_avatar(self, obj):
+        """Return avatar URL if exists."""
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -210,3 +231,30 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'cancel_at_period_end', 'created_at', 'updated_at'
         )
         read_only_fields = fields
+
+
+class SetAvatarSerializer(serializers.Serializer):
+    """Serializer for setting user avatar."""
+    
+    @extend_schema_field({"type": "string", "format": "binary"})
+    class AvatarField(serializers.ImageField):
+        pass
+    
+    avatar = AvatarField(
+        required=True,
+        help_text="Upload an image file (JPEG, PNG, GIF, or WebP, max 5MB)"
+    )
+    
+    def validate_avatar(self, value):
+        """Validate avatar file size and type."""
+        # Max file size: 5MB
+        max_size = 5 * 1024 * 1024
+        if value.size > max_size:
+            raise serializers.ValidationError("Avatar file size cannot exceed 5MB.")
+        
+        # Allowed file types
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError("Avatar must be a JPEG, PNG, GIF, or WebP image.")
+        
+        return value

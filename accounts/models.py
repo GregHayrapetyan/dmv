@@ -40,6 +40,7 @@ class User(AbstractUser):
         validators=[RegexValidator(r"^[+0-9()\-\s]{7,20}$", "Invalid phone format")],
     )
     is_email_verified = models.BooleanField(default=False)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
     objects = UserManager()
 

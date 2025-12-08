@@ -8,7 +8,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
-    ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer,
+    ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
 )
 from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
@@ -437,7 +437,7 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     @extend_schema(
         summary="Update current user",
         description="Update the authenticated user's profile. Can update first_name, last_name, and phone. Supports partial updates.",
-        request=UserSerializer,
+        request=UserUpdateSerializer,
         responses={
             200: UserSerializer,
             400: OpenApiResponse(description="Validation error"),
@@ -593,3 +593,83 @@ class LogoutView(generics.GenericAPIView):
         
         logger.info(f"User logged out: {request.user.email}")
         return response
+
+
+class SetAvatarView(generics.GenericAPIView):
+    """
+    Set or update user avatar.
+    
+    Accepts an image file and saves it as the user's avatar.
+    Replaces any existing avatar.
+    """
+    serializer_class = SetAvatarSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Set user avatar",
+        description="""Upload and set the user's avatar image. 
+        
+        **Important:** This endpoint requires multipart/form-data content type.
+        
+        - Accepts JPEG, PNG, GIF, or WebP images
+        - Maximum file size: 5MB
+        - Field name: `avatar` (file upload)
+        
+        Example using curl:
+        ```
+        curl -X POST /api/accounts/set_avatar/ \\
+          -H "Authorization: Bearer YOUR_TOKEN" \\
+          -F "avatar=@/path/to/image.jpg"
+        ```
+        """,
+        request=SetAvatarSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Avatar updated successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "avatar_url": "/media/avatars/user_123_avatar.jpg"
+                        },
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Validation error (e.g., file too large, invalid format)"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["User Profile"],
+    )
+    def post(self, request):
+        """Upload and set user avatar."""
+        serializer = self.get_serializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Avatar upload validation failed",
+                details=serializer.errors
+            )
+        
+        user = request.user
+        avatar_file = serializer.validated_data['avatar']
+        
+        # Delete old avatar if exists
+        if user.avatar:
+            try:
+                user.avatar.delete(save=False)
+            except Exception as e:
+                logger.warning(f"Failed to delete old avatar for user {user.email}: {str(e)}")
+        
+        # Save new avatar
+        user.avatar = avatar_file
+        user.save(update_fields=['avatar'])
+        
+        logger.info(f"Avatar updated for user: {user.email}")
+        
+        # Return the avatar URL
+        avatar_url = user.avatar.url if user.avatar else None
+        
+        return APIResponse.success(
+            data={"avatar_url": avatar_url},
+            message="Avatar updated successfully"
+        )
