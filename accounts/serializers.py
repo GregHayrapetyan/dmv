@@ -86,6 +86,10 @@ class LoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise serializers.ValidationError({"non_field_errors": ["User is inactive"]})
 
+        # Check if email is verified
+        if not user.is_email_verified:
+            raise serializers.ValidationError({"non_field_errors": ["Please verify your email before logging in"]})
+
         attrs["user"] = user
         return attrs
 

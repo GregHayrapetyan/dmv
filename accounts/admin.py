@@ -1,10 +1,36 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, EmailOTP, Subscription
 
 
 @admin.register(User)
-class UAdmin(admin.ModelAdmin):
-    list_display = ("id", "email", "phone", "is_email_verified")
+class UAdmin(BaseUserAdmin):
+    list_display = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "is_active", "is_staff")
+    list_filter = ("is_email_verified", "is_active", "is_staff", "is_superuser")
+    search_fields = ("email", "first_name", "last_name", "phone")
+    ordering = ("-date_joined",)
+    
+    # Fields to display when editing a user
+    fieldsets = (
+        (None, {"fields": ("email", "password")}),
+        ("Personal info", {"fields": ("first_name", "last_name", "phone", "avatar")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "is_email_verified", "groups", "user_permissions")}),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
+    )
+    
+    # Fields to display when creating a new user
+    add_fieldsets = (
+        (None, {
+            "classes": ("wide",),
+            "fields": ("email", "password1", "password2", "first_name", "last_name", "phone", "is_email_verified", "is_staff"),
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-verify email for users created via admin panel."""
+        if not change:  # New user being created
+            obj.is_email_verified = True
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(EmailOTP)
