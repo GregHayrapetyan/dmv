@@ -9,12 +9,18 @@ class State(models.Model):
 
 class Vehicle(models.Model):
     name = models.CharField(max_length=80, unique=True)
+    image = models.ImageField(upload_to='vehicles/', null=True, blank=True, help_text="Upload vehicle type icon")
+    image_width = models.PositiveIntegerField(null=True, blank=True, help_text="Image width in pixels")
+    image_height = models.PositiveIntegerField(null=True, blank=True, help_text="Image height in pixels")
     
     def __str__(self):
         return self.name
 
 class Knowledge(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    image = models.ImageField(upload_to='knowledge/', null=True, blank=True, help_text="Upload knowledge level icon")
+    image_width = models.PositiveIntegerField(null=True, blank=True, help_text="Image width in pixels")
+    image_height = models.PositiveIntegerField(null=True, blank=True, help_text="Image height in pixels")
     
     def __str__(self):
         return self.name

@@ -10,14 +10,16 @@ class StateAdmin(admin.ModelAdmin):
 
 @admin.register(Vehicle)
 class VehicleAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'image', 'image_width', 'image_height')
     search_fields = ('name',)
+    fields = ('name', 'image', 'image_width', 'image_height')
 
 
 @admin.register(Knowledge)
 class KnowledgeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'image', 'image_width', 'image_height')
     search_fields = ('name',)
+    fields = ('name', 'image', 'image_width', 'image_height')
 
 
 @admin.register(Profile)
