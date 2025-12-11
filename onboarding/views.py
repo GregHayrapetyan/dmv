@@ -16,6 +16,7 @@ class StateListView(StandardizedResponseMixin, generics.ListAPIView):
     queryset = State.objects.all().order_by("name")
     serializer_class = StateSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
 
     @extend_schema(
         summary="List all states",
@@ -38,6 +39,7 @@ class VehicleListView(StandardizedResponseMixin, generics.ListAPIView):
     queryset = Vehicle.objects.all().order_by("name")
     serializer_class = VehicleSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
 
     @extend_schema(
         summary="List all vehicle types",
@@ -60,6 +62,7 @@ class KnowledgeListView(StandardizedResponseMixin, generics.ListAPIView):
     queryset = Knowledge.objects.all().order_by("name")
     serializer_class = KnowledgeSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
 
     @extend_schema(
         summary="List all knowledge levels",
