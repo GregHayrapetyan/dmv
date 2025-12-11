@@ -132,7 +132,7 @@ class LoginView(generics.GenericAPIView):
             secure=not settings.DEBUG,  # True in production (HTTPS only)
             samesite='Lax',
             max_age=7*24*60*60,  # 7 days (match JWT_REFRESH_TOKEN_LIFETIME)
-            path='/api/accounts/token/refresh/'
+            path='/'
         )
         
         return response
@@ -386,7 +386,7 @@ class GoogleLoginView(generics.GenericAPIView):
                 secure=not settings.DEBUG,
                 samesite='Lax',
                 max_age=7*24*60*60,
-                path='/api/accounts/token/refresh/'
+                path='/'
             )
             
             return response
@@ -555,7 +555,7 @@ class CookieTokenRefreshView(TokenRefreshView):
                     secure=not settings.DEBUG,
                     samesite='Lax',
                     max_age=7*24*60*60,
-                    path='/api/accounts/token/refresh/'
+                    path='/'
                 )
             
             return response
@@ -602,7 +602,7 @@ class LogoutView(generics.GenericAPIView):
         # Delete refresh token cookie with matching parameters from login
         response.delete_cookie(
             key='refresh_token',
-            path='/api/accounts/token/refresh/',
+            path='/',
             samesite='Lax'
         )
         
