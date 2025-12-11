@@ -422,6 +422,12 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_serializer_class(self):
+        """Use UserUpdateSerializer for PUT requests, UserSerializer for GET."""
+        if self.request.method == 'PUT':
+            return UserUpdateSerializer
+        return UserSerializer
+
     @extend_schema(
         summary="Get current user",
         description="Retrieve the authenticated user's profile information.",
@@ -447,7 +453,25 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     )
     def put(self, request, *args, **kwargs):
         kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
+        # Use UserUpdateSerializer for input validation
+        serializer = UserUpdateSerializer(
+            self.get_object(),
+            data=request.data,
+            partial=True,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        # Use UserSerializer for response to include all fields
+        response_serializer = UserSerializer(
+            self.get_object(),
+            context={'request': request}
+        )
+        return APIResponse.success(
+            data=response_serializer.data,
+            message="Profile updated successfully"
+        )
 
     @extend_schema(exclude=True)
     def patch(self, request, *args, **kwargs):
