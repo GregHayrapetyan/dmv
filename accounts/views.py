@@ -599,21 +599,12 @@ class LogoutView(generics.GenericAPIView):
             message="Logged out successfully"
         )
         
-        # Delete all authentication-related cookies
-        # Delete refresh token cookie
-        response.delete_cookie('refresh_token', path='/api/accounts/token/refresh/')
-        
-        # Delete session cookie if it exists
-        response.delete_cookie('sessionid', path='/')
-        
-        # Delete CSRF token cookie if it exists
-        response.delete_cookie('csrftoken', path='/')
-        
-        # Delete any other custom cookies that might have been set
-        # This ensures a complete logout
-        for cookie_name in request.COOKIES.keys():
-            if cookie_name not in ['refresh_token', 'sessionid', 'csrftoken']:
-                response.delete_cookie(cookie_name, path='/')
+        # Delete refresh token cookie with matching parameters from login
+        response.delete_cookie(
+            key='refresh_token',
+            path='/api/accounts/token/refresh/',
+            samesite='Lax'
+        )
         
         logger.info(f"User logged out: {request.user.email}")
         return response
