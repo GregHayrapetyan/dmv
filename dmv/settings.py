@@ -214,7 +214,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://mytestdmv.com",
     "https://www.mytestdmv.com",
     "https://api.mytestdmv.com",
-    "https://localhost:3000"
+    "https://localhost:3000",
+    "http://localhost:3000",  # Development
+    "http://127.0.0.1:3000",  # Development alternative
 ]
 CORS_ALLOW_CREDENTIALS = True
 

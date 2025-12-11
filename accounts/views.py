@@ -129,8 +129,8 @@ class LoginView(generics.GenericAPIView):
             key='refresh_token',
             value=str(tokens),
             httponly=True,
-            secure=not settings.DEBUG,  # True in production (HTTPS only)
-            samesite='Lax',
+            secure=True,  # Required for SameSite=None
+            samesite='None',  # Allow cross-origin cookies
             max_age=7*24*60*60,  # 7 days (match JWT_REFRESH_TOKEN_LIFETIME)
             path='/'
         )
@@ -383,8 +383,8 @@ class GoogleLoginView(generics.GenericAPIView):
                 key='refresh_token',
                 value=str(tokens),
                 httponly=True,
-                secure=not settings.DEBUG,
-                samesite='Lax',
+                secure=True,  # Required for SameSite=None
+                samesite='None',  # Allow cross-origin cookies
                 max_age=7*24*60*60,
                 path='/'
             )
@@ -552,8 +552,8 @@ class CookieTokenRefreshView(TokenRefreshView):
                     key='refresh_token',
                     value=serializer.validated_data['refresh'],
                     httponly=True,
-                    secure=not settings.DEBUG,
-                    samesite='Lax',
+                    secure=True,  # Required for SameSite=None
+                    samesite='None',  # Allow cross-origin cookies
                     max_age=7*24*60*60,
                     path='/'
                 )
@@ -603,7 +603,7 @@ class LogoutView(generics.GenericAPIView):
         response.delete_cookie(
             key='refresh_token',
             path='/',
-            samesite='Lax'
+            samesite='None'
         )
         
         logger.info(f"User logged out: {request.user.email}")
