@@ -17,6 +17,10 @@ class KnowledgeSerializer(serializers.ModelSerializer):
         fields = ("id", "name")
 
 class ProfileSerializer(serializers.ModelSerializer):
+    state_name = serializers.CharField(source='state.name', read_only=True)
+    vehicle_name = serializers.CharField(source='vehicle.name', read_only=True)
+    knowledge_name = serializers.CharField(source='knowledge.name', read_only=True)
+    
     class Meta:
         model = Profile
-        fields = ("state", "vehicle", "knowledge")
+        fields = ("state", "state_name", "vehicle", "vehicle_name", "knowledge", "knowledge_name", "age", "gender")

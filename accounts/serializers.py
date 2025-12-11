@@ -191,20 +191,63 @@ class GoogleLoginSerializer(serializers.Serializer):
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating user profile (excludes avatar)."""
+    state = serializers.IntegerField(required=False, allow_null=True, write_only=True)
+    age = serializers.IntegerField(required=False, allow_null=True, write_only=True, min_value=0)
+    gender = serializers.ChoiceField(
+        choices=['male', 'female', 'other', 'prefer_not_to_say'],
+        required=False,
+        allow_null=True,
+        write_only=True
+    )
     
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "phone")
+        fields = ("first_name", "last_name", "phone", "state", "age", "gender")
+    
+    def update(self, instance, validated_data):
+        # Extract profile-related fields
+        state_id = validated_data.pop('state', None)
+        age = validated_data.pop('age', None)
+        gender = validated_data.pop('gender', None)
+        
+        # Update user fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update or create profile
+        from onboarding.models import Profile, State
+        profile, _ = Profile.objects.get_or_create(user=instance)
+        
+        if state_id is not None:
+            if state_id:
+                try:
+                    profile.state = State.objects.get(id=state_id)
+                except State.DoesNotExist:
+                    pass
+            else:
+                profile.state = None
+        
+        if age is not None:
+            profile.age = age
+        
+        if gender is not None:
+            profile.gender = gender
+        
+        profile.save()
+        return instance
 
 
 class UserSerializer(serializers.ModelSerializer):
     has_active_subscription = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     state = serializers.SerializerMethodField()
+    age = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state")
+        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state", "age", "gender")
         read_only_fields = ("id", "email", "is_email_verified", "date_joined")
     
     @extend_schema_field(serializers.BooleanField())
@@ -231,6 +274,26 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             if obj.profile and obj.profile.state:
                 return obj.profile.state.name
+            return None
+        except Exception:
+            return None
+    
+    @extend_schema_field(serializers.IntegerField(allow_null=True, required=False))
+    def get_age(self, obj):
+        """Return user's age from profile if exists."""
+        try:
+            if obj.profile:
+                return obj.profile.age
+            return None
+        except Exception:
+            return None
+    
+    @extend_schema_field(serializers.CharField(allow_null=True, required=False))
+    def get_gender(self, obj):
+        """Return user's gender from profile if exists."""
+        try:
+            if obj.profile:
+                return obj.profile.gender
             return None
         except Exception:
             return None

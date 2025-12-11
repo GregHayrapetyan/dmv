@@ -20,10 +20,19 @@ class Knowledge(models.Model):
         return self.name
 
 class Profile(models.Model):
+    GENDER_CHOICES = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say'),
+    )
+    
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     state = models.ForeignKey(State, null=True, blank=True, on_delete=models.SET_NULL)
     vehicle = models.ForeignKey(Vehicle, null=True, blank=True, on_delete=models.SET_NULL)
     knowledge = models.ForeignKey(Knowledge, null=True, blank=True, on_delete=models.SET_NULL)
+    age = models.PositiveIntegerField(null=True, blank=True)
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, null=True, blank=True)
 
     def __str__(self):
         return f"Profile for {self.user.email}"

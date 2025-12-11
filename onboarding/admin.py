@@ -22,7 +22,7 @@ class KnowledgeAdmin(admin.ModelAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'state', 'vehicle', 'knowledge')
-    list_filter = ('vehicle', 'knowledge', 'state')
+    list_display = ('id', 'user', 'state', 'vehicle', 'knowledge', 'age', 'gender')
+    list_filter = ('vehicle', 'knowledge', 'state', 'gender')
     search_fields = ('user__email',)
     raw_id_fields = ('user',)

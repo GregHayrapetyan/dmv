@@ -128,7 +128,7 @@ paths:
     put:
       operationId: accounts_me_update
       description: Update the authenticated user's profile. Can update first_name,
-        last_name, and phone. Supports partial updates.
+        last_name, phone, state, age, and gender. Supports partial updates.
       summary: Update current user
       tags:
       - User Profile
@@ -733,13 +733,6 @@ paths:
       description: Retrieve a list of all knowledge levels available for user profile
         selection.
       summary: List all knowledge levels
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
       tags:
       - Onboarding
       security:
@@ -750,7 +743,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedKnowledgeList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Knowledge'
           description: ''
   /api/onboarding/profile/:
     get:
@@ -774,7 +769,7 @@ paths:
     put:
       operationId: onboarding_profile_update
       description: Update the authenticated user's onboarding profile. Can update
-        state, vehicle type, and knowledge level.
+        state, vehicle type, knowledge level, age, and gender.
       summary: Update user profile
       tags:
       - Onboarding
@@ -807,13 +802,6 @@ paths:
       operationId: onboarding_states_list
       description: Retrieve a list of all US states available for user profile selection.
       summary: List all states
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
       tags:
       - Onboarding
       security:
@@ -824,7 +812,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedStateList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/State'
           description: ''
   /api/onboarding/vehicles/:
     get:
@@ -832,13 +822,6 @@ paths:
       description: Retrieve a list of all vehicle types available for user profile
         selection.
       summary: List all vehicle types
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
       tags:
       - Onboarding
       security:
@@ -849,7 +832,65 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedVehicleList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+          description: ''
+  /api/site-details/pricing-plans/:
+    get:
+      operationId: site_details_pricing_plans_list
+      description: |-
+        API endpoint to retrieve all active pricing plans with features.
+        GET /api/site-details/pricing-plans/
+
+        Returns:
+            200: List of active pricing plans with nested features
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - site-details
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPricingPlanList'
+          description: ''
+  /api/site-details/reviews/:
+    get:
+      operationId: site_details_reviews_list
+      description: |-
+        API endpoint to retrieve all active client reviews.
+        GET /api/site-details/reviews/
+
+        Returns:
+            200: List of active client reviews
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - site-details
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClientReviewList'
           description: ''
 components:
   schemas:
@@ -869,6 +910,62 @@ components:
       required:
       - id
       - text
+    BlankEnum:
+      enum:
+      - ''
+    ClientReview:
+      type: object
+      description: |-
+        Serializer for ClientReview model.
+        Returns all active client reviews with their details.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        avatar:
+          type: string
+          format: uri
+          description: Client avatar/profile image
+        name:
+          type: string
+          description: Client name (e.g., 'Bimosaurus')
+          maxLength: 100
+        job_title:
+          type: string
+          description: Client job title (e.g., 'Graphic Designer')
+          maxLength: 100
+        rating:
+          allOf:
+          - $ref: '#/components/schemas/RatingEnum'
+          description: |-
+            Rating out of 5 stars (1-5)
+
+            * `1` - 1 Stars
+            * `2` - 2 Stars
+            * `3` - 3 Stars
+            * `4` - 4 Stars
+            * `5` - 5 Stars
+          minimum: 0
+          maximum: 32767
+        review_text:
+          type: string
+          description: The review/testimonial text
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          description: Display order (lower numbers appear first)
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - avatar
+      - created_at
+      - id
+      - job_title
+      - name
+      - review_text
     ConfirmEmail:
       type: object
       properties:
@@ -888,6 +985,24 @@ components:
           type: string
       required:
       - id_token
+    IconTypeEnum:
+      enum:
+      - check
+      - star
+      - document
+      - car
+      - trophy
+      - lock
+      - unlock
+      type: string
+      description: |-
+        * `check` - Check Mark (✓)
+        * `star` - Star (⭐)
+        * `document` - Document (📄)
+        * `car` - Car (🚗)
+        * `trophy` - Trophy (🏆)
+        * `lock` - Lock (🔒)
+        * `unlock` - Unlock (🔓)
     Knowledge:
       type: object
       properties:
@@ -1066,7 +1181,10 @@ components:
       required:
       - identifier
       - password
-    PaginatedKnowledgeList:
+    NullEnum:
+      enum:
+      - null
+    PaginatedClientReviewList:
       type: object
       required:
       - count
@@ -1088,7 +1206,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/Knowledge'
+            $ref: '#/components/schemas/ClientReview'
     PaginatedLessonCategoryList:
       type: object
       required:
@@ -1158,7 +1276,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LessonProgress'
-    PaginatedStateList:
+    PaginatedPricingPlanList:
       type: object
       required:
       - count
@@ -1180,7 +1298,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/State'
+            $ref: '#/components/schemas/PricingPlan'
     PaginatedTestAttemptListList:
       type: object
       required:
@@ -1250,41 +1368,172 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TestList'
-    PaginatedVehicleList:
+    PlanFeature:
       type: object
-      required:
-      - count
-      - results
+      description: |-
+        Serializer for PlanFeature model.
+        Returns feature details including text, icon, and inclusion status.
       properties:
-        count:
+        id:
           type: integer
-          example: 123
-        next:
+          readOnly: true
+        text:
           type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
+          description: Feature description (e.g., 'All 650 exam-like questions for
+            your state')
+          maxLength: 255
+        is_included:
+          type: boolean
+          description: Whether this feature is included (unchecked = grayed out)
+        icon_type:
+          allOf:
+          - $ref: '#/components/schemas/IconTypeEnum'
+          description: |-
+            Icon to display next to the feature
+
+            * `check` - Check Mark (✓)
+            * `star` - Star (⭐)
+            * `document` - Document (📄)
+            * `car` - Car (🚗)
+            * `trophy` - Trophy (🏆)
+            * `lock` - Lock (🔒)
+            * `unlock` - Unlock (🔓)
+        detail_text:
           type: string
+          description: Optional detailed description (shown on hover/click)
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          description: Display order within the plan
+      required:
+      - id
+      - text
+    PricingPlan:
+      type: object
+      description: |-
+        Serializer for PricingPlan model with nested features.
+        Returns complete pricing plan information with all features.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        subtitle:
+          type: string
+          description: Plan category (e.g., 'STATE-SPECIFIC')
+          maxLength: 100
+        title:
+          type: string
+          description: Plan name (e.g., '7-Day Express', '30-Day All-Access')
+          maxLength: 100
+        description:
+          type: string
+          description: Brief description of the plan
+        price_old:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
           nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
+          description: Old/original price (crossed out, e.g., $49)
+        price_period:
+          type: string
+          description: Price period text (e.g., '/month')
+          maxLength: 50
+        price_new:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: New/current price (e.g., $39)
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Discount amount shown in badge (e.g., 10 for 'Save $10')
+        save_text:
+          type: string
+          readOnly: true
+        button_text:
+          type: string
+          description: Call-to-action button text
+          maxLength: 50
+        button_url:
+          type: string
+          description: URL or route for the CTA button
+          maxLength: 255
+        is_featured:
+          type: boolean
+          description: Highlight this plan with a border/special styling
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          description: Display order (lower numbers appear first)
+        stripe_price_id_monthly:
+          type: string
+          description: Stripe Price ID for monthly subscription
+          maxLength: 255
+        stripe_price_id_one_time:
+          type: string
+          description: Stripe Price ID for one-time payment
+          maxLength: 255
+        features:
           type: array
           items:
-            $ref: '#/components/schemas/Vehicle'
+            $ref: '#/components/schemas/PlanFeature'
+          readOnly: true
+      required:
+      - features
+      - id
+      - save_text
+      - title
     Profile:
       type: object
       properties:
         state:
           type: integer
           nullable: true
+        state_name:
+          type: string
+          readOnly: true
         vehicle:
           type: integer
           nullable: true
+        vehicle_name:
+          type: string
+          readOnly: true
         knowledge:
           type: integer
           nullable: true
+        knowledge_name:
+          type: string
+          readOnly: true
+        age:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/ProfileGenderEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - knowledge_name
+      - state_name
+      - vehicle_name
+    ProfileGenderEnum:
+      enum:
+      - male
+      - female
+      - other
+      - prefer_not_to_say
+      type: string
+      description: |-
+        * `male` - Male
+        * `female` - Female
+        * `other` - Other
+        * `prefer_not_to_say` - Prefer not to say
     Question:
       type: object
       properties:
@@ -1327,6 +1576,20 @@ components:
       description: |-
         * `multiple_choice` - Multiple Choice
         * `true_false` - True/False
+    RatingEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      type: integer
+      description: |-
+        * `1` - 1 Stars
+        * `2` - 2 Stars
+        * `3` - 3 Stars
+        * `4` - 4 Stars
+        * `5` - 5 Stars
     Register:
       type: object
       properties:
@@ -1782,13 +2045,28 @@ components:
           type: string
           nullable: true
           readOnly: true
+        state:
+          type: string
+          nullable: true
+          readOnly: true
+        age:
+          type: integer
+          nullable: true
+          readOnly: true
+        gender:
+          type: string
+          nullable: true
+          readOnly: true
       required:
+      - age
       - avatar
       - date_joined
       - email
+      - gender
       - has_active_subscription
       - id
       - is_email_verified
+      - state
     UserUpdate:
       type: object
       description: Serializer for updating user profile (excludes avatar).
@@ -1804,6 +2082,33 @@ components:
           nullable: true
           pattern: ^[+0-9()\-\s]{7,20}$
           maxLength: 20
+        state:
+          type: integer
+          writeOnly: true
+          nullable: true
+        age:
+          type: integer
+          minimum: 0
+          writeOnly: true
+          nullable: true
+        gender:
+          writeOnly: true
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/UserUpdateGenderEnum'
+          - $ref: '#/components/schemas/NullEnum'
+    UserUpdateGenderEnum:
+      enum:
+      - male
+      - female
+      - other
+      - prefer_not_to_say
+      type: string
+      description: |-
+        * `male` - male
+        * `female` - female
+        * `other` - other
+        * `prefer_not_to_say` - prefer_not_to_say
     Vehicle:
       type: object
       properties:

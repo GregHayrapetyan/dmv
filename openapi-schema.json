@@ -103,7 +103,7 @@
         "/api/accounts/login/": {
             "post": {
                 "operationId": "accounts_login_create",
-                "description": "Authenticate with email/phone and password. Returns JWT access and refresh tokens.",
+                "description": "Authenticate with email/phone and password. Returns JWT access token and sets refresh token as httpOnly cookie.",
                 "summary": "Login user",
                 "tags": [
                     "Authentication"
@@ -144,6 +144,29 @@
                 }
             }
         },
+        "/api/accounts/logout/": {
+            "post": {
+                "operationId": "accounts_logout_create",
+                "description": "Clear the refresh token cookie to logout the user. Client should also discard the access token.",
+                "summary": "Logout user",
+                "tags": [
+                    "Authentication"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Logged out successfully"
+                    },
+                    "401": {
+                        "description": "Authentication required"
+                    }
+                }
+            }
+        },
         "/api/accounts/me/": {
             "get": {
                 "operationId": "accounts_me_retrieve",
@@ -175,7 +198,7 @@
             },
             "put": {
                 "operationId": "accounts_me_update",
-                "description": "Update the authenticated user's profile. Can update first_name, last_name, and phone.",
+                "description": "Update the authenticated user's profile. Can update first_name, last_name, phone, state, age, and gender. Supports partial updates.",
                 "summary": "Update current user",
                 "tags": [
                     "User Profile"
@@ -184,67 +207,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/User"
+                                "$ref": "#/components/schemas/UserUpdate"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/User"
+                                "$ref": "#/components/schemas/UserUpdate"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/User"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/User"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "description": "Validation error"
-                    },
-                    "401": {
-                        "description": "Authentication required"
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "accounts_me_partial_update",
-                "description": "Partially update the authenticated user's profile.",
-                "summary": "Partially update current user",
-                "tags": [
-                    "User Profile"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedUser"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedUser"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedUser"
+                                "$ref": "#/components/schemas/UserUpdate"
                             }
                         }
                     }
@@ -277,7 +250,7 @@
         "/api/accounts/password/forgot/": {
             "post": {
                 "operationId": "accounts_password_forgot_create",
-                "description": "Send a password reset code to the user's email. Rate limited to 5 requests per hour.",
+                "description": "Send a password reset code to the user's email.",
                 "summary": "Request password reset",
                 "tags": [
                     "Authentication"
@@ -311,9 +284,6 @@
                 "responses": {
                     "200": {
                         "description": "Reset code sent (or email doesn't exist - security measure)"
-                    },
-                    "429": {
-                        "description": "Too many requests - rate limit exceeded"
                     }
                 }
             }
@@ -405,6 +375,52 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/accounts/set_avatar/": {
+            "post": {
+                "operationId": "accounts_set_avatar_create",
+                "description": "Upload and set the user's avatar image. \n        \n        **Important:** This endpoint requires multipart/form-data content type.\n        \n        - Accepts JPEG, PNG, GIF, or WebP images\n        - Maximum file size: 5MB\n        - Field name: `avatar` (file upload)\n        \n        Example using curl:\n        ```\n        curl -X POST /api/accounts/set_avatar/ \\\n          -H \"Authorization: Bearer YOUR_TOKEN\" \\\n          -F \"avatar=@/path/to/image.jpg\"\n        ```\n        ",
+                "summary": "Set user avatar",
+                "tags": [
+                    "User Profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetAvatar"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetAvatar"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetAvatar"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Avatar updated successfully"
+                    },
+                    "400": {
+                        "description": "Validation error (e.g., file too large, invalid format)"
+                    },
+                    "401": {
+                        "description": "Authentication required"
                     }
                 }
             }
@@ -577,40 +593,20 @@
         "/api/accounts/token/refresh/": {
             "post": {
                 "operationId": "accounts_token_refresh_create",
-                "description": "Takes a refresh type JSON web token and returns an access type JSON web\ntoken if the refresh token is valid.",
+                "description": "Refresh the access token using the refresh token stored in httpOnly cookie. Returns a new access token and optionally a new refresh token (if rotation is enabled).",
+                "summary": "Refresh access token",
                 "tags": [
-                    "accounts"
+                    "Authentication"
                 ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/TokenRefresh"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/TokenRefresh"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/TokenRefresh"
-                            }
-                        }
-                    },
-                    "required": true
-                },
+                "security": [
+                    {}
+                ],
                 "responses": {
                     "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/TokenRefresh"
-                                }
-                            }
-                        },
-                        "description": ""
+                        "description": "Token refreshed successfully"
+                    },
+                    "401": {
+                        "description": "Refresh token not found or invalid"
                     }
                 }
             }
@@ -1143,6 +1139,37 @@
                 }
             }
         },
+        "/api/onboarding/knowledge/": {
+            "get": {
+                "operationId": "onboarding_knowledge_list",
+                "description": "Retrieve a list of all knowledge levels available for user profile selection.",
+                "summary": "List all knowledge levels",
+                "tags": [
+                    "Onboarding"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Knowledge"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/onboarding/profile/": {
             "get": {
                 "operationId": "onboarding_profile_retrieve",
@@ -1174,7 +1201,7 @@
             },
             "put": {
                 "operationId": "onboarding_profile_update",
-                "description": "Update the authenticated user's onboarding profile. Can update state, vehicle type, and knowledge level.",
+                "description": "Update the authenticated user's onboarding profile. Can update state, vehicle type, knowledge level, age, and gender.",
                 "summary": "Update user profile",
                 "tags": [
                     "Onboarding"
@@ -1221,56 +1248,6 @@
                         "description": "Authentication required"
                     }
                 }
-            },
-            "patch": {
-                "operationId": "onboarding_profile_partial_update",
-                "description": "Partially update the authenticated user's onboarding profile.",
-                "summary": "Partially update user profile",
-                "tags": [
-                    "Onboarding"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedProfile"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedProfile"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedProfile"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Profile"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "description": "Validation error"
-                    },
-                    "401": {
-                        "description": "Authentication required"
-                    }
-                }
             }
         },
         "/api/onboarding/states/": {
@@ -1278,17 +1255,6 @@
                 "operationId": "onboarding_states_list",
                 "description": "Retrieve a list of all US states available for user profile selection.",
                 "summary": "List all states",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "required": false,
-                        "in": "query",
-                        "description": "A page number within the paginated result set.",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
                 "tags": [
                     "Onboarding"
                 ],
@@ -1303,7 +1269,117 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PaginatedStateList"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/State"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/onboarding/vehicles/": {
+            "get": {
+                "operationId": "onboarding_vehicles_list",
+                "description": "Retrieve a list of all vehicle types available for user profile selection.",
+                "summary": "List all vehicle types",
+                "tags": [
+                    "Onboarding"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Vehicle"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/site-details/pricing-plans/": {
+            "get": {
+                "operationId": "site_details_pricing_plans_list",
+                "description": "API endpoint to retrieve all active pricing plans with features.\nGET /api/site-details/pricing-plans/\n\nReturns:\n    200: List of active pricing plans with nested features",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "site-details"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedPricingPlanList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/site-details/reviews/": {
+            "get": {
+                "operationId": "site_details_reviews_list",
+                "description": "API endpoint to retrieve all active client reviews.\nGET /api/site-details/reviews/\n\nReturns:\n    200: List of active client reviews",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "site-details"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedClientReviewList"
                                 }
                             }
                         },
@@ -1327,9 +1403,8 @@
                     },
                     "order": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "Display order of the answer option"
                     }
                 },
@@ -1341,6 +1416,64 @@
             "BlankEnum": {
                 "enum": [
                     ""
+                ]
+            },
+            "ClientReview": {
+                "type": "object",
+                "description": "Serializer for ClientReview model.\nReturns all active client reviews with their details.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "avatar": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Client avatar/profile image"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Client name (e.g., 'Bimosaurus')",
+                        "maxLength": 100
+                    },
+                    "job_title": {
+                        "type": "string",
+                        "description": "Client job title (e.g., 'Graphic Designer')",
+                        "maxLength": 100
+                    },
+                    "rating": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RatingEnum"
+                            }
+                        ],
+                        "description": "Rating out of 5 stars (1-5)\n\n* `1` - 1 Stars\n* `2` - 2 Stars\n* `3` - 3 Stars\n* `4` - 4 Stars\n* `5` - 5 Stars",
+                        "minimum": 0,
+                        "maximum": 32767
+                    },
+                    "review_text": {
+                        "type": "string",
+                        "description": "The review/testimonial text"
+                    },
+                    "order": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "description": "Display order (lower numbers appear first)"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "avatar",
+                    "created_at",
+                    "id",
+                    "job_title",
+                    "name",
+                    "review_text"
                 ]
             },
             "ConfirmEmail": {
@@ -1371,15 +1504,35 @@
                     "id_token"
                 ]
             },
-            "KnowledgeEnum": {
+            "IconTypeEnum": {
                 "enum": [
-                    "very_well",
-                    "some_details",
-                    "average",
-                    "barely"
+                    "check",
+                    "star",
+                    "document",
+                    "car",
+                    "trophy",
+                    "lock",
+                    "unlock"
                 ],
                 "type": "string",
-                "description": "* `very_well` - I know them very well\n* `some_details` - I know them but forgot some details\n* `average` - I know them at an average level\n* `barely` - I barely know them"
+                "description": "* `check` - Check Mark (✓)\n* `star` - Star (⭐)\n* `document` - Document (📄)\n* `car` - Car (🚗)\n* `trophy` - Trophy (🏆)\n* `lock` - Lock (🔒)\n* `unlock` - Unlock (🔓)"
+            },
+            "Knowledge": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 100
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ]
             },
             "LessonCategory": {
                 "type": "object",
@@ -1444,16 +1597,14 @@
                     },
                     "order": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "Display order within category"
                     },
                     "duration_minutes": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Estimated duration in minutes"
                     },
@@ -1502,16 +1653,14 @@
                     },
                     "order": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "Display order within category"
                     },
                     "duration_minutes": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Estimated duration in minutes"
                     },
@@ -1603,6 +1752,37 @@
                 "enum": [
                     null
                 ]
+            },
+            "PaginatedClientReviewList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ClientReview"
+                        }
+                    }
+                }
             },
             "PaginatedLessonCategoryList": {
                 "type": "object",
@@ -1697,7 +1877,7 @@
                     }
                 }
             },
-            "PaginatedStateList": {
+            "PaginatedPricingPlanList": {
                 "type": "object",
                 "required": [
                     "count",
@@ -1723,7 +1903,7 @@
                     "results": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/components/schemas/State"
+                            "$ref": "#/components/schemas/PricingPlan"
                         }
                     }
                 }
@@ -1821,83 +2001,141 @@
                     }
                 }
             },
-            "PatchedProfile": {
+            "PlanFeature": {
                 "type": "object",
-                "properties": {
-                    "state": {
-                        "type": "integer",
-                        "nullable": true
-                    },
-                    "vehicle": {
-                        "nullable": true,
-                        "oneOf": [
-                            {
-                                "$ref": "#/components/schemas/VehicleEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/BlankEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/NullEnum"
-                            }
-                        ]
-                    },
-                    "knowledge": {
-                        "nullable": true,
-                        "oneOf": [
-                            {
-                                "$ref": "#/components/schemas/KnowledgeEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/BlankEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/NullEnum"
-                            }
-                        ]
-                    }
-                }
-            },
-            "PatchedUser": {
-                "type": "object",
+                "description": "Serializer for PlanFeature model.\nReturns feature details including text, icon, and inclusion status.",
                 "properties": {
                     "id": {
                         "type": "integer",
                         "readOnly": true
                     },
-                    "email": {
+                    "text": {
                         "type": "string",
-                        "format": "email",
-                        "readOnly": true
+                        "description": "Feature description (e.g., 'All 650 exam-like questions for your state')",
+                        "maxLength": 255
                     },
-                    "first_name": {
-                        "type": "string",
-                        "maxLength": 150
-                    },
-                    "last_name": {
-                        "type": "string",
-                        "maxLength": 150
-                    },
-                    "phone": {
-                        "type": "string",
-                        "nullable": true,
-                        "pattern": "^[+0-9()\\-\\s]{7,20}$",
-                        "maxLength": 20
-                    },
-                    "is_email_verified": {
+                    "is_included": {
                         "type": "boolean",
+                        "description": "Whether this feature is included (unchecked = grayed out)"
+                    },
+                    "icon_type": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/IconTypeEnum"
+                            }
+                        ],
+                        "description": "Icon to display next to the feature\n\n* `check` - Check Mark (✓)\n* `star` - Star (⭐)\n* `document` - Document (📄)\n* `car` - Car (🚗)\n* `trophy` - Trophy (🏆)\n* `lock` - Lock (🔒)\n* `unlock` - Unlock (🔓)"
+                    },
+                    "detail_text": {
+                        "type": "string",
+                        "description": "Optional detailed description (shown on hover/click)"
+                    },
+                    "order": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "description": "Display order within the plan"
+                    }
+                },
+                "required": [
+                    "id",
+                    "text"
+                ]
+            },
+            "PricingPlan": {
+                "type": "object",
+                "description": "Serializer for PricingPlan model with nested features.\nReturns complete pricing plan information with all features.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
                         "readOnly": true
                     },
-                    "date_joined": {
+                    "subtitle": {
                         "type": "string",
-                        "format": "date-time",
+                        "description": "Plan category (e.g., 'STATE-SPECIFIC')",
+                        "maxLength": 100
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Plan name (e.g., '7-Day Express', '30-Day All-Access')",
+                        "maxLength": 100
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Brief description of the plan"
+                    },
+                    "price_old": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,4}(?:\\.\\d{0,2})?$",
+                        "nullable": true,
+                        "description": "Old/original price (crossed out, e.g., $49)"
+                    },
+                    "price_period": {
+                        "type": "string",
+                        "description": "Price period text (e.g., '/month')",
+                        "maxLength": 50
+                    },
+                    "price_new": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,4}(?:\\.\\d{0,2})?$",
+                        "description": "New/current price (e.g., $39)"
+                    },
+                    "discount_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,4}(?:\\.\\d{0,2})?$",
+                        "description": "Discount amount shown in badge (e.g., 10 for 'Save $10')"
+                    },
+                    "save_text": {
+                        "type": "string",
                         "readOnly": true
                     },
-                    "has_active_subscription": {
+                    "button_text": {
                         "type": "string",
+                        "description": "Call-to-action button text",
+                        "maxLength": 50
+                    },
+                    "button_url": {
+                        "type": "string",
+                        "description": "URL or route for the CTA button",
+                        "maxLength": 255
+                    },
+                    "is_featured": {
+                        "type": "boolean",
+                        "description": "Highlight this plan with a border/special styling"
+                    },
+                    "order": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "description": "Display order (lower numbers appear first)"
+                    },
+                    "stripe_price_id_monthly": {
+                        "type": "string",
+                        "description": "Stripe Price ID for monthly subscription",
+                        "maxLength": 255
+                    },
+                    "stripe_price_id_one_time": {
+                        "type": "string",
+                        "description": "Stripe Price ID for one-time payment",
+                        "maxLength": 255
+                    },
+                    "features": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PlanFeature"
+                        },
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "features",
+                    "id",
+                    "save_text",
+                    "title"
+                ]
             },
             "Profile": {
                 "type": "object",
@@ -1906,25 +2144,37 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "state_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "vehicle": {
-                        "nullable": true,
-                        "oneOf": [
-                            {
-                                "$ref": "#/components/schemas/VehicleEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/BlankEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/NullEnum"
-                            }
-                        ]
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "vehicle_name": {
+                        "type": "string",
+                        "readOnly": true
                     },
                     "knowledge": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "knowledge_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "age": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "gender": {
                         "nullable": true,
                         "oneOf": [
                             {
-                                "$ref": "#/components/schemas/KnowledgeEnum"
+                                "$ref": "#/components/schemas/ProfileGenderEnum"
                             },
                             {
                                 "$ref": "#/components/schemas/BlankEnum"
@@ -1934,7 +2184,22 @@
                             }
                         ]
                     }
-                }
+                },
+                "required": [
+                    "knowledge_name",
+                    "state_name",
+                    "vehicle_name"
+                ]
+            },
+            "ProfileGenderEnum": {
+                "enum": [
+                    "male",
+                    "female",
+                    "other",
+                    "prefer_not_to_say"
+                ],
+                "type": "string",
+                "description": "* `male` - Male\n* `female` - Female\n* `other` - Other\n* `prefer_not_to_say` - Prefer not to say"
             },
             "Question": {
                 "type": "object",
@@ -1957,16 +2222,14 @@
                     },
                     "order": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "Display order of the question in the test"
                     },
                     "points": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "How many points this question is worth"
                     },
                     "answer_options": {
@@ -1991,6 +2254,17 @@
                 "type": "string",
                 "description": "* `multiple_choice` - Multiple Choice\n* `true_false` - True/False"
             },
+            "RatingEnum": {
+                "enum": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ],
+                "type": "integer",
+                "description": "* `1` - 1 Stars\n* `2` - 2 Stars\n* `3` - 3 Stars\n* `4` - 4 Stars\n* `5` - 5 Stars"
+            },
             "Register": {
                 "type": "object",
                 "properties": {
@@ -2001,12 +2275,6 @@
                     "last_name": {
                         "type": "string",
                         "maxLength": 150
-                    },
-                    "phone": {
-                        "type": "string",
-                        "nullable": true,
-                        "pattern": "^[+0-9()\\-\\s]{7,20}$",
-                        "maxLength": 20
                     },
                     "email": {
                         "type": "string",
@@ -2061,6 +2329,20 @@
                     "code",
                     "email",
                     "new_password"
+                ]
+            },
+            "SetAvatar": {
+                "type": "object",
+                "description": "Serializer for setting user avatar.",
+                "properties": {
+                    "avatar": {
+                        "type": "string",
+                        "format": "binary",
+                        "description": "Upload an image file (JPEG, PNG, GIF, or WebP, max 5MB)"
+                    }
+                },
+                "required": [
+                    "avatar"
                 ]
             },
             "State": {
@@ -2225,9 +2507,8 @@
                     },
                     "time_taken_seconds": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Time taken to complete the test in seconds"
                     },
@@ -2308,9 +2589,8 @@
                     },
                     "time_taken_seconds": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Time taken to complete the test in seconds"
                     },
@@ -2403,9 +2683,8 @@
                     },
                     "time_limit_seconds": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Time limit in seconds (if any)"
                     },
@@ -2422,9 +2701,8 @@
                     },
                     "passing_percentage": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "Percentage needed to pass (0-100)"
                     },
                     "shuffle_questions": {
@@ -2478,9 +2756,8 @@
                     },
                     "time_limit_seconds": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Time limit in seconds (if any)"
                     },
@@ -2490,16 +2767,14 @@
                     },
                     "passing_percentage": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "description": "Percentage needed to pass (0-100)"
                     },
                     "max_attempts": {
                         "type": "integer",
-                        "maximum": 9223372036854775807,
+                        "maximum": 2147483647,
                         "minimum": 0,
-                        "format": "int64",
                         "nullable": true,
                         "description": "Maximum allowed attempts (null = unlimited)"
                     }
@@ -2528,22 +2803,6 @@
                 },
                 "required": [
                     "answers"
-                ]
-            },
-            "TokenRefresh": {
-                "type": "object",
-                "properties": {
-                    "access": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "refresh": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "access",
-                    "refresh"
                 ]
             },
             "User": {
@@ -2582,26 +2841,111 @@
                         "readOnly": true
                     },
                     "has_active_subscription": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "avatar": {
                         "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "state": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "age": {
+                        "type": "integer",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "gender": {
+                        "type": "string",
+                        "nullable": true,
                         "readOnly": true
                     }
                 },
                 "required": [
+                    "age",
+                    "avatar",
                     "date_joined",
                     "email",
+                    "gender",
                     "has_active_subscription",
                     "id",
-                    "is_email_verified"
+                    "is_email_verified",
+                    "state"
                 ]
             },
-            "VehicleEnum": {
+            "UserUpdate": {
+                "type": "object",
+                "description": "Serializer for updating user profile (excludes avatar).",
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "phone": {
+                        "type": "string",
+                        "nullable": true,
+                        "pattern": "^[+0-9()\\-\\s]{7,20}$",
+                        "maxLength": 20
+                    },
+                    "state": {
+                        "type": "integer",
+                        "writeOnly": true,
+                        "nullable": true
+                    },
+                    "age": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "writeOnly": true,
+                        "nullable": true
+                    },
+                    "gender": {
+                        "writeOnly": true,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/UserUpdateGenderEnum"
+                            },
+                            {
+                                "$ref": "#/components/schemas/NullEnum"
+                            }
+                        ]
+                    }
+                }
+            },
+            "UserUpdateGenderEnum": {
                 "enum": [
-                    "car",
-                    "motorcycle",
-                    "cdl"
+                    "male",
+                    "female",
+                    "other",
+                    "prefer_not_to_say"
                 ],
                 "type": "string",
-                "description": "* `car` - Car\n* `motorcycle` - Motorcycle\n* `cdl` - CDL"
+                "description": "* `male` - male\n* `female` - female\n* `other` - other\n* `prefer_not_to_say` - prefer_not_to_say"
+            },
+            "Vehicle": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 80
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ]
             }
         },
         "securitySchemes": {

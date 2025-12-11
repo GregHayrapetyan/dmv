@@ -80,7 +80,7 @@ class ProfileRetrieveUpdateView(StandardizedResponseMixin, generics.RetrieveUpda
     Get or update user profile.
     
     Retrieves or updates the authenticated user's onboarding profile,
-    including state, vehicle type, and knowledge level.
+    including state, vehicle type, knowledge level, age, and gender.
     Profile is automatically created when user registers.
     """
     serializer_class = ProfileSerializer
@@ -100,7 +100,7 @@ class ProfileRetrieveUpdateView(StandardizedResponseMixin, generics.RetrieveUpda
 
     @extend_schema(
         summary="Update user profile",
-        description="Update the authenticated user's onboarding profile. Can update state, vehicle type, and knowledge level.",
+        description="Update the authenticated user's onboarding profile. Can update state, vehicle type, knowledge level, age, and gender.",
         request=ProfileSerializer,
         responses={
             200: ProfileSerializer,
