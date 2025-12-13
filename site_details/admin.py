@@ -9,8 +9,22 @@ class PlanFeatureInline(admin.TabularInline):
     """
     model = PlanFeature
     extra = 1
-    fields = ("text", "is_included", "icon_type", "detail_text", "order")
+    fields = ("text", "is_included", "icon_type", "icon", "detail_text", "order")
+    readonly_fields = ("icon_preview",)
     ordering = ("order",)
+    
+    def icon_preview(self, obj):
+        """
+        Display a thumbnail preview of the uploaded icon.
+        """
+        if obj.icon:
+            return format_html(
+                '<img src="{}" style="width: 30px; height: 30px; object-fit: contain;" />',
+                obj.icon.url
+            )
+        return "No custom icon"
+    
+    icon_preview.short_description = "Icon Preview"
 
 
 @admin.register(PricingPlan)

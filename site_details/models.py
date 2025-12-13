@@ -117,13 +117,10 @@ class PlanFeature(models.Model):
     """
     
     ICON_CHOICES = [
-        ("check", "Check Mark (✓)"),
-        ("star", "Star (⭐)"),
-        ("document", "Document (📄)"),
-        ("car", "Car (🚗)"),
-        ("trophy", "Trophy (🏆)"),
-        ("lock", "Lock (🔒)"),
-        ("unlock", "Unlock (🔓)"),
+        ("pricing_icons/check.svg", "Check Mark"),
+        ("pricing_icons/book.svg", "Book"),
+        ("pricing_icons/shield.svg", "Shield"),
+        ("pricing_icons/simulation.svg", "Simulation"),
     ]
     
     plan = models.ForeignKey(
@@ -144,10 +141,17 @@ class PlanFeature(models.Model):
     )
     
     icon_type = models.CharField(
-        max_length=20,
+        max_length=50,
         choices=ICON_CHOICES,
-        default="check",
+        default="pricing_icons/check.svg",
         help_text="Icon to display next to the feature",
+    )
+    
+    icon = models.ImageField(
+        upload_to="plan_features/icons/",
+        blank=True,
+        null=True,
+        help_text="Custom uploaded icon (overrides icon_type if provided)",
     )
     
     order = models.PositiveIntegerField(

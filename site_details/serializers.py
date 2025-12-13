@@ -36,6 +36,7 @@ class PlanFeatureSerializer(serializers.ModelSerializer):
             "text",
             "is_included",
             "icon_type",
+            "icon",
             "detail_text",
             "order",
         ]
