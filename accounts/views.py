@@ -721,3 +721,68 @@ class SetAvatarView(generics.GenericAPIView):
             data={"avatar_url": avatar_url},
             message="Avatar updated successfully"
         )
+
+
+class DeleteAccountView(generics.GenericAPIView):
+    """
+    Delete the authenticated user's account.
+    
+    Permanently deletes the user account and all associated data.
+    This action cannot be undone.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Delete user account",
+        description="""Permanently delete the authenticated user's account and all associated data.
+        
+        **Warning:** This action is irreversible. All user data, progress, and subscriptions will be deleted.
+        
+        The refresh token cookie will be cleared automatically.
+        """,
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Account deleted successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={"detail": "Account deleted successfully"},
+                    )
+                ]
+            ),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["User Profile"],
+    )
+    def delete(self, request):
+        """Delete the authenticated user's account."""
+        user = request.user
+        user_email = user.email
+        
+        try:
+            # Delete the user account (cascade will handle related data)
+            user.delete()
+            
+            logger.info(f"Account deleted: {user_email}")
+            
+            # Create response
+            response = APIResponse.success(
+                data=None,
+                message="Account deleted successfully"
+            )
+            
+            # Clear the refresh token cookie
+            response.delete_cookie(
+                key='refresh_token',
+                path='/',
+                samesite='None'
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error deleting account for {user_email}: {str(e)}")
+            return APIResponse.server_error(
+                message="Failed to delete account. Please try again later."
+            )

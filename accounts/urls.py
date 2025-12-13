@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     LoginView, RegisterView, ConfirmEmailView, ResetPasswordView, 
     RequestPasswordResetView, GoogleLoginView, MeView, CookieTokenRefreshView, LogoutView,
-    SetAvatarView
+    SetAvatarView, DeleteAccountView
 )
 from .subscription_views import (
     CreateCheckoutSessionView, CreateBillingPortalSessionView,
@@ -21,6 +21,7 @@ urlpatterns = [
     path("google/", GoogleLoginView.as_view(), name="google-login"),
     path("me/", MeView.as_view(), name="me"),
     path("set_avatar/", SetAvatarView.as_view(), name="set-avatar"),
+    path("delete_account/", DeleteAccountView.as_view(), name="delete-account"),
     
     # Subscription endpoints
     path("subscription/checkout/", CreateCheckoutSessionView.as_view(), name="subscription-checkout"),
