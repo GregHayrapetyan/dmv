@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
-    LessonProgress, TestAttempt, TestAnswer
+    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
 
@@ -164,3 +164,18 @@ class TestAttemptListSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'user_email', 'test', 'test_title', 'score', 'total_points', 
                   'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at')
         read_only_fields = ('user', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')
+
+
+class FavoriteLessonSerializer(serializers.ModelSerializer):
+    """Serializer for favorite lessons"""
+    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+    lesson_slug = serializers.CharField(source='lesson.slug', read_only=True)
+    category_name = serializers.CharField(source='lesson.category.name', read_only=True)
+    lesson_type = serializers.CharField(source='lesson.lesson_type', read_only=True)
+    duration_minutes = serializers.IntegerField(source='lesson.duration_minutes', read_only=True)
+    
+    class Meta:
+        model = FavoriteLesson
+        fields = ('id', 'lesson', 'lesson_title', 'lesson_slug', 'category_name', 
+                  'lesson_type', 'duration_minutes', 'created_at')
+        read_only_fields = ('created_at',)

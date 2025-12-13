@@ -3,7 +3,8 @@ from .views import (
     LessonCategoryListView, LessonListView, LessonDetailView,
     TestCategoryListView, TestListView, TestDetailView, TestSubmitView,
     LessonProgressView, UserLessonProgressListView,
-    UserTestAttemptsListView, TestAttemptDetailView
+    UserTestAttemptsListView, TestAttemptDetailView,
+    AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView
 )
 
 
@@ -24,4 +25,9 @@ urlpatterns = [
     path('my-progress/', UserLessonProgressListView.as_view(), name='my-lesson-progress'),
     path('my-attempts/', UserTestAttemptsListView.as_view(), name='my-test-attempts'),
     path('my-attempts/<int:pk>/', TestAttemptDetailView.as_view(), name='test-attempt-detail'),
+    
+    # Favorite lessons endpoints
+    path('favorites/', FavoriteLessonsListView.as_view(), name='favorite-lessons-list'),
+    path('lessons/<int:lesson_id>/favorite/', AddFavoriteLessonView.as_view(), name='add-favorite-lesson'),
+    path('lessons/<int:lesson_id>/unfavorite/', RemoveFavoriteLessonView.as_view(), name='remove-favorite-lesson'),
 ]

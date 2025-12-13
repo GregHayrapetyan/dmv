@@ -373,3 +373,32 @@ class TestAnswer(models.Model):
     def __str__(self):
         status = "Correct" if self.is_correct else "Incorrect"
         return f"Answer for Q{self.question.order} - {status}"
+
+
+class FavoriteLesson(models.Model):
+    """Track user's favorite lessons."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favorite_lessons'
+    )
+    lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.CASCADE,
+        related_name='favorited_by'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Favorite lesson"
+        verbose_name_plural = "Favorite lessons"
+        unique_together = ['user', 'lesson']
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['lesson']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.lesson.title}"

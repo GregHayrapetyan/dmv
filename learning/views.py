@@ -9,13 +9,14 @@ from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
 from .models import (
     LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
-    LessonProgress, TestAttempt, TestAnswer
+    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 from .serializers import (
     LessonCategorySerializer, LessonListSerializer, LessonDetailSerializer,
     TestCategorySerializer, TestListSerializer, TestDetailSerializer,
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
-    LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer
+    LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
+    FavoriteLessonSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -584,3 +585,111 @@ class TestAttemptDetailView(StandardizedResponseMixin, generics.RetrieveAPIView)
             'answers__question',
             'answers__selected_option'
         ).select_related('test')
+
+
+class AddFavoriteLessonView(APIView):
+    """
+    Add a lesson to user's favorites.
+    
+    Creates a favorite record for the authenticated user and specified lesson.
+    If already favorited, returns the existing record.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Add lesson to favorites",
+        description="Add a lesson to the authenticated user's favorites. Returns existing record if already favorited.",
+        responses={
+            201: FavoriteLessonSerializer,
+            200: FavoriteLessonSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Lesson not found"),
+        },
+        tags=["Favorites"],
+    )
+    def post(self, request, lesson_id):
+        lesson = get_object_or_404(Lesson, pk=lesson_id)
+        
+        favorite, created = FavoriteLesson.objects.get_or_create(
+            user=request.user,
+            lesson=lesson
+        )
+        
+        serializer = FavoriteLessonSerializer(favorite)
+        
+        if created:
+            logger.info(f"User {request.user.email} added lesson {lesson.title} to favorites")
+            return APIResponse.success(
+                data=serializer.data,
+                message="Lesson added to favorites",
+                status_code=status.HTTP_201_CREATED
+            )
+        else:
+            return APIResponse.success(
+                data=serializer.data,
+                message="Lesson already in favorites"
+            )
+
+
+class RemoveFavoriteLessonView(APIView):
+    """
+    Remove a lesson from user's favorites.
+    
+    Deletes the favorite record for the authenticated user and specified lesson.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Remove lesson from favorites",
+        description="Remove a lesson from the authenticated user's favorites.",
+        responses={
+            200: OpenApiResponse(description="Lesson removed from favorites"),
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Favorite not found"),
+        },
+        tags=["Favorites"],
+    )
+    def delete(self, request, lesson_id):
+        favorite = get_object_or_404(
+            FavoriteLesson,
+            user=request.user,
+            lesson_id=lesson_id
+        )
+        
+        lesson_title = favorite.lesson.title
+        favorite.delete()
+        
+        logger.info(f"User {request.user.email} removed lesson {lesson_title} from favorites")
+        
+        return APIResponse.success(
+            message="Lesson removed from favorites"
+        )
+
+
+class FavoriteLessonsListView(StandardizedResponseMixin, generics.ListAPIView):
+    """
+    List all favorite lessons for the authenticated user.
+    
+    Returns all lessons the user has marked as favorite,
+    including lesson details and when it was favorited.
+    """
+    serializer_class = FavoriteLessonSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get my favorite lessons",
+        description="Retrieve all favorite lessons for the authenticated user.",
+        responses={
+            200: FavoriteLessonSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Favorites"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
+    def get_queryset(self):
+        return FavoriteLesson.objects.filter(user=self.request.user).select_related(
+            'lesson',
+            'lesson__category'
+        )

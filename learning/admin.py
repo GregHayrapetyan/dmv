@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
-    LessonProgress, TestAttempt, TestAnswer
+    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
 
@@ -136,4 +136,14 @@ class TestAnswerAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         # Test answers should only be created through the API
         return False
+
+
+@admin.register(FavoriteLesson)
+class FavoriteLessonAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'lesson', 'created_at')
+    list_filter = ('lesson__category', 'created_at')
+    search_fields = ('user__email', 'lesson__title')
+    raw_id_fields = ('user', 'lesson')
+    readonly_fields = ('created_at',)
+    date_hierarchy = 'created_at'
 
