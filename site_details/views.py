@@ -16,6 +16,7 @@ class ClientReviewListAPIView(generics.ListAPIView):
     """
     serializer_class = ClientReviewSerializer
     permission_classes = [AllowAny]
+    pagination_class = None
     
     def get_queryset(self):
         """
