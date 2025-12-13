@@ -298,14 +298,17 @@ class GoogleLoginView(generics.GenericAPIView):
         tags=["Authentication"],
     )
     def post(self, request):
-        """Accepts a Google id_token and returns app JWTs. Verifies token locally."""
+        """Accepts a Google id_token or access_token and returns app JWTs."""
+        import requests as http_requests
         from google.oauth2 import id_token
         from google.auth.transport import requests as grequests
         from google.auth.exceptions import GoogleAuthError
 
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        token = ser.validated_data["id_token"]
+        
+        id_token_str = ser.validated_data.get("id_token")
+        access_token = ser.validated_data.get("access_token")
         
         if not settings.GOOGLE_OAUTH_CLIENT_ID:
             logger.error("Google OAuth Client ID not configured")
@@ -314,17 +317,51 @@ class GoogleLoginView(generics.GenericAPIView):
             )
         
         try:
-            # Verify the token with Google
-            info = id_token.verify_oauth2_token(
-                token, 
-                grequests.Request(), 
-                settings.GOOGLE_OAUTH_CLIENT_ID
-            )
+            # Method 1: If ID token is provided (from GoogleLogin component)
+            if id_token_str:
+                # Verify the ID token with Google
+                info = id_token.verify_oauth2_token(
+                    id_token_str, 
+                    grequests.Request(), 
+                    settings.GOOGLE_OAUTH_CLIENT_ID
+                )
+                
+                # Extract user information from ID token
+                email = info.get("email")
+                email_verified = info.get("email_verified", False)
+                first_name = info.get("given_name", "")
+                last_name = info.get("family_name", "")
+            
+            # Method 2: If access token is provided (from useGoogleLogin hook)
+            elif access_token:
+                # Use access token to fetch user info from Google's userinfo endpoint
+                userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+                headers = {"Authorization": f"Bearer {access_token}"}
+                
+                response = http_requests.get(userinfo_url, headers=headers, timeout=10)
+                
+                if response.status_code != 200:
+                    logger.error(f"Google userinfo fetch failed: {response.text}")
+                    return APIResponse.error(
+                        message="Invalid or expired Google access token.",
+                        error_code=ErrorCodes.INVALID_TOKEN,
+                        status_code=status.HTTP_401_UNAUTHORIZED
+                    )
+                
+                info = response.json()
+                
+                # Extract user information from userinfo response
+                email = info.get("email")
+                email_verified = info.get("verified_email", False)
+                first_name = info.get("given_name", "")
+                last_name = info.get("family_name", "")
+            
+            else:
+                return APIResponse.validation_error(
+                    message="Either id_token or access_token must be provided."
+                )
             
             # Validate required fields
-            email = info.get("email")
-            email_verified = info.get("email_verified", False)
-            
             if not email:
                 return APIResponse.validation_error(
                     message="Email not provided by Google."
@@ -338,10 +375,6 @@ class GoogleLoginView(generics.GenericAPIView):
                     error_code=ErrorCodes.EMAIL_NOT_VERIFIED,
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
-            
-            # Extract user information
-            first_name = info.get("given_name", "")
-            last_name = info.get("family_name", "")
             
             # Get or create user
             user, created = User.objects.get_or_create(

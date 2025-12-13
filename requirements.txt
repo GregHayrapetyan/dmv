@@ -24,3 +24,4 @@ typing_extensions==4.15.0
 uritemplate==4.2.0
 stripe==7.8.0
 psycopg2-binary==2.9.10
+requests==2.31.0

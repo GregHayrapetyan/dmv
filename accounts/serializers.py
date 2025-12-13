@@ -187,7 +187,13 @@ class ResetPasswordSerializer(serializers.Serializer):
         return user
 
 class GoogleLoginSerializer(serializers.Serializer):
-    id_token = serializers.CharField()
+    id_token = serializers.CharField(required=False, allow_blank=True, help_text="Google ID token (JWT)")
+    access_token = serializers.CharField(required=False, allow_blank=True, help_text="Google access token")
+    
+    def validate(self, attrs):
+        if not attrs.get('id_token') and not attrs.get('access_token'):
+            raise serializers.ValidationError("Either id_token or access_token must be provided")
+        return attrs
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating user profile (excludes avatar)."""
