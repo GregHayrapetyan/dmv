@@ -268,12 +268,15 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.avatar.url
         return None
     
-    @extend_schema_field(serializers.CharField(allow_null=True, required=False))
+    @extend_schema_field(serializers.DictField(allow_null=True, required=False))
     def get_state(self, obj):
         """Return user's state from profile if exists."""
         try:
             if obj.profile and obj.profile.state:
-                return obj.profile.state.name
+                return {
+                    "id": obj.profile.state.id,
+                    "name": obj.profile.state.name
+                }
             return None
         except Exception:
             return None
