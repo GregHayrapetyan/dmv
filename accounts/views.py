@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
     ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
+    ChangePasswordSerializer,
 )
 from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
@@ -786,3 +787,64 @@ class DeleteAccountView(generics.GenericAPIView):
             return APIResponse.server_error(
                 message="Failed to delete account. Please try again later."
             )
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    """
+    Change the authenticated user's password.
+    
+    Requires the current password for verification and a new password.
+    """
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Change password",
+        description="""Change the authenticated user's password.
+        
+        Requires:
+        - old_password: Current password for verification
+        - new_password: New password (minimum 8 characters)
+        - confirm_password: Must match new_password
+        
+        The new password must be different from the old password.
+        """,
+        request=ChangePasswordSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Password changed successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={"detail": "Password changed successfully"},
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Validation error (e.g., passwords don't match, old password incorrect)"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["User Profile"],
+    )
+    def post(self, request):
+        """Change user password."""
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Password change validation failed",
+                details=serializer.errors
+            )
+        
+        user = request.user
+        new_password = serializer.validated_data['new_password']
+        
+        # Set the new password
+        user.set_password(new_password)
+        user.save()
+        
+        logger.info(f"Password changed for user: {user.email}")
+        
+        return APIResponse.success(
+            data=None,
+            message="Password changed successfully"
+        )

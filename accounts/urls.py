@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     LoginView, RegisterView, ConfirmEmailView, ResetPasswordView, 
     RequestPasswordResetView, GoogleLoginView, MeView, CookieTokenRefreshView, LogoutView,
-    SetAvatarView, DeleteAccountView
+    SetAvatarView, DeleteAccountView, ChangePasswordView
 )
 from .subscription_views import (
     CreateCheckoutSessionView, CreateBillingPortalSessionView,
@@ -22,6 +22,7 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
     path("set_avatar/", SetAvatarView.as_view(), name="set-avatar"),
     path("delete_account/", DeleteAccountView.as_view(), name="delete-account"),
+    path("password/change/", ChangePasswordView.as_view(), name="password-change"),
     
     # Subscription endpoints
     path("subscription/checkout/", CreateCheckoutSessionView.as_view(), name="subscription-checkout"),
