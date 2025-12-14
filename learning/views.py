@@ -595,7 +595,7 @@ class AddFavoriteLessonView(APIView):
     If already favorited, returns the existing record.
     """
     permission_classes = [permissions.IsAuthenticated]
-    
+    pagination_class = None
     @extend_schema(
         summary="Add lesson to favorites",
         description="Add a lesson to the authenticated user's favorites. Returns existing record if already favorited.",
