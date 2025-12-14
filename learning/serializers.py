@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db.models import Avg, Count
 from .models import (
     LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
@@ -32,10 +33,39 @@ class LessonDetailSerializer(serializers.ModelSerializer):
 
 class TestCategorySerializer(serializers.ModelSerializer):
     lesson_category_name = serializers.CharField(source='lesson_category.name', read_only=True)
+    tests_count = serializers.SerializerMethodField()
+    average_pass_percentage = serializers.SerializerMethodField()
     
     class Meta:
         model = TestCategory
-        fields = ('id', 'name', 'slug', 'lesson_category', 'lesson_category_name')
+        fields = ('id', 'name', 'slug', 'lesson_category', 'lesson_category_name', 
+                  'tests_count', 'average_pass_percentage')
+    
+    def get_tests_count(self, obj):
+        """Return the total number of tests in this category"""
+        return obj.tests.count()
+    
+    def get_average_pass_percentage(self, obj):
+        """
+        Calculate the average percentage score for the current user across all tests in this category.
+        Returns 0 if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        
+        # Get all test attempts for the current user in this category
+        attempts = TestAttempt.objects.filter(
+            user=request.user,
+            test__test_category=obj
+        ).values_list('percentage', flat=True)
+        
+        if not attempts:
+            return 0
+        
+        # Calculate average of all percentages
+        avg_percentage = sum(attempts) / len(attempts)
+        return round(avg_percentage, 2)
 
 
 class AnswerOptionSerializer(serializers.ModelSerializer):
@@ -74,15 +104,75 @@ class TestListSerializer(serializers.ModelSerializer):
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
     test_category_name = serializers.CharField(source='test_category.name', read_only=True)
     question_count = serializers.SerializerMethodField()
+    best_percentage = serializers.SerializerMethodField()
+    best_score = serializers.SerializerMethodField()
+    best_total_points = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
         fields = ('id', 'title', 'lesson', 'lesson_title', 'test_category', 
                   'test_category_name', 'is_demo', 'time_limit_seconds', 'question_count',
-                  'passing_percentage', 'max_attempts')
+                  'passing_percentage', 'max_attempts', 'best_percentage', 'best_score', 'best_total_points')
     
     def get_question_count(self, obj):
         return obj.questions.count()
+    
+    def get_best_percentage(self, obj):
+        """
+        Get the best percentage score for the current user for this test.
+        Returns None if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Get the best attempt for this test by the current user
+        best_attempt = TestAttempt.objects.filter(
+            user=request.user,
+            test=obj
+        ).order_by('-percentage').first()
+        
+        if best_attempt:
+            return float(best_attempt.percentage)
+        return None
+    
+    def get_best_score(self, obj):
+        """
+        Get the score from the best attempt for the current user for this test.
+        Returns None if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Get the best attempt for this test by the current user
+        best_attempt = TestAttempt.objects.filter(
+            user=request.user,
+            test=obj
+        ).order_by('-percentage').first()
+        
+        if best_attempt:
+            return best_attempt.score
+        return None
+    
+    def get_best_total_points(self, obj):
+        """
+        Get the total points from the best attempt for the current user for this test.
+        Returns None if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Get the best attempt for this test by the current user
+        best_attempt = TestAttempt.objects.filter(
+            user=request.user,
+            test=obj
+        ).order_by('-percentage').first()
+        
+        if best_attempt:
+            return best_attempt.total_points
+        return None
 
 
 class TestDetailSerializer(serializers.ModelSerializer):
