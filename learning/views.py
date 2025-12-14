@@ -305,6 +305,20 @@ class TestSubmitView(APIView):
         summary="Submit test answers",
         description="Submit answers for a test. Returns score, percentage, pass/fail status, and correct answers. Requires authentication.",
         request=TestSubmissionSerializer,
+        examples=[
+            OpenApiExample(
+                "Submit Test Answers",
+                value={
+                    "answers": {
+                        "1": 2,
+                        "2": 5,
+                        "3": 8
+                    },
+                    "time_taken_seconds": 450
+                },
+                request_only=True,
+            )
+        ],
         responses={
             200: OpenApiResponse(
                 description="Test submitted successfully",
