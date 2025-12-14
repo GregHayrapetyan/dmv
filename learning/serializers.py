@@ -15,20 +15,30 @@ class LessonCategorySerializer(serializers.ModelSerializer):
 class LessonListSerializer(serializers.ModelSerializer):
     """Serializer for listing lessons (without full content)"""
     category_name = serializers.CharField(source='category.name', read_only=True)
+    state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'slug', 'category', 'category_name', 'lesson_type', 'order', 'duration_minutes', 'is_published')
+        fields = ('id', 'title', 'slug', 'category', 'category_name', 'lesson_type', 'order', 'duration_minutes', 'is_published', 'state_names')
+    
+    def get_state_names(self, obj):
+        """Return list of state names this lesson is available for. Empty list means available for all states."""
+        return [state.name for state in obj.states.all()]
 
 
 class LessonDetailSerializer(serializers.ModelSerializer):
     """Serializer for lesson detail view (with full content)"""
     category_name = serializers.CharField(source='category.name', read_only=True)
+    state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
         fields = ('id', 'title', 'slug', 'category', 'category_name', 
-                  'lesson_type', 'content', 'video_url', 'order', 'duration_minutes', 'created_at')
+                  'lesson_type', 'content', 'video_url', 'order', 'duration_minutes', 'created_at', 'state_names')
+    
+    def get_state_names(self, obj):
+        """Return list of state names this lesson is available for. Empty list means available for all states."""
+        return [state.name for state in obj.states.all()]
 
 
 class TestCategorySerializer(serializers.ModelSerializer):
@@ -107,12 +117,13 @@ class TestListSerializer(serializers.ModelSerializer):
     best_percentage = serializers.SerializerMethodField()
     best_score = serializers.SerializerMethodField()
     best_total_points = serializers.SerializerMethodField()
+    state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
         fields = ('id', 'title', 'lesson', 'lesson_title', 'test_category', 
                   'test_category_name', 'is_demo', 'time_limit_seconds', 'question_count',
-                  'passing_percentage', 'max_attempts', 'best_percentage', 'best_score', 'best_total_points')
+                  'passing_percentage', 'max_attempts', 'best_percentage', 'best_score', 'best_total_points', 'state_names')
     
     def get_question_count(self, obj):
         return obj.questions.count()
@@ -173,6 +184,10 @@ class TestListSerializer(serializers.ModelSerializer):
         if best_attempt:
             return best_attempt.total_points
         return None
+    
+    def get_state_names(self, obj):
+        """Return list of state names this test is available for. Empty list means available for all states."""
+        return [state.name for state in obj.states.all()]
 
 
 class TestDetailSerializer(serializers.ModelSerializer):
@@ -180,12 +195,17 @@ class TestDetailSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
     test_category_name = serializers.CharField(source='test_category.name', read_only=True)
+    state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
         fields = ('id', 'title', 'description', 'lesson', 'lesson_title', 
                   'test_category', 'test_category_name', 'time_limit_seconds', 
-                  'is_demo', 'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers')
+                  'is_demo', 'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names')
+    
+    def get_state_names(self, obj):
+        """Return list of state names this test is available for. Empty list means available for all states."""
+        return [state.name for state in obj.states.all()]
 
 
 class TestSubmissionSerializer(serializers.Serializer):

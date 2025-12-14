@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db import models
 from decimal import Decimal
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from dmv.api_response import APIResponse, ErrorCodes
@@ -83,6 +84,19 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
         category_id = self.request.query_params.get('category', None)
         if category_id:
             queryset = queryset.filter(category_id=category_id)
+        
+        # Filter by user's profile state if authenticated
+        if self.request.user.is_authenticated:
+            try:
+                profile = self.request.user.profile
+                if profile.state:
+                    # Show lessons for user's state OR lessons available in all states (no state assigned)
+                    queryset = queryset.filter(
+                        models.Q(states=profile.state) | models.Q(states__isnull=True)
+                    ).distinct()
+            except:
+                pass  # Profile doesn't exist, show all
+        
         return queryset.order_by('category', 'id')
 
 
@@ -201,6 +215,18 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
         is_demo = self.request.query_params.get('demo', None)
         if is_demo is not None:
             queryset = queryset.filter(is_demo=is_demo.lower() == 'true')
+        
+        # Filter by user's profile state if authenticated
+        if self.request.user.is_authenticated:
+            try:
+                profile = self.request.user.profile
+                if profile.state:
+                    # Show tests for user's state OR tests available in all states (no state assigned)
+                    queryset = queryset.filter(
+                        models.Q(states=profile.state) | models.Q(states__isnull=True)
+                    ).distinct()
+            except:
+                pass  # Profile doesn't exist, show all
         
         return queryset.order_by('test_category', 'id')
 

@@ -15,12 +15,13 @@ class LessonCategoryAdmin(admin.ModelAdmin):
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'category', 'lesson_type', 'order', 'is_published', 'duration_minutes', 'created_at')
-    list_filter = ('lesson_type', 'category', 'is_published')
+    list_filter = ('lesson_type', 'category', 'is_published', 'states')
     search_fields = ('title', 'slug')
     prepopulated_fields = {'slug': ('title',)}
     raw_id_fields = ('category',)
     list_editable = ('order', 'is_published')
     readonly_fields = ('created_at', 'updated_at')
+    filter_horizontal = ('states',)
 
 
 @admin.register(TestCategory)
@@ -40,14 +41,18 @@ class QuestionInline(admin.TabularInline):
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'lesson', 'test_category', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
-    list_filter = ('is_demo', 'test_category', 'shuffle_questions')
+    list_filter = ('is_demo', 'test_category', 'shuffle_questions', 'states')
     search_fields = ('title', 'lesson__title')
     raw_id_fields = ('lesson', 'test_category')
     inlines = [QuestionInline]
     readonly_fields = ('created_at', 'updated_at')
+    filter_horizontal = ('states',)
     fieldsets = (
         ('Basic Information', {
             'fields': ('lesson', 'test_category', 'title', 'description', 'is_demo')
+        }),
+        ('State Availability', {
+            'fields': ('states',)
         }),
         ('Test Settings', {
             'fields': ('passing_percentage', 'max_attempts', 'time_limit_seconds', 'shuffle_questions', 'shuffle_answers')

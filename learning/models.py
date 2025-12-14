@@ -50,6 +50,12 @@ class Lesson(models.Model):
         blank=True,
         help_text="Estimated duration in minutes"
     )
+    states = models.ManyToManyField(
+        'onboarding.State',
+        blank=True,
+        related_name='lessons',
+        help_text="States where this lesson is available. Leave empty for all states."
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
@@ -134,6 +140,12 @@ class Test(models.Model):
     shuffle_answers = models.BooleanField(
         default=False,
         help_text="Randomize answer order for each attempt"
+    )
+    states = models.ManyToManyField(
+        'onboarding.State',
+        blank=True,
+        related_name='tests',
+        help_text="States where this test is available. Leave empty for all states."
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
