@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import PricingPlan, PlanFeature, ClientReview
+from .models import PricingPlan, PlanFeature, ClientReview, Contact
 
 
 class PlanFeatureInline(admin.TabularInline):
@@ -219,4 +219,63 @@ class ClientReviewAdmin(admin.ModelAdmin):
         return format_html('<span style="font-size: 16px;">{}</span>', stars)
     
     rating_display.short_description = "Rating"
+
+
+@admin.register(Contact)
+class ContactAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing contact form submissions.
+    """
+    list_display = (
+        "name",
+        "email",
+        "subject",
+        "status",
+        "created_at",
+    )
+    
+    list_filter = (
+        "status",
+        "created_at",
+    )
+    
+    search_fields = (
+        "name",
+        "email",
+        "subject",
+        "message",
+    )
+    
+    readonly_fields = (
+        "name",
+        "email",
+        "subject",
+        "message",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Contact Information", {
+            "fields": ("name", "email", "subject")
+        }),
+        ("Message", {
+            "fields": ("message",)
+        }),
+        ("Status", {
+            "fields": ("status",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    list_editable = ("status",)
+    
+    def has_add_permission(self, request):
+        """
+        Disable adding contacts through admin (they come from the API).
+        """
+        return False
 

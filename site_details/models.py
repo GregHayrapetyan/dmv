@@ -230,3 +230,56 @@ class ClientReview(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.rating} stars"
+
+
+class Contact(models.Model):
+    """
+    Contact form submission model.
+    Stores messages from users who contact the site.
+    """
+    STATUS_CHOICES = [
+        ('new', 'New'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+    ]
+    
+    name = models.CharField(
+        max_length=100,
+        help_text="Contact person's name",
+    )
+    
+    email = models.EmailField(
+        help_text="Contact person's email address",
+    )
+    
+    subject = models.CharField(
+        max_length=200,
+        help_text="Subject of the message",
+    )
+    
+    message = models.TextField(
+        help_text="The message content",
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='new',
+        help_text="Status of the contact request",
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+    
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Contact"
+        verbose_name_plural = "Contacts"
+    
+    def __str__(self):
+        return f"{self.name} - {self.subject}"

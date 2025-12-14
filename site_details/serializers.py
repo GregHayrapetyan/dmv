@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature
+from .models import ClientReview, PricingPlan, PlanFeature, Contact
 
 
 class ClientReviewSerializer(serializers.ModelSerializer):
@@ -82,3 +82,22 @@ class PricingPlanSerializer(serializers.ModelSerializer):
         if obj.discount_amount > 0:
             return f"Save ${int(obj.discount_amount)}"
         return ""
+
+
+class ContactSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Contact model.
+    Used for creating contact form submissions.
+    """
+    
+    class Meta:
+        model = Contact
+        fields = [
+            "id",
+            "name",
+            "email",
+            "subject",
+            "message",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
