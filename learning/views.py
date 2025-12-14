@@ -80,6 +80,7 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
         return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
+        from django.db.models import Count
         queryset = Lesson.objects.all().select_related('category')
         category_id = self.request.query_params.get('category', None)
         if category_id:
@@ -90,11 +91,13 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
             try:
                 profile = self.request.user.profile
                 if profile.state:
-                    # Show lessons for user's state OR lessons available in all states (no state assigned)
+                    # Show lessons for user's state OR lessons with no states assigned (available for all)
+                    # Annotate with state count to identify lessons with no states
+                    queryset = queryset.annotate(state_count=Count('states'))
                     queryset = queryset.filter(
-                        models.Q(states=profile.state) | models.Q(states__isnull=True)
+                        models.Q(states=profile.state) | models.Q(state_count=0)
                     ).distinct()
-            except:
+            except Exception as e:
                 pass  # Profile doesn't exist, show all
         
         return queryset.order_by('category', 'id')
@@ -204,6 +207,7 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
         return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
+        from django.db.models import Count
         queryset = Test.objects.all().select_related('lesson', 'test_category')
         
         # Filter by test category
@@ -221,11 +225,13 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
             try:
                 profile = self.request.user.profile
                 if profile.state:
-                    # Show tests for user's state OR tests available in all states (no state assigned)
+                    # Show tests for user's state OR tests with no states assigned (available for all)
+                    # Annotate with state count to identify tests with no states
+                    queryset = queryset.annotate(state_count=Count('states'))
                     queryset = queryset.filter(
-                        models.Q(states=profile.state) | models.Q(states__isnull=True)
+                        models.Q(states=profile.state) | models.Q(state_count=0)
                     ).distinct()
-            except:
+            except Exception as e:
                 pass  # Profile doesn't exist, show all
         
         return queryset.order_by('test_category', 'id')
