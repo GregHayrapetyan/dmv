@@ -160,6 +160,7 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     serializer_class = TestListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
     
     @extend_schema(
         summary="List tests",
@@ -675,7 +676,7 @@ class FavoriteLessonsListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     serializer_class = FavoriteLessonSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+    pagination_class = None
     @extend_schema(
         summary="Get my favorite lessons",
         description="Retrieve all favorite lessons for the authenticated user.",
