@@ -4,6 +4,23 @@ info:
   version: 1.0.0
   description: Auth + Onboarding + Learning backend for DMV prep app
 paths:
+  /api/accounts/delete_account/:
+    delete:
+      operationId: accounts_delete_account_destroy
+      description: "Permanently delete the authenticated user's account and all associated\
+        \ data.\n        \n        **Warning:** This action is irreversible. All user\
+        \ data, progress, and subscriptions will be deleted.\n        \n        The\
+        \ refresh token cookie will be cleared automatically.\n        "
+      summary: Delete user account
+      tags:
+      - User Profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Account deleted successfully
+        '401':
+          description: Authentication required
   /api/accounts/email/confirm/:
     post:
       operationId: accounts_email_confirm_create
@@ -51,7 +68,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/GoogleLogin'
-        required: true
       security:
       - jwtAuth: []
       - {}
@@ -156,6 +172,39 @@ paths:
           description: Validation error
         '401':
           description: Authentication required
+  /api/accounts/password/change/:
+    post:
+      operationId: accounts_password_change_create
+      description: "Change the authenticated user's password.\n        \n        Requires:\n\
+        \        - old_password: Current password for verification\n        - new_password:\
+        \ New password (minimum 8 characters)\n        - confirm_password: Must match\
+        \ new_password\n        \n        The new password must be different from\
+        \ the old password.\n        "
+      summary: Change password
+      tags:
+      - User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          description: Validation error (e.g., passwords don't match, old password
+            incorrect)
+        '401':
+          description: Authentication required
   /api/accounts/password/forgot/:
     post:
       operationId: accounts_password_forgot_create
@@ -212,13 +261,10 @@ paths:
   /api/accounts/register/:
     post:
       operationId: accounts_register_create
-      description: |-
-        Register a new user account.
-
-        Creates a new user and sends a verification code to their email.
-        The user must verify their email before they can log in.
+      description: Create a new user account and send email verification code.
+      summary: Register new user
       tags:
-      - accounts
+      - Authentication
       requestBody:
         content:
           application/json:
@@ -236,11 +282,10 @@ paths:
       - {}
       responses:
         '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Register'
-          description: ''
+          description: Registration successful
+        '400':
+          description: Validation error (e.g., passwords don't match, email already
+            exists)
   /api/accounts/set_avatar/:
     post:
       operationId: accounts_set_avatar_create
@@ -422,6 +467,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedLessonCategoryList'
           description: ''
+  /api/learning/favorites/:
+    get:
+      operationId: learning_favorites_list
+      description: Retrieve all favorite lessons for the authenticated user.
+      summary: Get my favorite lessons
+      tags:
+      - Favorites
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FavoriteLesson'
+          description: ''
+        '401':
+          description: Authentication required
   /api/learning/lessons/:
     get:
       operationId: learning_lessons_list
@@ -451,6 +516,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedLessonListList'
           description: ''
+  /api/learning/lessons/{lesson_id}/favorite/:
+    post:
+      operationId: learning_lessons_favorite_create
+      description: Add a lesson to the authenticated user's favorites. Returns existing
+        record if already favorited.
+      summary: Add lesson to favorites
+      parameters:
+      - in: path
+        name: lesson_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Favorites
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteLesson'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteLesson'
+          description: ''
+        '401':
+          description: Authentication required
+        '404':
+          description: Lesson not found
   /api/learning/lessons/{lesson_id}/progress/:
     post:
       operationId: learning_lessons_progress_create
@@ -489,6 +587,28 @@ paths:
           description: Authentication required
         '404':
           description: Lesson not found
+  /api/learning/lessons/{lesson_id}/unfavorite/:
+    delete:
+      operationId: learning_lessons_unfavorite_destroy
+      description: Remove a lesson from the authenticated user's favorites.
+      summary: Remove lesson from favorites
+      parameters:
+      - in: path
+        name: lesson_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Favorites
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Lesson removed from favorites
+        '401':
+          description: Authentication required
+        '404':
+          description: Favorite not found
   /api/learning/lessons/{slug}/:
     get:
       operationId: learning_lessons_retrieve
@@ -644,12 +764,6 @@ paths:
         schema:
           type: boolean
         description: Filter by demo status (true/false)
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
       tags:
       - Tests
       security:
@@ -660,7 +774,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedTestListList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/TestList'
           description: ''
   /api/learning/tests/{id}/:
     get:
@@ -836,15 +952,38 @@ paths:
                 items:
                   $ref: '#/components/schemas/Vehicle'
           description: ''
+  /api/site-details/contact/:
+    post:
+      operationId: site_details_contact_create
+      description: Submit a contact form message. No authentication required.
+      summary: Submit contact form
+      tags:
+      - Site Details
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Contact'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Contact'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Contact'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          description: Contact submission created successfully
+        '400':
+          description: Validation error
   /api/site-details/pricing-plans/:
     get:
       operationId: site_details_pricing_plans_list
-      description: |-
-        API endpoint to retrieve all active pricing plans with features.
-        GET /api/site-details/pricing-plans/
-
-        Returns:
-            200: List of active pricing plans with nested features
+      description: Retrieve all active pricing plans with their features.
+      summary: List pricing plans
       parameters:
       - name: page
         required: false
@@ -853,7 +992,7 @@ paths:
         schema:
           type: integer
       tags:
-      - site-details
+      - Site Details
       security:
       - jwtAuth: []
       - {}
@@ -867,21 +1006,10 @@ paths:
   /api/site-details/reviews/:
     get:
       operationId: site_details_reviews_list
-      description: |-
-        API endpoint to retrieve all active client reviews.
-        GET /api/site-details/reviews/
-
-        Returns:
-            200: List of active client reviews
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
+      description: Retrieve all active client reviews.
+      summary: List client reviews
       tags:
-      - site-details
+      - Site Details
       security:
       - jwtAuth: []
       - {}
@@ -890,7 +1018,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedClientReviewList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientReview'
           description: ''
 components:
   schemas:
@@ -913,6 +1043,24 @@ components:
     BlankEnum:
       enum:
       - ''
+    ChangePassword:
+      type: object
+      description: Serializer for changing user password.
+      properties:
+        old_password:
+          type: string
+          writeOnly: true
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        confirm_password:
+          type: string
+          writeOnly: true
+      required:
+      - confirm_password
+      - new_password
+      - old_password
     ClientReview:
       type: object
       description: |-
@@ -978,43 +1126,120 @@ components:
       required:
       - code
       - email
-    GoogleLogin:
+    Contact:
       type: object
-      properties:
-        id_token:
-          type: string
-      required:
-      - id_token
-    IconTypeEnum:
-      enum:
-      - check
-      - star
-      - document
-      - car
-      - trophy
-      - lock
-      - unlock
-      type: string
       description: |-
-        * `check` - Check Mark (✓)
-        * `star` - Star (⭐)
-        * `document` - Document (📄)
-        * `car` - Car (🚗)
-        * `trophy` - Trophy (🏆)
-        * `lock` - Lock (🔒)
-        * `unlock` - Unlock (🔓)
-    Knowledge:
-      type: object
+        Serializer for Contact model.
+        Used for creating contact form submissions.
       properties:
         id:
           type: integer
           readOnly: true
         name:
           type: string
+          description: Contact person's name
           maxLength: 100
+        email:
+          type: string
+          format: email
+          description: Contact person's email address
+          maxLength: 254
+        subject:
+          type: string
+          description: Subject of the message
+          maxLength: 200
+        message:
+          type: string
+          description: The message content
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - id
+      - message
+      - name
+      - subject
+    FavoriteLesson:
+      type: object
+      description: Serializer for favorite lessons
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lesson:
+          type: integer
+        lesson_title:
+          type: string
+          readOnly: true
+        lesson_slug:
+          type: string
+          readOnly: true
+        category_name:
+          type: string
+          readOnly: true
+        lesson_type:
+          type: string
+          readOnly: true
+        duration_minutes:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_name
+      - created_at
+      - duration_minutes
+      - id
+      - lesson
+      - lesson_slug
+      - lesson_title
+      - lesson_type
+    GoogleLogin:
+      type: object
+      properties:
+        id_token:
+          type: string
+          description: Google ID token (JWT)
+        access_token:
+          type: string
+          description: Google access token
+    IconTypeEnum:
+      enum:
+      - pricing_icons/check.svg
+      - pricing_icons/book.svg
+      - pricing_icons/shield.svg
+      - pricing_icons/simulation.svg
+      type: string
+      description: |-
+        * `pricing_icons/check.svg` - Check Mark
+        * `pricing_icons/book.svg` - Book
+        * `pricing_icons/shield.svg` - Shield
+        * `pricing_icons/simulation.svg` - Simulation
+    Knowledge:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+        image:
+          type: string
+          readOnly: true
+        imageSize:
+          type: string
+          readOnly: true
       required:
       - id
-      - name
+      - image
+      - imageSize
+      - label
     LessonCategory:
       type: object
       properties:
@@ -1184,29 +1409,6 @@ components:
     NullEnum:
       enum:
       - null
-    PaginatedClientReviewList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/ClientReview'
     PaginatedLessonCategoryList:
       type: object
       required:
@@ -1345,29 +1547,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TestCategory'
-    PaginatedTestListList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/TestList'
     PlanFeature:
       type: object
       description: |-
@@ -1391,13 +1570,15 @@ components:
           description: |-
             Icon to display next to the feature
 
-            * `check` - Check Mark (✓)
-            * `star` - Star (⭐)
-            * `document` - Document (📄)
-            * `car` - Car (🚗)
-            * `trophy` - Trophy (🏆)
-            * `lock` - Lock (🔒)
-            * `unlock` - Unlock (🔓)
+            * `pricing_icons/check.svg` - Check Mark
+            * `pricing_icons/book.svg` - Book
+            * `pricing_icons/shield.svg` - Shield
+            * `pricing_icons/simulation.svg` - Simulation
+        icon:
+          type: string
+          format: uri
+          nullable: true
+          description: Custom uploaded icon (overrides icon_type if provided)
         detail_text:
           type: string
           description: Optional detailed description (shown on hover/click)
@@ -2046,7 +2227,8 @@ components:
           nullable: true
           readOnly: true
         state:
-          type: string
+          type: object
+          additionalProperties: {}
           nullable: true
           readOnly: true
         age:
@@ -2115,12 +2297,20 @@ components:
         id:
           type: integer
           readOnly: true
-        name:
+        label:
           type: string
-          maxLength: 80
+          readOnly: true
+        image:
+          type: string
+          readOnly: true
+        imageSize:
+          type: string
+          readOnly: true
       required:
       - id
-      - name
+      - image
+      - imageSize
+      - label
   securitySchemes:
     jwtAuth:
       type: http

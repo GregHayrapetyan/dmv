@@ -5,7 +5,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import InvalidToken
-from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
     ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
@@ -20,17 +20,8 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-class RegisterView(generics.CreateAPIView):
-    """
-    Register a new user account.
-    
-    Creates a new user and sends a verification code to their email.
-    The user must verify their email before they can log in.
-    """
-    serializer_class = RegisterSerializer
-    permission_classes = [permissions.AllowAny]
-
-    @extend_schema(
+@extend_schema_view(
+    post=extend_schema(
         summary="Register new user",
         description="Create a new user account and send email verification code.",
         request=RegisterSerializer,
@@ -48,6 +39,17 @@ class RegisterView(generics.CreateAPIView):
         },
         tags=["Authentication"],
     )
+)
+class RegisterView(generics.CreateAPIView):
+    """
+    Register a new user account.
+    
+    Creates a new user and sends a verification code to their email.
+    The user must verify their email before they can log in.
+    """
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():

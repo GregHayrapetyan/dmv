@@ -1,12 +1,19 @@
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
 
 from .models import PricingPlan, ClientReview, Contact
 from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer
 from dmv.api_response import APIResponse
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="List client reviews",
+        description="Retrieve all active client reviews.",
+        tags=["Site Details"],
+    )
+)
 class ClientReviewListAPIView(generics.ListAPIView):
     """
     API endpoint to retrieve all active client reviews.
@@ -35,6 +42,13 @@ class ClientReviewListAPIView(generics.ListAPIView):
         return APIResponse.success(data=serializer.data)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="List pricing plans",
+        description="Retrieve all active pricing plans with their features.",
+        tags=["Site Details"],
+    )
+)
 class PricingPlanListAPIView(generics.ListAPIView):
     """
     API endpoint to retrieve all active pricing plans with features.
