@@ -160,7 +160,10 @@ class RequestPasswordResetView(generics.GenericAPIView):
                 examples=[
                     OpenApiExample(
                         "Success",
-                        value={"detail": "If this email exists, a reset code has been sent."},
+                        value={
+                            "detail": "If this email exists, a reset code has been sent.",
+                            "otp": "123456"
+                        },
                     )
                 ]
             ),
@@ -174,9 +177,9 @@ class RequestPasswordResetView(generics.GenericAPIView):
                 message="Validation failed",
                 details=ser.errors
             )
-        ser.save()
+        otp_code = ser.save()
         return APIResponse.success(
-            data=None,
+            data={"otp": otp_code},
             message="If this email exists, a reset code has been sent."
         )
 

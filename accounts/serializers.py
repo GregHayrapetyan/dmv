@@ -155,6 +155,9 @@ class RequestPasswordResetSerializer(serializers.Serializer):
         except Exception as e:
             logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
             raise serializers.ValidationError("Failed to send reset email. Please try again.")
+        
+        # Return the code so it can be included in the response
+        return code
 
 
 class ResetPasswordSerializer(serializers.Serializer):
