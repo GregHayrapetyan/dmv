@@ -533,7 +533,7 @@ class UserLessonProgressListView(StandardizedResponseMixin, generics.ListAPIView
     """
     serializer_class = LessonProgressSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+    pagination_class = None
     @extend_schema(
         summary="Get my lesson progress",
         description="Retrieve all lesson progress records for the authenticated user.",
@@ -559,7 +559,7 @@ class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     serializer_class = TestAttemptListSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+    pagination_class = None
     @extend_schema(
         summary="Get my test attempts",
         description="Retrieve all test attempts for the authenticated user. Can filter by test ID or pass/fail status.",
