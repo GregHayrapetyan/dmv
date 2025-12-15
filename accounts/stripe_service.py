@@ -36,6 +36,12 @@ class StripeService:
         """Get existing Stripe customer or create a new one."""
         try:
             subscription = Subscription.objects.get(user=user)
+            # If subscription exists but has no stripe_customer_id, create one
+            if not subscription.stripe_customer_id:
+                customer = StripeService.create_customer(user)
+                subscription.stripe_customer_id = customer.id
+                subscription.save()
+                return customer.id
             return subscription.stripe_customer_id
         except Subscription.DoesNotExist:
             customer = StripeService.create_customer(user)

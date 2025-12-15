@@ -88,6 +88,8 @@ class Subscription(models.Model):
     stripe_customer_id = models.CharField(
         max_length=255,
         unique=True,
+        null=True,
+        blank=True,
         help_text="Stripe customer ID"
     )
     stripe_subscription_id = models.CharField(
