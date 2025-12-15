@@ -4,7 +4,8 @@ from .views import (
     TestCategoryListView, TestListView, TestDetailView, TestSubmitView,
     LessonProgressView, UserLessonProgressListView,
     UserTestAttemptsListView, TestAttemptDetailView,
-    AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView
+    AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView,
+    TestCategoryStatisticsView
 )
 
 
@@ -17,6 +18,7 @@ urlpatterns = [
     
     # Test endpoints
     path('test-categories/', TestCategoryListView.as_view(), name='test-categories'),
+    path('test-categories/<int:category_id>/statistics/', TestCategoryStatisticsView.as_view(), name='test-category-statistics'),
     path('tests/', TestListView.as_view(), name='tests'),
     path('tests/<int:pk>/', TestDetailView.as_view(), name='test-detail'),
     path('tests/<int:pk>/submit/', TestSubmitView.as_view(), name='test-submit'),

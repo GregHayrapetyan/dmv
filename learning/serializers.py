@@ -288,3 +288,28 @@ class FavoriteLessonSerializer(serializers.ModelSerializer):
         fields = ('id', 'lesson', 'lesson_title', 'lesson_slug', 'category_name', 
                   'lesson_type', 'duration_minutes', 'created_at')
         read_only_fields = ('created_at',)
+
+
+class TestStatisticsSerializer(serializers.Serializer):
+    """Serializer for individual test statistics within a category"""
+    test_id = serializers.IntegerField()
+    test_title = serializers.CharField()
+    best_score = serializers.IntegerField()
+    best_percentage = serializers.FloatField()
+    total_points = serializers.IntegerField()
+    total_attempts = serializers.IntegerField()
+    total_correct_answers = serializers.IntegerField()
+    total_questions = serializers.IntegerField()
+    passed = serializers.BooleanField()
+
+
+class TestCategoryStatisticsSerializer(serializers.Serializer):
+    """Serializer for test category statistics"""
+    category_id = serializers.IntegerField()
+    category_name = serializers.CharField()
+    total_tests = serializers.IntegerField()
+    total_attempts = serializers.IntegerField()
+    tests = TestStatisticsSerializer(many=True)
+    overall_correct_answers = serializers.IntegerField()
+    overall_total_questions = serializers.IntegerField()
+    overall_accuracy = serializers.FloatField()

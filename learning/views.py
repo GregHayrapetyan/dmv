@@ -17,7 +17,7 @@ from .serializers import (
     TestCategorySerializer, TestListSerializer, TestDetailSerializer,
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
-    FavoriteLessonSerializer
+    FavoriteLessonSerializer, TestCategoryStatisticsSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -741,4 +741,108 @@ class FavoriteLessonsListView(StandardizedResponseMixin, generics.ListAPIView):
         return FavoriteLesson.objects.filter(user=self.request.user).select_related(
             'lesson',
             'lesson__category'
+        )
+
+
+class TestCategoryStatisticsView(APIView):
+    """
+    Get aggregated statistics for all tests in a test category.
+    
+    Returns comprehensive statistics including:
+    - Best scores for each test
+    - Total correct answers across all attempts
+    - Overall accuracy metrics
+    - Attempt counts per test
+    
+    Requires authentication to view personal statistics.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get test category statistics",
+        description="Retrieve aggregated statistics for all tests in a category. Includes best scores, correct answers, and overall accuracy for the authenticated user.",
+        responses={
+            200: TestCategoryStatisticsSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Test category not found"),
+        },
+        tags=["Tests"],
+    )
+    def get(self, request, category_id):
+        # Get the test category
+        test_category = get_object_or_404(TestCategory, pk=category_id)
+        
+        # Get all tests in this category
+        tests = Test.objects.filter(test_category=test_category).prefetch_related('questions')
+        
+        # Initialize statistics
+        test_stats = []
+        overall_correct_answers = 0
+        overall_total_questions = 0
+        total_attempts = 0
+        
+        for test in tests:
+            # Get all attempts for this test by the user
+            attempts = TestAttempt.objects.filter(
+                user=request.user,
+                test=test
+            ).select_related('test').prefetch_related('answers')
+            
+            if not attempts.exists():
+                # No attempts for this test, skip or include with zeros
+                continue
+            
+            # Get best attempt (highest percentage)
+            best_attempt = attempts.order_by('-percentage').first()
+            
+            # Calculate total correct answers across all attempts for this test
+            total_correct = 0
+            for attempt in attempts:
+                correct_count = attempt.answers.filter(is_correct=True).count()
+                total_correct += correct_count
+            
+            # Get total questions for this test
+            total_questions = test.questions.count()
+            
+            test_stats.append({
+                'test_id': test.id,
+                'test_title': test.title,
+                'best_score': best_attempt.score,
+                'best_percentage': float(best_attempt.percentage),
+                'total_points': best_attempt.total_points,
+                'total_attempts': attempts.count(),
+                'total_correct_answers': total_correct,
+                'total_questions': total_questions,
+                'passed': best_attempt.passed,
+            })
+            
+            # Aggregate for overall statistics
+            overall_correct_answers += total_correct
+            overall_total_questions += total_questions * attempts.count()
+            total_attempts += attempts.count()
+        
+        # Calculate overall accuracy
+        overall_accuracy = 0.0
+        if overall_total_questions > 0:
+            overall_accuracy = (overall_correct_answers / overall_total_questions) * 100
+        
+        # Prepare response data
+        statistics_data = {
+            'category_id': test_category.id,
+            'category_name': test_category.name,
+            'total_tests': len(test_stats),
+            'total_attempts': total_attempts,
+            'tests': test_stats,
+            'overall_correct_answers': overall_correct_answers,
+            'overall_total_questions': overall_total_questions,
+            'overall_accuracy': round(overall_accuracy, 2),
+        }
+        
+        serializer = TestCategoryStatisticsSerializer(statistics_data)
+        
+        logger.info(f"User {request.user.email} retrieved statistics for category {test_category.name}")
+        
+        return APIResponse.success(
+            data=serializer.data,
+            message="Statistics retrieved successfully"
         )
