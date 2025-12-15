@@ -155,6 +155,7 @@ class TestCategoryListView(StandardizedResponseMixin, generics.ListAPIView):
     queryset = TestCategory.objects.all().select_related('lesson_category').order_by('name')
     serializer_class = TestCategorySerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
 
     @extend_schema(
         summary="List test categories",
