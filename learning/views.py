@@ -132,13 +132,13 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             if not subscription.has_access():
                 return APIResponse.error(
                     message="Active subscription required to access lessons",
-                    error_code=ErrorCodes.PERMISSION_DENIED,
+                    error_code=ErrorCodes.FORBIDDEN,
                     status_code=status.HTTP_403_FORBIDDEN
                 )
         except Subscription.DoesNotExist:
             return APIResponse.error(
                 message="Active subscription required to access lessons",
-                error_code=ErrorCodes.PERMISSION_DENIED,
+                error_code=ErrorCodes.FORBIDDEN,
                 status_code=status.HTTP_403_FORBIDDEN
             )
         
@@ -270,26 +270,27 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             if not request.user.is_authenticated:
                 return APIResponse.error(
                     message="Authentication required for premium tests",
-                    error_code=ErrorCodes.AUTHENTICATION_REQUIRED,
+                    error_code=ErrorCodes.UNAUTHORIZED,
                     status_code=status.HTTP_401_UNAUTHORIZED
                 )
-            
+
             try:
                 subscription = Subscription.objects.get(user=request.user)
                 if not subscription.has_access():
                     return APIResponse.error(
                         message="Active subscription required to access this test",
-                        error_code=ErrorCodes.PERMISSION_DENIED,
+                        error_code=ErrorCodes.FORBIDDEN,
                         status_code=status.HTTP_403_FORBIDDEN
                     )
             except Subscription.DoesNotExist:
                 return APIResponse.error(
                     message="Active subscription required to access this test",
-                    error_code=ErrorCodes.PERMISSION_DENIED,
+                    error_code=ErrorCodes.FORBIDDEN,
                     status_code=status.HTTP_403_FORBIDDEN
                 )
-        
+
         return super().get(request, *args, **kwargs)
+
 
 
 class TestSubmitView(APIView):
@@ -366,13 +367,13 @@ class TestSubmitView(APIView):
                 if not subscription.has_access():
                     return APIResponse.error(
                         message="Active subscription required to submit this test",
-                        error_code=ErrorCodes.PERMISSION_DENIED,
+                        error_code=ErrorCodes.FORBIDDEN,
                         status_code=status.HTTP_403_FORBIDDEN
                     )
             except Subscription.DoesNotExist:
                 return APIResponse.error(
                     message="Active subscription required to submit this test",
-                    error_code=ErrorCodes.PERMISSION_DENIED,
+                    error_code=ErrorCodes.FORBIDDEN,
                     status_code=status.HTTP_403_FORBIDDEN
                 )
         

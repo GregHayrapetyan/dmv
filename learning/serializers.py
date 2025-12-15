@@ -81,8 +81,7 @@ class TestCategorySerializer(serializers.ModelSerializer):
 class AnswerOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerOption
-        fields = ('id', 'text', 'order')
-        # Don't expose is_correct or explanation in list view
+        fields = ('id', 'text', 'is_correct', 'explanation', 'order')
 
 
 class AnswerOptionDetailSerializer(serializers.ModelSerializer):

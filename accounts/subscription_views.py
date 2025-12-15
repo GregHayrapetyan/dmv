@@ -83,7 +83,7 @@ class CreateCheckoutSessionView(APIView):
             logger.error(f"Error creating checkout session: {str(e)}")
             return APIResponse.error(
                 message="Failed to create checkout session",
-                error_code=ErrorCodes.INTERNAL_ERROR,
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -146,7 +146,7 @@ class CreateBillingPortalSessionView(APIView):
             logger.error(f"Error creating billing portal session: {str(e)}")
             return APIResponse.error(
                 message="Failed to create billing portal session",
-                error_code=ErrorCodes.INTERNAL_ERROR,
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -220,7 +220,7 @@ class CancelSubscriptionView(APIView):
             logger.error(f"Error cancelling subscription: {str(e)}")
             return APIResponse.error(
                 message="Failed to cancel subscription",
-                error_code=ErrorCodes.INTERNAL_ERROR,
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
