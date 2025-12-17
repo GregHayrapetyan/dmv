@@ -1,35 +1,19 @@
 from django.contrib import admin
 from .models import (
-    LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
+    Lesson, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
 
-@admin.register(LessonCategory)
-class LessonCategoryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'slug')
-    search_fields = ('name', 'slug')
-    prepopulated_fields = {'slug': ('name',)}
-
-
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'category', 'lesson_type', 'order', 'is_published', 'duration_minutes', 'created_at')
-    list_filter = ('lesson_type', 'category', 'is_published', 'states')
+    list_display = ('id', 'title', 'lesson_type', 'order', 'is_published', 'duration_minutes', 'created_at')
+    list_filter = ('lesson_type', 'is_published', 'states')
     search_fields = ('title', 'slug')
     prepopulated_fields = {'slug': ('title',)}
-    raw_id_fields = ('category',)
     list_editable = ('order', 'is_published')
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('states',)
-
-
-@admin.register(TestCategory)
-class TestCategoryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'lesson_category', 'slug')
-    search_fields = ('name', 'slug')
-    prepopulated_fields = {'slug': ('name',)}
-    raw_id_fields = ('lesson_category',)
 
 
 class QuestionInline(admin.TabularInline):
@@ -40,16 +24,16 @@ class QuestionInline(admin.TabularInline):
 
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'lesson', 'test_category', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
-    list_filter = ('is_demo', 'test_category', 'shuffle_questions', 'states')
+    list_display = ('id', 'title', 'lesson', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_filter = ('is_demo', 'shuffle_questions', 'states')
     search_fields = ('title', 'lesson__title')
-    raw_id_fields = ('lesson', 'test_category')
+    raw_id_fields = ('lesson',)
     inlines = [QuestionInline]
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('states',)
     fieldsets = (
         ('Basic Information', {
-            'fields': ('lesson', 'test_category', 'title', 'description', 'is_demo')
+            'fields': ('lesson', 'title', 'description', 'image', 'is_demo')
         }),
         ('State Availability', {
             'fields': ('states',)
@@ -73,7 +57,7 @@ class AnswerOptionInline(admin.TabularInline):
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     list_display = ('id', 'text_preview', 'test', 'question_type', 'order', 'points', 'has_correct_answer')
-    list_filter = ('test__test_category', 'question_type')
+    list_filter = ('question_type',)
     search_fields = ('text', 'test__title')
     raw_id_fields = ('test',)
     inlines = [AnswerOptionInline]
@@ -100,7 +84,7 @@ class AnswerOptionAdmin(admin.ModelAdmin):
 @admin.register(LessonProgress)
 class LessonProgressAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'lesson', 'completed', 'started_at', 'completed_at')
-    list_filter = ('completed', 'lesson__category')
+    list_filter = ('completed',)
     search_fields = ('user__email', 'lesson__title')
     raw_id_fields = ('user', 'lesson')
     readonly_fields = ('started_at', 'updated_at')
@@ -118,7 +102,7 @@ class TestAnswerInline(admin.TabularInline):
 @admin.register(TestAttempt)
 class TestAttemptAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'test', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')
-    list_filter = ('passed', 'test__test_category', 'started_at')
+    list_filter = ('passed', 'started_at')
     search_fields = ('user__email', 'test__title')
     raw_id_fields = ('user', 'test')
     readonly_fields = ('started_at', 'completed_at', 'score', 'total_points', 'percentage', 'passed')
@@ -146,7 +130,7 @@ class TestAnswerAdmin(admin.ModelAdmin):
 @admin.register(FavoriteLesson)
 class FavoriteLessonAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'lesson', 'created_at')
-    list_filter = ('lesson__category', 'created_at')
+    list_filter = ('created_at',)
     search_fields = ('user__email', 'lesson__title')
     raw_id_fields = ('user', 'lesson')
     readonly_fields = ('created_at',)

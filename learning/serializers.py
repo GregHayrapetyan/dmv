@@ -1,25 +1,18 @@
 from rest_framework import serializers
 from django.db.models import Avg, Count
 from .models import (
-    LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
+    Lesson, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
 
-class LessonCategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LessonCategory
-        fields = ('id', 'name', 'slug', 'description')
-
-
 class LessonListSerializer(serializers.ModelSerializer):
     """Serializer for listing lessons (without full content)"""
-    category_name = serializers.CharField(source='category.name', read_only=True)
     state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'slug', 'category', 'category_name', 'lesson_type', 'order', 'duration_minutes', 'is_published', 'state_names')
+        fields = ('id', 'title', 'slug', 'lesson_type', 'order', 'duration_minutes', 'is_published', 'state_names')
     
     def get_state_names(self, obj):
         """Return list of state names this lesson is available for. Empty list means available for all states."""
@@ -28,54 +21,15 @@ class LessonListSerializer(serializers.ModelSerializer):
 
 class LessonDetailSerializer(serializers.ModelSerializer):
     """Serializer for lesson detail view (with full content)"""
-    category_name = serializers.CharField(source='category.name', read_only=True)
     state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'slug', 'category', 'category_name', 
-                  'lesson_type', 'content', 'video_url', 'order', 'duration_minutes', 'created_at', 'state_names')
+        fields = ('id', 'title', 'slug', 'lesson_type', 'content', 'video_url', 'order', 'duration_minutes', 'created_at', 'state_names')
     
     def get_state_names(self, obj):
         """Return list of state names this lesson is available for. Empty list means available for all states."""
         return [state.name for state in obj.states.all()]
-
-
-class TestCategorySerializer(serializers.ModelSerializer):
-    lesson_category_name = serializers.CharField(source='lesson_category.name', read_only=True)
-    tests_count = serializers.SerializerMethodField()
-    average_pass_percentage = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = TestCategory
-        fields = ('id', 'name', 'slug', 'lesson_category', 'lesson_category_name', 
-                  'tests_count', 'average_pass_percentage')
-    
-    def get_tests_count(self, obj):
-        """Return the total number of tests in this category"""
-        return obj.tests.count()
-    
-    def get_average_pass_percentage(self, obj):
-        """
-        Calculate the average percentage score for the current user across all tests in this category.
-        Returns 0 if user is not authenticated or has no attempts.
-        """
-        request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return 0
-        
-        # Get all test attempts for the current user in this category
-        attempts = TestAttempt.objects.filter(
-            user=request.user,
-            test__test_category=obj
-        ).values_list('percentage', flat=True)
-        
-        if not attempts:
-            return 0
-        
-        # Calculate average of all percentages
-        avg_percentage = sum(attempts) / len(attempts)
-        return round(avg_percentage, 2)
 
 
 class AnswerOptionSerializer(serializers.ModelSerializer):
@@ -111,7 +65,6 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
 class TestListSerializer(serializers.ModelSerializer):
     """Serializer for listing tests"""
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
-    test_category_name = serializers.CharField(source='test_category.name', read_only=True)
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
     best_score = serializers.SerializerMethodField()
@@ -120,8 +73,7 @@ class TestListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'lesson', 'lesson_title', 'test_category', 
-                  'test_category_name', 'is_demo', 'time_limit_seconds', 'question_count',
+        fields = ('id', 'title', 'image', 'lesson', 'lesson_title', 'is_demo', 'time_limit_seconds', 'question_count',
                   'passing_percentage', 'max_attempts', 'best_percentage', 'best_score', 'best_total_points', 'state_names')
     
     def get_question_count(self, obj):
@@ -193,13 +145,11 @@ class TestDetailSerializer(serializers.ModelSerializer):
     """Serializer for taking a test"""
     questions = QuestionSerializer(many=True, read_only=True)
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
-    test_category_name = serializers.CharField(source='test_category.name', read_only=True)
     state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'description', 'lesson', 'lesson_title', 
-                  'test_category', 'test_category_name', 'time_limit_seconds', 
+        fields = ('id', 'title', 'image', 'description', 'lesson', 'lesson_title', 'time_limit_seconds', 
                   'is_demo', 'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names')
     
     def get_state_names(self, obj):
@@ -279,37 +229,85 @@ class FavoriteLessonSerializer(serializers.ModelSerializer):
     """Serializer for favorite lessons"""
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
     lesson_slug = serializers.CharField(source='lesson.slug', read_only=True)
-    category_name = serializers.CharField(source='lesson.category.name', read_only=True)
     lesson_type = serializers.CharField(source='lesson.lesson_type', read_only=True)
     duration_minutes = serializers.IntegerField(source='lesson.duration_minutes', read_only=True)
     
     class Meta:
         model = FavoriteLesson
-        fields = ('id', 'lesson', 'lesson_title', 'lesson_slug', 'category_name', 
-                  'lesson_type', 'duration_minutes', 'created_at')
+        fields = ('id', 'lesson', 'lesson_title', 'lesson_slug', 'lesson_type', 'duration_minutes', 'created_at')
         read_only_fields = ('created_at',)
 
 
-class TestStatisticsSerializer(serializers.Serializer):
-    """Serializer for individual test statistics within a category"""
-    test_id = serializers.IntegerField()
-    test_title = serializers.CharField()
-    best_score = serializers.IntegerField()
-    best_percentage = serializers.FloatField()
-    total_points = serializers.IntegerField()
-    total_attempts = serializers.IntegerField()
-    total_correct_answers = serializers.IntegerField()
-    total_questions = serializers.IntegerField()
-    passed = serializers.BooleanField()
+class TestStatisticsSerializer(serializers.ModelSerializer):
+    """Serializer for test statistics showing user's best performance"""
+    question_count = serializers.SerializerMethodField()
+    best_percentage = serializers.SerializerMethodField()
+    best_score = serializers.SerializerMethodField()
+    best_total_points = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Test
+        fields = ('id', 'title', 'image', 'question_count', 'best_percentage', 'best_score', 'best_total_points')
+    
+    def get_question_count(self, obj):
+        """Return the total number of questions in this test"""
+        return obj.questions.count()
+    
+    def get_best_percentage(self, obj):
+        """
+        Get the best percentage score for the current user for this test.
+        Returns None if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Get the best attempt for this test by the current user
+        best_attempt = TestAttempt.objects.filter(
+            user=request.user,
+            test=obj
+        ).order_by('-percentage').first()
+        
+        if best_attempt:
+            return float(best_attempt.percentage)
+        return None
+    
+    def get_best_score(self, obj):
+        """
+        Get the score from the best attempt for the current user for this test.
+        Returns None if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Get the best attempt for this test by the current user
+        best_attempt = TestAttempt.objects.filter(
+            user=request.user,
+            test=obj
+        ).order_by('-percentage').first()
+        
+        if best_attempt:
+            return best_attempt.score
+        return None
+    
+    def get_best_total_points(self, obj):
+        """
+        Get the total points from the best attempt for the current user for this test.
+        Returns None if user is not authenticated or has no attempts.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Get the best attempt for this test by the current user
+        best_attempt = TestAttempt.objects.filter(
+            user=request.user,
+            test=obj
+        ).order_by('-percentage').first()
+        
+        if best_attempt:
+            return best_attempt.total_points
+        return None
 
 
-class TestCategoryStatisticsSerializer(serializers.Serializer):
-    """Serializer for test category statistics"""
-    category_id = serializers.IntegerField()
-    category_name = serializers.CharField()
-    total_tests = serializers.IntegerField()
-    total_attempts = serializers.IntegerField()
-    tests = TestStatisticsSerializer(many=True)
-    overall_correct_answers = serializers.IntegerField()
-    overall_total_questions = serializers.IntegerField()
-    overall_accuracy = serializers.FloatField()

@@ -1,25 +1,23 @@
 from django.urls import path
 from .views import (
-    LessonCategoryListView, LessonListView, LessonDetailView,
-    TestCategoryListView, TestListView, TestDetailView, TestSubmitView,
+    LessonListView, LessonDetailView,
+    TestListView, TestDetailView, TestSubmitView,
     LessonProgressView, UserLessonProgressListView,
     UserTestAttemptsListView, TestAttemptDetailView,
     AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView,
-    TestCategoryStatisticsView
+    TestStatisticsView
 )
 
 
 urlpatterns = [
     # Lesson endpoints
-    path('categories/', LessonCategoryListView.as_view(), name='lesson-categories'),
     path('lessons/', LessonListView.as_view(), name='lessons'),
     path('lessons/<slug:slug>/', LessonDetailView.as_view(), name='lesson-detail'),
     path('lessons/<int:lesson_id>/progress/', LessonProgressView.as_view(), name='lesson-progress'),
     
     # Test endpoints
-    path('test-categories/', TestCategoryListView.as_view(), name='test-categories'),
-    path('test-categories/<int:category_id>/statistics/', TestCategoryStatisticsView.as_view(), name='test-category-statistics'),
     path('tests/', TestListView.as_view(), name='tests'),
+    path('tests/statistics/', TestStatisticsView.as_view(), name='test-statistics'),
     path('tests/<int:pk>/', TestDetailView.as_view(), name='test-detail'),
     path('tests/<int:pk>/submit/', TestSubmitView.as_view(), name='test-submit'),
     

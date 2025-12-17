@@ -3,21 +3,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 
 
-class LessonCategory(models.Model):
-    """Category of driving lessons (e.g. 'Road signs')."""
-
-    name = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True)
-    description = models.TextField(blank=True)
-
-    class Meta:
-        verbose_name = "Lesson category"
-        verbose_name_plural = "Lesson categories"
-
-    def __str__(self):
-        return self.name
-
-
 class Lesson(models.Model):
     """Single lesson (video, theory, etc.)."""
 
@@ -26,11 +11,6 @@ class Lesson(models.Model):
         THEORY = "theory", "Theory"
         MIXED = "mixed", "Video + theory"
 
-    category = models.ForeignKey(
-        LessonCategory,
-        on_delete=models.PROTECT,
-        related_name="lessons",
-    )
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     lesson_type = models.CharField(
@@ -42,7 +22,7 @@ class Lesson(models.Model):
     video_url = models.URLField(blank=True)
     order = models.PositiveIntegerField(
         default=1,
-        help_text="Display order within category"
+        help_text="Display order"
     )
     is_published = models.BooleanField(default=True)
     duration_minutes = models.PositiveIntegerField(
@@ -62,10 +42,10 @@ class Lesson(models.Model):
     class Meta:
         verbose_name = "Lesson"
         verbose_name_plural = "Lessons"
-        ordering = ['category', 'order', 'id']
+        ordering = ['order', 'id']
         indexes = [
-            models.Index(fields=['category', 'order']),
-            models.Index(fields=['category', 'slug']),
+            models.Index(fields=['order']),
+            models.Index(fields=['slug']),
             models.Index(fields=['lesson_type']),
         ]
 
@@ -73,33 +53,10 @@ class Lesson(models.Model):
         return self.title
 
 
-class TestCategory(models.Model):
-    """
-    Category of tests that matches a lesson category.
-    For example: 'Tests for road signs'.
-    """
-
-    lesson_category = models.OneToOneField(
-        LessonCategory,
-        on_delete=models.CASCADE,
-        related_name="test_category",
-    )
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True)
-
-    class Meta:
-        verbose_name = "Test category"
-        verbose_name_plural = "Test categories"
-
-    def __str__(self):
-        return self.name
-
-
 class Test(models.Model):
     """
     Test for a specific lesson.
-    One lesson has exactly one test,
-    and the test belongs to the corresponding test category.
+    One lesson has exactly one test.
     """
 
     lesson = models.OneToOneField(
@@ -107,14 +64,15 @@ class Test(models.Model):
         on_delete=models.CASCADE,
         related_name="test",
     )
-    test_category = models.ForeignKey(
-        TestCategory,
-        on_delete=models.PROTECT,
-        related_name="tests",
-    )
 
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    image = models.ImageField(
+        upload_to="test_images/",
+        blank=True,
+        null=True,
+        help_text="Cover image for the test",
+    )
     time_limit_seconds = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -154,7 +112,7 @@ class Test(models.Model):
         verbose_name = "Test"
         verbose_name_plural = "Tests"
         indexes = [
-            models.Index(fields=['test_category', 'is_demo']),
+            models.Index(fields=['is_demo']),
             models.Index(fields=['lesson']),
         ]
         constraints = [
@@ -163,13 +121,6 @@ class Test(models.Model):
                 name='test_passing_percentage_range'
             ),
         ]
-
-    def save(self, *args, **kwargs):
-        # Automatically set test_category from the lesson category if not provided
-        if self.lesson and not self.test_category_id:
-            if hasattr(self.lesson.category, "test_category"):
-                self.test_category = self.lesson.category.test_category
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Test for lesson: {self.lesson.title}"

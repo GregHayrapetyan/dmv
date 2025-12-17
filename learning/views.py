@@ -9,44 +9,21 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
 from .models import (
-    LessonCategory, Lesson, TestCategory, Test, Question, AnswerOption,
+    Lesson, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 from .serializers import (
-    LessonCategorySerializer, LessonListSerializer, LessonDetailSerializer,
-    TestCategorySerializer, TestListSerializer, TestDetailSerializer,
+    LessonListSerializer, LessonDetailSerializer,
+    TestListSerializer, TestDetailSerializer,
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
-    FavoriteLessonSerializer, TestCategoryStatisticsSerializer
+    FavoriteLessonSerializer, TestStatisticsSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-class LessonCategoryListView(StandardizedResponseMixin, generics.ListAPIView):
-    """
-    List all lesson categories.
-    
-    Returns all available lesson categories for organizing learning content.
-    No authentication required.
-    """
-    queryset = LessonCategory.objects.all().order_by('name')
-    serializer_class = LessonCategorySerializer
-    permission_classes = [permissions.AllowAny]
-
-    @extend_schema(
-        summary="List lesson categories",
-        description="Retrieve all lesson categories. Used for filtering lessons by category.",
-        responses={
-            200: LessonCategorySerializer(many=True),
-        },
-        tags=["Lessons"],
-    )
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
 
 
 class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
@@ -61,16 +38,7 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
     
     @extend_schema(
         summary="List lessons",
-        description="Retrieve all lessons. Optionally filter by category ID.",
-        parameters=[
-            OpenApiParameter(
-                name='category',
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description='Filter lessons by category ID',
-                required=False,
-            ),
-        ],
+        description="Retrieve all lessons.",
         responses={
             200: LessonListSerializer(many=True),
         },
@@ -81,10 +49,7 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
     
     def get_queryset(self):
         from django.db.models import Count
-        queryset = Lesson.objects.all().select_related('category')
-        category_id = self.request.query_params.get('category', None)
-        if category_id:
-            queryset = queryset.filter(category_id=category_id)
+        queryset = Lesson.objects.all()
         
         # Filter by user's profile state if authenticated
         if self.request.user.is_authenticated:
@@ -100,7 +65,7 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
             except Exception as e:
                 pass  # Profile doesn't exist, show all
         
-        return queryset.order_by('category', 'id')
+        return queryset.order_by('order', 'id')
 
 
 class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
@@ -110,7 +75,7 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     Returns full lesson content including text, video URL, and metadata.
     Accessed by lesson slug. Requires active subscription.
     """
-    queryset = Lesson.objects.all().select_related('category')
+    queryset = Lesson.objects.all()
     serializer_class = LessonDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'slug'
@@ -145,30 +110,6 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class TestCategoryListView(StandardizedResponseMixin, generics.ListAPIView):
-    """
-    List all test categories.
-    
-    Returns all available test categories for organizing tests.
-    No authentication required.
-    """
-    queryset = TestCategory.objects.all().select_related('lesson_category').order_by('name')
-    serializer_class = TestCategorySerializer
-    permission_classes = [permissions.AllowAny]
-    pagination_class = None
-
-    @extend_schema(
-        summary="List test categories",
-        description="Retrieve all test categories. Used for filtering tests by category.",
-        responses={
-            200: TestCategorySerializer(many=True),
-        },
-        tags=["Tests"],
-    )
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
-
-
 class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     List all tests, optionally filtered by category or demo status.
@@ -182,15 +123,8 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     
     @extend_schema(
         summary="List tests",
-        description="Retrieve all tests. Can filter by category or demo status.",
+        description="Retrieve all tests. Can filter by demo status.",
         parameters=[
-            OpenApiParameter(
-                name='category',
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description='Filter tests by category ID',
-                required=False,
-            ),
             OpenApiParameter(
                 name='demo',
                 type=bool,
@@ -209,12 +143,7 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     
     def get_queryset(self):
         from django.db.models import Count
-        queryset = Test.objects.all().select_related('lesson', 'test_category')
-        
-        # Filter by test category
-        category_id = self.request.query_params.get('category', None)
-        if category_id:
-            queryset = queryset.filter(test_category_id=category_id)
+        queryset = Test.objects.all().select_related('lesson')
         
         # Filter by demo status
         is_demo = self.request.query_params.get('demo', None)
@@ -235,7 +164,7 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
             except Exception as e:
                 pass  # Profile doesn't exist, show all
         
-        return queryset.order_by('test_category', 'id')
+        return queryset.order_by('id')
 
 
 class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
@@ -248,7 +177,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     """
     queryset = Test.objects.all().prefetch_related(
         'questions__answer_options'
-    ).select_related('lesson', 'test_category')
+    ).select_related('lesson')
     serializer_class = TestDetailSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -547,7 +476,7 @@ class UserLessonProgressListView(StandardizedResponseMixin, generics.ListAPIView
         return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
-        return LessonProgress.objects.filter(user=self.request.user).select_related('lesson', 'lesson__category')
+        return LessonProgress.objects.filter(user=self.request.user).select_related('lesson')
 
 
 class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
@@ -739,110 +668,55 @@ class FavoriteLessonsListView(StandardizedResponseMixin, generics.ListAPIView):
     
     def get_queryset(self):
         return FavoriteLesson.objects.filter(user=self.request.user).select_related(
-            'lesson',
-            'lesson__category'
+            'lesson'
         )
 
 
-class TestCategoryStatisticsView(APIView):
+class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):
     """
-    Get aggregated statistics for all tests in a test category.
+    Get statistics for all tests showing user's best performance.
     
-    Returns comprehensive statistics including:
-    - Best scores for each test
-    - Total correct answers across all attempts
-    - Overall accuracy metrics
-    - Attempt counts per test
+    Returns a list of all tests with:
+    - Test image, title
+    - Number of questions
+    - User's best percentage score
+    - User's best score and total points
     
-    Requires authentication to view personal statistics.
+    Requires authentication to show personal statistics.
     """
+    serializer_class = TestStatisticsSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
     
     @extend_schema(
-        summary="Get test category statistics",
-        description="Retrieve aggregated statistics for all tests in a category. Includes best scores, correct answers, and overall accuracy for the authenticated user.",
+        summary="Get test statistics",
+        description="Retrieve statistics for all tests including user's best performance. Shows test image, question count, and best scores.",
         responses={
-            200: TestCategoryStatisticsSerializer,
+            200: TestStatisticsSerializer(many=True),
             401: OpenApiResponse(description="Authentication required"),
-            404: OpenApiResponse(description="Test category not found"),
         },
         tags=["Tests"],
     )
-    def get(self, request, category_id):
-        # Get the test category
-        test_category = get_object_or_404(TestCategory, pk=category_id)
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
+    def get_queryset(self):
+        from django.db.models import Count
+        queryset = Test.objects.all().prefetch_related('questions')
         
-        # Get all tests in this category
-        tests = Test.objects.filter(test_category=test_category).prefetch_related('questions')
+        # Filter by user's profile state if authenticated
+        if self.request.user.is_authenticated:
+            try:
+                profile = self.request.user.profile
+                if profile.state:
+                    # Show tests for user's state OR tests with no states assigned (available for all)
+                    queryset = queryset.annotate(state_count=Count('states'))
+                    queryset = queryset.filter(
+                        models.Q(states=profile.state) | models.Q(state_count=0)
+                    ).distinct()
+            except Exception as e:
+                pass  # Profile doesn't exist, show all
         
-        # Initialize statistics
-        test_stats = []
-        overall_correct_answers = 0
-        overall_total_questions = 0
-        total_attempts = 0
-        
-        for test in tests:
-            # Get all attempts for this test by the user
-            attempts = TestAttempt.objects.filter(
-                user=request.user,
-                test=test
-            ).select_related('test').prefetch_related('answers')
-            
-            if not attempts.exists():
-                # No attempts for this test, skip or include with zeros
-                continue
-            
-            # Get best attempt (highest percentage)
-            best_attempt = attempts.order_by('-percentage').first()
-            
-            # Calculate total correct answers across all attempts for this test
-            total_correct = 0
-            for attempt in attempts:
-                correct_count = attempt.answers.filter(is_correct=True).count()
-                total_correct += correct_count
-            
-            # Get total questions for this test
-            total_questions = test.questions.count()
-            
-            test_stats.append({
-                'test_id': test.id,
-                'test_title': test.title,
-                'best_score': best_attempt.score,
-                'best_percentage': float(best_attempt.percentage),
-                'total_points': best_attempt.total_points,
-                'total_attempts': attempts.count(),
-                'total_correct_answers': total_correct,
-                'total_questions': total_questions,
-                'passed': best_attempt.passed,
-            })
-            
-            # Aggregate for overall statistics
-            overall_correct_answers += total_correct
-            overall_total_questions += total_questions * attempts.count()
-            total_attempts += attempts.count()
-        
-        # Calculate overall accuracy
-        overall_accuracy = 0.0
-        if overall_total_questions > 0:
-            overall_accuracy = (overall_correct_answers / overall_total_questions) * 100
-        
-        # Prepare response data
-        statistics_data = {
-            'category_id': test_category.id,
-            'category_name': test_category.name,
-            'total_tests': len(test_stats),
-            'total_attempts': total_attempts,
-            'tests': test_stats,
-            'overall_correct_answers': overall_correct_answers,
-            'overall_total_questions': overall_total_questions,
-            'overall_accuracy': round(overall_accuracy, 2),
-        }
-        
-        serializer = TestCategoryStatisticsSerializer(statistics_data)
-        
-        logger.info(f"User {request.user.email} retrieved statistics for category {test_category.name}")
-        
-        return APIResponse.success(
-            data=serializer.data,
-            message="Statistics retrieved successfully"
-        )
+        return queryset.order_by('id')
+
+
