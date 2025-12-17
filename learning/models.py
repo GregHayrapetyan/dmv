@@ -36,6 +36,14 @@ class Lesson(models.Model):
         related_name='lessons',
         help_text="States where this lesson is available. Leave empty for all states."
     )
+    test = models.OneToOneField(
+        'Test',
+        on_delete=models.CASCADE,
+        related_name='lesson',
+        null=True,
+        blank=True,
+        help_text="Test associated with this lesson"
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
@@ -58,12 +66,6 @@ class Test(models.Model):
     Test for a specific lesson.
     One lesson has exactly one test.
     """
-
-    lesson = models.OneToOneField(
-        Lesson,
-        on_delete=models.CASCADE,
-        related_name="test",
-    )
 
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -113,7 +115,6 @@ class Test(models.Model):
         verbose_name_plural = "Tests"
         indexes = [
             models.Index(fields=['is_demo']),
-            models.Index(fields=['lesson']),
         ]
         constraints = [
             models.CheckConstraint(
@@ -123,7 +124,10 @@ class Test(models.Model):
         ]
 
     def __str__(self):
-        return f"Test for lesson: {self.lesson.title}"
+        try:
+            return f"Test for lesson: {self.lesson.title}"
+        except:
+            return f"Test: {self.title}"
 
 
 class Question(models.Model):
@@ -144,6 +148,12 @@ class Question(models.Model):
         blank=True,
         null=True,
         help_text="Image for the question (if any)",
+    )
+    video = models.FileField(
+        upload_to="test_questions/videos/",
+        blank=True,
+        null=True,
+        help_text="Video for the question (if any)",
     )
     question_type = models.CharField(
         max_length=20,

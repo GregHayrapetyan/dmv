@@ -7,33 +7,33 @@ from .models import (
 
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'lesson_type', 'order', 'is_published', 'duration_minutes', 'created_at')
+    list_display = ('id', 'title', 'lesson_type', 'order', 'is_published', 'duration_minutes', 'test', 'created_at')
     list_filter = ('lesson_type', 'is_published', 'states')
     search_fields = ('title', 'slug')
     prepopulated_fields = {'slug': ('title',)}
     list_editable = ('order', 'is_published')
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('states',)
+    raw_id_fields = ('test',)
 
 
 class QuestionInline(admin.TabularInline):
     model = Question
     extra = 1
-    fields = ('text', 'question_type', 'order', 'points')
+    fields = ('text', 'image', 'video', 'question_type', 'order', 'points')
 
 
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'lesson', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_display = ('id', 'title', 'get_lesson', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
     list_filter = ('is_demo', 'shuffle_questions', 'states')
     search_fields = ('title', 'lesson__title')
-    raw_id_fields = ('lesson',)
     inlines = [QuestionInline]
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('states',)
     fieldsets = (
         ('Basic Information', {
-            'fields': ('lesson', 'title', 'description', 'image', 'is_demo')
+            'fields': ('title', 'description', 'image', 'is_demo')
         }),
         ('State Availability', {
             'fields': ('states',)
@@ -46,6 +46,14 @@ class TestAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def get_lesson(self, obj):
+        """Get the lesson this test belongs to."""
+        try:
+            return obj.lesson
+        except:
+            return None
+    get_lesson.short_description = 'Lesson'
 
 
 class AnswerOptionInline(admin.TabularInline):
@@ -62,6 +70,18 @@ class QuestionAdmin(admin.ModelAdmin):
     raw_id_fields = ('test',)
     inlines = [AnswerOptionInline]
     readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Question Content', {
+            'fields': ('test', 'text', 'image', 'video', 'question_type')
+        }),
+        ('Settings', {
+            'fields': ('order', 'points')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
     def text_preview(self, obj):
         return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text

@@ -143,7 +143,7 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     
     def get_queryset(self):
         from django.db.models import Count
-        queryset = Test.objects.all().select_related('lesson')
+        queryset = Test.objects.all()
         
         # Filter by demo status
         is_demo = self.request.query_params.get('demo', None)
@@ -177,7 +177,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     """
     queryset = Test.objects.all().prefetch_related(
         'questions__answer_options'
-    ).select_related('lesson')
+    )
     serializer_class = TestDetailSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -518,7 +518,7 @@ class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
         return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
-        queryset = TestAttempt.objects.filter(user=self.request.user).select_related('test', 'test__lesson')
+        queryset = TestAttempt.objects.filter(user=self.request.user).select_related('test')
         
         # Optional filter by test
         test_id = self.request.query_params.get('test', None)

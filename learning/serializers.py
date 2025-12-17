@@ -64,7 +64,8 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
 
 class TestListSerializer(serializers.ModelSerializer):
     """Serializer for listing tests"""
-    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+    lesson_title = serializers.SerializerMethodField()
+    lesson_id = serializers.SerializerMethodField()
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
     best_score = serializers.SerializerMethodField()
@@ -73,8 +74,22 @@ class TestListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'image', 'lesson', 'lesson_title', 'is_demo', 'time_limit_seconds', 'question_count',
+        fields = ('id', 'title', 'image', 'lesson_id', 'lesson_title', 'is_demo', 'time_limit_seconds', 'question_count',
                   'passing_percentage', 'max_attempts', 'best_percentage', 'best_score', 'best_total_points', 'state_names')
+    
+    def get_lesson_title(self, obj):
+        """Get the title of the lesson this test belongs to."""
+        try:
+            return obj.lesson.title
+        except:
+            return None
+    
+    def get_lesson_id(self, obj):
+        """Get the ID of the lesson this test belongs to."""
+        try:
+            return obj.lesson.id
+        except:
+            return None
     
     def get_question_count(self, obj):
         return obj.questions.count()
@@ -144,13 +159,28 @@ class TestListSerializer(serializers.ModelSerializer):
 class TestDetailSerializer(serializers.ModelSerializer):
     """Serializer for taking a test"""
     questions = QuestionSerializer(many=True, read_only=True)
-    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+    lesson_title = serializers.SerializerMethodField()
+    lesson_id = serializers.SerializerMethodField()
     state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'image', 'description', 'lesson', 'lesson_title', 'time_limit_seconds', 
+        fields = ('id', 'title', 'image', 'description', 'lesson_id', 'lesson_title', 'time_limit_seconds', 
                   'is_demo', 'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names')
+    
+    def get_lesson_title(self, obj):
+        """Get the title of the lesson this test belongs to."""
+        try:
+            return obj.lesson.title
+        except:
+            return None
+    
+    def get_lesson_id(self, obj):
+        """Get the ID of the lesson this test belongs to."""
+        try:
+            return obj.lesson.id
+        except:
+            return None
     
     def get_state_names(self, obj):
         """Return list of state names this test is available for. Empty list means available for all states."""
