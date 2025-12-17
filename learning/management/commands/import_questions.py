@@ -87,7 +87,7 @@ class Command(BaseCommand):
                     title=category.replace('_', ' ').title(),
                     defaults={
                         'description': f'Test for {category.replace("_", " ").title()}',
-                        'passing_percentage': 80,
+                        'passing_percentage': 100,
                         'shuffle_questions': True,
                         'shuffle_answers': True,
                     }

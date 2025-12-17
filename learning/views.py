@@ -35,7 +35,7 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
     """
     serializer_class = LessonListSerializer
     permission_classes = [permissions.AllowAny]
-    
+    pagination_class = None
     @extend_schema(
         summary="List lessons",
         description="Retrieve all lessons.",
@@ -73,16 +73,16 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     Get details of a specific lesson.
     
     Returns full lesson content including text, video URL, and metadata.
-    Accessed by lesson slug. Requires active subscription.
+    Accessed by lesson ID. Requires active subscription.
     """
     queryset = Lesson.objects.all()
     serializer_class = LessonDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'slug'
+    lookup_field = 'pk'
 
     @extend_schema(
         summary="Get lesson detail",
-        description="Retrieve full details of a specific lesson by its slug. Requires active subscription.",
+        description="Retrieve full details of a specific lesson by its ID. Requires active subscription.",
         responses={
             200: LessonDetailSerializer,
             403: OpenApiResponse(description="Active subscription required"),

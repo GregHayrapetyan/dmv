@@ -12,7 +12,7 @@ from .views import (
 urlpatterns = [
     # Lesson endpoints
     path('lessons/', LessonListView.as_view(), name='lessons'),
-    path('lessons/<slug:slug>/', LessonDetailView.as_view(), name='lesson-detail'),
+    path('lessons/<int:pk>/', LessonDetailView.as_view(), name='lesson-detail'),
     path('lessons/<int:lesson_id>/progress/', LessonProgressView.as_view(), name='lesson-progress'),
     
     # Test endpoints
