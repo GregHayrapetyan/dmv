@@ -94,51 +94,6 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
-class VerifyOTPSerializer(serializers.Serializer):
-    """Unified serializer for verifying OTP codes for any purpose."""
-    email = serializers.EmailField()
-    code = serializers.CharField(max_length=6)
-    purpose = serializers.ChoiceField(
-        choices=["verify_email", "reset_password"],
-        help_text="Purpose of the OTP: 'verify_email' for registration, 'reset_password' for password reset"
-    )
-
-    def validate(self, attrs):
-        try:
-            user = User.objects.get(email=attrs["email"])
-        except User.DoesNotExist:
-            raise serializers.ValidationError("Invalid email or code")
-        
-        purpose = attrs["purpose"]
-        try:
-            otp = EmailOTP.objects.filter(user=user, purpose=purpose).latest("created_at")
-        except EmailOTP.DoesNotExist:
-            raise serializers.ValidationError("Invalid email or code")
-        
-        if otp.code != attrs["code"] or not otp.is_valid():
-            raise serializers.ValidationError("Invalid or expired code")
-        
-        attrs["user"] = user
-        attrs["otp"] = otp
-        return attrs
-
-    def save(self, **kwargs):
-        user = self.validated_data["user"]
-        otp = self.validated_data["otp"]
-        purpose = self.validated_data["purpose"]
-        
-        # Mark OTP as used
-        otp.is_used = True
-        otp.save(update_fields=["is_used"])
-        
-        # If verifying email, mark user as verified
-        if purpose == "verify_email":
-            user.is_email_verified = True
-            user.save(update_fields=["is_email_verified"])
-        
-        return user
-
-
 class ConfirmEmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
     code = serializers.CharField(max_length=6)
@@ -201,44 +156,37 @@ class RequestPasswordResetSerializer(serializers.Serializer):
             logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
             raise serializers.ValidationError("Failed to send reset email. Please try again.")
         
-        # Don't return the code for security reasons
-        return None
+        # Return the code so it can be included in the response
+        return code
 
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
     new_password = serializers.CharField(min_length=8)
 
     def validate(self, attrs):
         try:
             user = User.objects.get(email=attrs["email"])
         except User.DoesNotExist:
-            raise serializers.ValidationError("Invalid email")
-        
-        # Check if user has a verified (used) reset password OTP
-        # The OTP should have been verified via /verify-otp/ endpoint first
+            raise serializers.ValidationError("Invalid email or code")
         try:
-            otp = EmailOTP.objects.filter(
-                user=user, 
-                purpose="reset_password",
-                is_used=True  # Must be verified first
-            ).latest("created_at")
-            
-            # Check if the verified OTP is still recent (within 10 minutes of verification)
-            from django.utils import timezone
-            from datetime import timedelta
-            if timezone.now() > otp.expires_at + timedelta(minutes=10):
-                raise serializers.ValidationError("Reset session expired. Please request a new code.")
+            otp = EmailOTP.objects.filter(user=user, purpose="reset_password").latest("created_at")
         except EmailOTP.DoesNotExist:
-            raise serializers.ValidationError("Please verify your reset code first using /verify-otp/ endpoint")
-        
+            raise serializers.ValidationError("Invalid email or code")
+        if otp.code != attrs["code"] or not otp.is_valid():
+            raise serializers.ValidationError("Invalid or expired code")
         attrs["user"] = user
+        attrs["otp"] = otp
         return attrs
 
     def save(self, **kwargs):
         user = self.validated_data["user"]
+        otp = self.validated_data["otp"]
         user.set_password(self.validated_data["new_password"])
         user.save()
+        otp.is_used = True
+        otp.save(update_fields=["is_used"])
         return user
 
 class GoogleLoginSerializer(serializers.Serializer):

@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     LoginView, RegisterView, ConfirmEmailView, ResetPasswordView, 
     RequestPasswordResetView, GoogleLoginView, MeView, CookieTokenRefreshView, LogoutView,
-    SetAvatarView, DeleteAccountView, ChangePasswordView, VerifyOTPView
+    SetAvatarView, DeleteAccountView, ChangePasswordView
 )
 from .subscription_views import (
     CreateCheckoutSessionView, CreateBillingPortalSessionView,
@@ -15,8 +15,7 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("token/refresh/", CookieTokenRefreshView.as_view(), name="token-refresh"),
-    path("verify-otp/", VerifyOTPView.as_view(), name="verify-otp"),  # New unified endpoint
-    path("email/confirm/", ConfirmEmailView.as_view(), name="email-confirm"),  # Legacy
+    path("email/confirm/", ConfirmEmailView.as_view(), name="email-confirm"),
     path("password/forgot/", RequestPasswordResetView.as_view(), name="password-forgot"),
     path("password/reset/", ResetPasswordView.as_view(), name="password-reset"),
     path("google/", GoogleLoginView.as_view(), name="google-login"),
