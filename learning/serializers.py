@@ -50,7 +50,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'question_type', 'order', 'points', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'order', 'answer_options')
 
 
 class QuestionDetailSerializer(serializers.ModelSerializer):
@@ -59,7 +59,7 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'question_type', 'order', 'points', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'order', 'answer_options')
 
 
 class TestListSerializer(serializers.ModelSerializer):
@@ -68,14 +68,14 @@ class TestListSerializer(serializers.ModelSerializer):
     lesson_id = serializers.SerializerMethodField()
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
-    best_score = serializers.SerializerMethodField()
-    best_total_points = serializers.SerializerMethodField()
+    best_correct_answers = serializers.SerializerMethodField()
+    best_incorrect_answers = serializers.SerializerMethodField()
     state_names = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
         fields = ('id', 'title', 'image', 'lesson_id', 'lesson_title', 'is_demo', 'time_limit_seconds', 'question_count',
-                  'passing_percentage', 'max_attempts', 'best_percentage', 'best_score', 'best_total_points', 'state_names')
+                  'passing_percentage', 'max_attempts', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers', 'state_names')
     
     def get_lesson_title(self, obj):
         """Get the title of the lesson this test belongs to."""
@@ -113,9 +113,9 @@ class TestListSerializer(serializers.ModelSerializer):
             return float(best_attempt.percentage)
         return None
     
-    def get_best_score(self, obj):
+    def get_best_correct_answers(self, obj):
         """
-        Get the score from the best attempt for the current user for this test.
+        Get the correct answers count from the best attempt for the current user for this test.
         Returns None if user is not authenticated or has no attempts.
         """
         request = self.context.get('request')
@@ -129,12 +129,12 @@ class TestListSerializer(serializers.ModelSerializer):
         ).order_by('-percentage').first()
         
         if best_attempt:
-            return best_attempt.score
+            return best_attempt.correct_answers
         return None
     
-    def get_best_total_points(self, obj):
+    def get_best_incorrect_answers(self, obj):
         """
-        Get the total points from the best attempt for the current user for this test.
+        Get the incorrect answers count from the best attempt for the current user for this test.
         Returns None if user is not authenticated or has no attempts.
         """
         request = self.context.get('request')
@@ -148,7 +148,7 @@ class TestListSerializer(serializers.ModelSerializer):
         ).order_by('-percentage').first()
         
         if best_attempt:
-            return best_attempt.total_points
+            return best_attempt.incorrect_answers
         return None
     
     def get_state_names(self, obj):
@@ -202,8 +202,9 @@ class TestSubmissionSerializer(serializers.Serializer):
 
 class TestResultSerializer(serializers.Serializer):
     """Serializer for test results"""
-    score = serializers.IntegerField()
-    total_points = serializers.IntegerField()
+    correct_answers = serializers.IntegerField()
+    incorrect_answers = serializers.IntegerField()
+    questions_count = serializers.IntegerField()
     percentage = serializers.FloatField()
     passed = serializers.BooleanField()
     questions = QuestionDetailSerializer(many=True)
@@ -238,9 +239,9 @@ class TestAttemptSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = TestAttempt
-        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'score', 'total_points', 
+        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'correct_answers', 'incorrect_answers', 'questions_count',
                   'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at', 'answers')
-        read_only_fields = ('user', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')
+        read_only_fields = ('user', 'correct_answers', 'incorrect_answers', 'questions_count', 'percentage', 'passed', 'started_at', 'completed_at')
 
 
 class TestAttemptListSerializer(serializers.ModelSerializer):
@@ -250,9 +251,18 @@ class TestAttemptListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = TestAttempt
-        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'score', 'total_points', 
+        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'correct_answers', 'incorrect_answers', 'questions_count',
                   'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at')
-        read_only_fields = ('user', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')
+        read_only_fields = ('user', 'correct_answers', 'incorrect_answers', 'questions_count', 'percentage', 'passed', 'started_at', 'completed_at')
+
+
+class TestAttemptListWithStatsSerializer(serializers.Serializer):
+    """Serializer for test attempts list with aggregated statistics"""
+    attempts = TestAttemptListSerializer(many=True, read_only=True)
+    total_correct_answers = serializers.IntegerField(read_only=True, help_text="Total correct answers across all attempts")
+    total_incorrect_answers = serializers.IntegerField(read_only=True, help_text="Total incorrect answers across all attempts")
+    total_questions = serializers.IntegerField(read_only=True, help_text="Total questions across all attempts")
+    total_percentage = serializers.FloatField(read_only=True, help_text="Overall percentage of correct answers")
 
 
 class FavoriteLessonSerializer(serializers.ModelSerializer):
@@ -272,12 +282,12 @@ class TestStatisticsSerializer(serializers.ModelSerializer):
     """Serializer for test statistics showing user's best performance"""
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
-    best_score = serializers.SerializerMethodField()
-    best_total_points = serializers.SerializerMethodField()
+    best_correct_answers = serializers.SerializerMethodField()
+    best_incorrect_answers = serializers.SerializerMethodField()
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'image', 'question_count', 'best_percentage', 'best_score', 'best_total_points')
+        fields = ('id', 'title', 'image', 'question_count', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers')
     
     def get_question_count(self, obj):
         """Return the total number of questions in this test"""
@@ -302,9 +312,9 @@ class TestStatisticsSerializer(serializers.ModelSerializer):
             return float(best_attempt.percentage)
         return None
     
-    def get_best_score(self, obj):
+    def get_best_correct_answers(self, obj):
         """
-        Get the score from the best attempt for the current user for this test.
+        Get the correct answers count from the best attempt for the current user for this test.
         Returns None if user is not authenticated or has no attempts.
         """
         request = self.context.get('request')
@@ -318,12 +328,12 @@ class TestStatisticsSerializer(serializers.ModelSerializer):
         ).order_by('-percentage').first()
         
         if best_attempt:
-            return best_attempt.score
+            return best_attempt.correct_answers
         return None
     
-    def get_best_total_points(self, obj):
+    def get_best_incorrect_answers(self, obj):
         """
-        Get the total points from the best attempt for the current user for this test.
+        Get the incorrect answers count from the best attempt for the current user for this test.
         Returns None if user is not authenticated or has no attempts.
         """
         request = self.context.get('request')
@@ -337,7 +347,7 @@ class TestStatisticsSerializer(serializers.ModelSerializer):
         ).order_by('-percentage').first()
         
         if best_attempt:
-            return best_attempt.total_points
+            return best_attempt.incorrect_answers
         return None
 
 

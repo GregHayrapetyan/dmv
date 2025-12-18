@@ -17,7 +17,7 @@ from .serializers import (
     TestListSerializer, TestDetailSerializer,
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
-    FavoriteLessonSerializer, TestStatisticsSerializer
+    TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -258,8 +258,9 @@ class TestSubmitView(APIView):
                         "Success",
                         value={
                             "attempt_id": 1,
-                            "score": 8,
-                            "total_points": 10,
+                            "correct_answers": 8,
+                            "incorrect_answers": 2,
+                            "questions_count": 10,
                             "percentage": 80.0,
                             "passed": True,
                             "questions": [
@@ -326,14 +327,15 @@ class TestSubmitView(APIView):
         answers = serializer.validated_data['answers']
         time_taken = request.data.get('time_taken_seconds', None)
         
-        # Calculate score
-        score = 0
-        total_points = 0
+        # Calculate results
+        correct_answers = 0
+        incorrect_answers = 0
         answer_records = []
         
         questions = test.questions.all()
+        questions_count = questions.count()
+        
         for question in questions:
-            total_points += question.points
             user_answer_id = answers.get(str(question.id))
             
             selected_option = None
@@ -344,9 +346,14 @@ class TestSubmitView(APIView):
                     selected_option = question.answer_options.get(id=user_answer_id)
                     is_correct = selected_option.is_correct
                     if is_correct:
-                        score += question.points
+                        correct_answers += 1
+                    else:
+                        incorrect_answers += 1
                 except AnswerOption.DoesNotExist:
                     logger.warning(f"Invalid answer option {user_answer_id} for question {question.id}")
+                    incorrect_answers += 1
+            else:
+                incorrect_answers += 1
             
             answer_records.append({
                 'question': question,
@@ -354,15 +361,16 @@ class TestSubmitView(APIView):
                 'is_correct': is_correct
             })
         
-        percentage = Decimal(score / total_points * 100) if total_points > 0 else Decimal(0)
+        percentage = Decimal(correct_answers / questions_count * 100) if questions_count > 0 else Decimal(0)
         passed = percentage >= test.passing_percentage
         
         # Create test attempt record
         test_attempt = TestAttempt.objects.create(
             user=request.user,
             test=test,
-            score=score,
-            total_points=total_points,
+            correct_answers=correct_answers,
+            incorrect_answers=incorrect_answers,
+            questions_count=questions_count,
             percentage=percentage,
             passed=passed,
             time_taken_seconds=time_taken,
@@ -383,15 +391,16 @@ class TestSubmitView(APIView):
         
         result_data = {
             'attempt_id': test_attempt.id,
-            'score': score,
-            'total_points': total_points,
+            'correct_answers': correct_answers,
+            'incorrect_answers': incorrect_answers,
+            'questions_count': questions_count,
             'percentage': float(percentage),
             'passed': passed,
             'questions': question_serializer.data,
             'user_answers': answers
         }
         
-        logger.info(f"Test {test.id} submitted by {request.user.email}. Score: {score}/{total_points} ({percentage:.2f}%)")
+        logger.info(f"Test {test.id} submitted by {request.user.email}. Correct: {correct_answers}/{questions_count} ({percentage:.2f}%)")
         
         return APIResponse.success(
             data=result_data,
@@ -491,7 +500,7 @@ class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
     pagination_class = None
     @extend_schema(
         summary="Get my test attempts",
-        description="Retrieve all test attempts for the authenticated user. Can filter by test ID or pass/fail status.",
+        description="Retrieve all test attempts for the authenticated user with aggregated statistics. Can filter by test ID or pass/fail status.",
         parameters=[
             OpenApiParameter(
                 name='test',
@@ -509,7 +518,7 @@ class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
             ),
         ],
         responses={
-            200: TestAttemptListSerializer(many=True),
+            200: TestAttemptListWithStatsSerializer,
             401: OpenApiResponse(description="Authentication required"),
         },
         tags=["Progress"],
@@ -531,6 +540,32 @@ class UserTestAttemptsListView(StandardizedResponseMixin, generics.ListAPIView):
             queryset = queryset.filter(passed=passed.lower() == 'true')
         
         return queryset.order_by('-started_at')
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # Calculate aggregated statistics across all attempts
+        aggregates = queryset.aggregate(
+            total_correct_answers=models.Sum('correct_answers'),
+            total_incorrect_answers=models.Sum('incorrect_answers'),
+            total_questions=models.Sum('questions_count')
+        )
+        
+        total_correct = aggregates['total_correct_answers'] or 0
+        total_incorrect = aggregates['total_incorrect_answers'] or 0
+        total_questions = aggregates['total_questions'] or 0
+        total_percentage = (total_correct / total_questions * 100) if total_questions > 0 else 0
+        
+        response_data = {
+            'attempts': serializer.data,
+            'total_correct_answers': total_correct,
+            'total_incorrect_answers': total_incorrect,
+            'total_questions': total_questions,
+            'total_percentage': round(total_percentage, 2)
+        }
+        
+        return Response(response_data)
 
 
 class TestAttemptDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):

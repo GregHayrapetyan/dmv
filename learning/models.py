@@ -75,6 +75,7 @@ class Test(models.Model):
         null=True,
         help_text="Cover image for the test",
     )
+    #TODO add video upload
     time_limit_seconds = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -164,10 +165,6 @@ class Question(models.Model):
         default=1,
         help_text="Display order of the question in the test",
     )
-    points = models.PositiveIntegerField(
-        default=1,
-        help_text="How many points this question is worth",
-    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
@@ -175,12 +172,6 @@ class Question(models.Model):
         verbose_name = "Question"
         verbose_name_plural = "Questions"
         ordering = ["order", "id"]
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(points__gte=1),
-                name='question_points_positive'
-            ),
-        ]
 
     def __str__(self):
         return f"Question #{self.order} for test '{self.test.title}'"
@@ -288,8 +279,9 @@ class TestAttempt(models.Model):
         on_delete=models.CASCADE,
         related_name='attempts'
     )
-    score = models.PositiveIntegerField()
-    total_points = models.PositiveIntegerField()
+    correct_answers = models.PositiveIntegerField()
+    incorrect_answers = models.PositiveIntegerField()
+    questions_count = models.PositiveIntegerField()
     percentage = models.DecimalField(max_digits=5, decimal_places=2)
     passed = models.BooleanField()
     time_taken_seconds = models.PositiveIntegerField(

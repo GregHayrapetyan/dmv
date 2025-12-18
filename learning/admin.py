@@ -20,7 +20,7 @@ class LessonAdmin(admin.ModelAdmin):
 class QuestionInline(admin.TabularInline):
     model = Question
     extra = 1
-    fields = ('text', 'image', 'video', 'question_type', 'order', 'points')
+    fields = ('text', 'image', 'video', 'question_type', 'order')
 
 
 @admin.register(Test)
@@ -64,7 +64,7 @@ class AnswerOptionInline(admin.TabularInline):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'text_preview', 'test', 'question_type', 'order', 'points', 'has_correct_answer')
+    list_display = ('id', 'text_preview', 'test', 'question_type', 'order', 'has_correct_answer')
     list_filter = ('question_type',)
     search_fields = ('text', 'test__title')
     raw_id_fields = ('test',)
@@ -75,7 +75,7 @@ class QuestionAdmin(admin.ModelAdmin):
             'fields': ('test', 'text', 'image', 'video', 'question_type')
         }),
         ('Settings', {
-            'fields': ('order', 'points')
+            'fields': ('order',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -121,11 +121,11 @@ class TestAnswerInline(admin.TabularInline):
 
 @admin.register(TestAttempt)
 class TestAttemptAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'test', 'score', 'total_points', 'percentage', 'passed', 'started_at', 'completed_at')
+    list_display = ('id', 'user', 'test', 'correct_answers', 'incorrect_answers', 'questions_count', 'percentage', 'passed', 'started_at', 'completed_at')
     list_filter = ('passed', 'started_at')
     search_fields = ('user__email', 'test__title')
     raw_id_fields = ('user', 'test')
-    readonly_fields = ('started_at', 'completed_at', 'score', 'total_points', 'percentage', 'passed')
+    readonly_fields = ('started_at', 'completed_at', 'correct_answers', 'incorrect_answers', 'questions_count', 'percentage', 'passed')
     date_hierarchy = 'started_at'
     inlines = [TestAnswerInline]
 
