@@ -346,3 +346,39 @@ class Contact(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.email}"
+
+
+class Partner(models.Model):
+    """
+    Partner/sponsor model for displaying partner logos and information.
+    Stores partner details like logo and description.
+    """
+    logo = models.ImageField(
+        upload_to="partners/logos/",
+        help_text="Partner logo image",
+    )
+    
+    description = models.TextField(
+        help_text="Partner description (e.g., 'Great potential for cooperation with Ineco Bank for over 10 years')",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this partner is displayed on the site",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ("order", "-created_at")
+        verbose_name = "Partner"
+        verbose_name_plural = "Partners"
+    
+    def __str__(self):
+        return f"Partner #{self.id}"

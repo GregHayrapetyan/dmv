@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import PricingPlan, PlanFeature, ClientReview, Contact, ContactInfo
+from .models import PricingPlan, PlanFeature, ClientReview, Contact, ContactInfo, Partner
 
 
 class PlanFeatureInline(admin.TabularInline):
@@ -335,4 +335,75 @@ class ContactAdmin(admin.ModelAdmin):
         Disable adding contacts through admin (they come from the API).
         """
         return False
+
+
+@admin.register(Partner)
+class PartnerAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing partners/sponsors.
+    """
+    list_display = (
+        "id",
+        "logo_preview",
+        "description_preview",
+        "order",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "order",
+        "is_active",
+    )
+    
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "description",
+    )
+    
+    readonly_fields = (
+        "logo_preview",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Partner Information", {
+            "fields": ("logo", "logo_preview", "description")
+        }),
+        ("Display Settings", {
+            "fields": ("order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def logo_preview(self, obj):
+        """
+        Display a thumbnail preview of the partner logo.
+        """
+        if obj.logo:
+            return format_html(
+                '<img src="{}" style="max-width: 150px; max-height: 60px; object-fit: contain;" />',
+                obj.logo.url
+            )
+        return "No logo"
+    
+    logo_preview.short_description = "Logo Preview"
+    
+    def description_preview(self, obj):
+        """
+        Display truncated description.
+        """
+        if len(obj.description) > 50:
+            return f"{obj.description[:50]}..."
+        return obj.description
+    
+    description_preview.short_description = "Description"
 

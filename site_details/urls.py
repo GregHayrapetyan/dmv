@@ -4,6 +4,7 @@ from .views import (
     PricingPlanListAPIView,
     ContactCreateAPIView,
     ContactInfoRetrieveAPIView,
+    PartnerListAPIView,
 )
 
 urlpatterns = [
@@ -11,4 +12,5 @@ urlpatterns = [
     path("pricing-plans/", PricingPlanListAPIView.as_view(), name="pricing-plans-list"),
     path("contact/", ContactCreateAPIView.as_view(), name="contact-create"),
     path("contact-info/", ContactInfoRetrieveAPIView.as_view(), name="contact-info"),
+    path("partners/", PartnerListAPIView.as_view(), name="partners-list"),
 ]
