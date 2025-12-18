@@ -17,7 +17,8 @@ from .serializers import (
     TestListSerializer, TestDetailSerializer,
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
-    TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer
+    TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
+    TestStatisticsWithAggregatesSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -717,6 +718,11 @@ class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):
     - User's best percentage score
     - User's best score and total points
     
+    Also includes aggregate statistics across all test attempts:
+    - Total questions answered
+    - Total correct/incorrect answers
+    - Overall correct/incorrect percentages
+    
     Requires authentication to show personal statistics.
     """
     serializer_class = TestStatisticsSerializer
@@ -725,15 +731,45 @@ class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):
     
     @extend_schema(
         summary="Get test statistics",
-        description="Retrieve statistics for all tests including user's best performance. Shows test image, question count, and best scores.",
+        description="Retrieve statistics for all tests including user's best performance and aggregate statistics across all attempts.",
         responses={
-            200: TestStatisticsSerializer(many=True),
+            200: TestStatisticsWithAggregatesSerializer,
             401: OpenApiResponse(description="Authentication required"),
         },
         tags=["Tests"],
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # Calculate aggregate statistics across all test attempts for the user
+        aggregates = TestAttempt.objects.filter(user=request.user).aggregate(
+            total_correct=models.Sum('correct_answers'),
+            total_incorrect=models.Sum('incorrect_answers'),
+            total_questions=models.Sum('questions_count')
+        )
+        
+        total_correct = aggregates['total_correct'] or 0
+        total_incorrect = aggregates['total_incorrect'] or 0
+        total_questions = aggregates['total_questions'] or 0
+        
+        # Calculate percentages
+        correct_percentage = round((total_correct / total_questions * 100), 2) if total_questions > 0 else 0
+        incorrect_percentage = round((total_incorrect / total_questions * 100), 2) if total_questions > 0 else 0
+        
+        response_data = {
+            'tests': serializer.data,
+            'total_questions_answered': total_questions,
+            'total_correct_answers': total_correct,
+            'total_incorrect_answers': total_incorrect,
+            'correct_percentage': correct_percentage,
+            'incorrect_percentage': incorrect_percentage
+        }
+        
+        return Response(response_data)
     
     def get_queryset(self):
         from django.db.models import Count

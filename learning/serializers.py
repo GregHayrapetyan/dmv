@@ -351,3 +351,13 @@ class TestStatisticsSerializer(serializers.ModelSerializer):
         return None
 
 
+class TestStatisticsWithAggregatesSerializer(serializers.Serializer):
+    """Serializer for test statistics response with aggregate data across all attempts"""
+    tests = TestStatisticsSerializer(many=True, read_only=True)
+    total_questions_answered = serializers.IntegerField(read_only=True, help_text="Total questions answered across all test attempts")
+    total_correct_answers = serializers.IntegerField(read_only=True, help_text="Total correct answers across all test attempts")
+    total_incorrect_answers = serializers.IntegerField(read_only=True, help_text="Total incorrect answers across all test attempts")
+    correct_percentage = serializers.FloatField(read_only=True, help_text="Percentage of correct answers across all attempts")
+    incorrect_percentage = serializers.FloatField(read_only=True, help_text="Percentage of incorrect answers across all attempts")
+
+
