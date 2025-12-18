@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import PricingPlan, PlanFeature, ClientReview, Contact
+from .models import PricingPlan, PlanFeature, ClientReview, Contact, ContactInfo
 
 
 class PlanFeatureInline(admin.TabularInline):
@@ -221,6 +221,63 @@ class ClientReviewAdmin(admin.ModelAdmin):
     rating_display.short_description = "Rating"
 
 
+@admin.register(ContactInfo)
+class ContactInfoAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing contact information.
+    Only one active ContactInfo should exist at a time.
+    """
+    list_display = (
+        "email_primary",
+        "phone_primary",
+        "is_active",
+        "updated_at",
+    )
+    
+    list_filter = (
+        "is_active",
+        "updated_at",
+    )
+    
+    search_fields = (
+        "address_line1",
+        "address_line2",
+        "email_primary",
+        "email_secondary",
+        "phone_primary",
+        "phone_secondary",
+    )
+    
+    fieldsets = (
+        ("Address Information", {
+            "fields": ("address_line1", "address_line2")
+        }),
+        ("Phone Numbers", {
+            "fields": ("phone_primary", "phone_secondary")
+        }),
+        ("Email Addresses", {
+            "fields": ("email_primary", "email_secondary")
+        }),
+        ("Status", {
+            "fields": ("is_active",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    readonly_fields = ("created_at", "updated_at")
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Prevent deletion of contact info to maintain at least one record.
+        """
+        if ContactInfo.objects.count() <= 1:
+            return False
+        return super().has_delete_permission(request, obj)
+
+
 @admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
     """
@@ -229,7 +286,7 @@ class ContactAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "email",
-        "subject",
+        "phone",
         "status",
         "created_at",
     )
@@ -242,14 +299,14 @@ class ContactAdmin(admin.ModelAdmin):
     search_fields = (
         "name",
         "email",
-        "subject",
+        "phone",
         "message",
     )
     
     readonly_fields = (
         "name",
         "email",
-        "subject",
+        "phone",
         "message",
         "created_at",
         "updated_at",
@@ -257,7 +314,7 @@ class ContactAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ("Contact Information", {
-            "fields": ("name", "email", "subject")
+            "fields": ("name", "email", "phone")
         }),
         ("Message", {
             "fields": ("message",)

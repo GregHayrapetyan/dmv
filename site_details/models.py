@@ -232,6 +232,67 @@ class ClientReview(models.Model):
         return f"{self.name} - {self.rating} stars"
 
 
+class ContactInfo(models.Model):
+    """
+    Contact information model for the Contact Us page.
+    Stores business contact details like address, phone numbers, and emails.
+    Only one instance should exist (singleton pattern).
+    """
+    address_line1 = models.CharField(
+        max_length=255,
+        help_text="First line of address (e.g., street address in Armenian)",
+    )
+    
+    address_line2 = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Second line of address (e.g., translated address)",
+    )
+    
+    phone_primary = models.CharField(
+        max_length=20,
+        help_text="Primary phone number (e.g., 011 580606)",
+    )
+    
+    phone_secondary = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Secondary phone number (e.g., 044 580606)",
+    )
+    
+    email_primary = models.EmailField(
+        help_text="Primary email address (e.g., info@smv.am)",
+    )
+    
+    email_secondary = models.EmailField(
+        blank=True,
+        help_text="Secondary email address (e.g., nn@consultant.com)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Only one ContactInfo should be active at a time",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Contact Information"
+        verbose_name_plural = "Contact Information"
+    
+    def __str__(self):
+        return f"Contact Info - {self.email_primary}"
+    
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one ContactInfo is active at a time (singleton pattern).
+        """
+        if self.is_active:
+            ContactInfo.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+
 class Contact(models.Model):
     """
     Contact form submission model.
@@ -252,9 +313,11 @@ class Contact(models.Model):
         help_text="Contact person's email address",
     )
     
-    subject = models.CharField(
-        max_length=200,
-        help_text="Subject of the message",
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Contact person's phone number",
     )
     
     message = models.TextField(
@@ -282,4 +345,4 @@ class Contact(models.Model):
         verbose_name_plural = "Contacts"
     
     def __str__(self):
-        return f"{self.name} - {self.subject}"
+        return f"{self.name} - {self.email}"

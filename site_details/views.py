@@ -1,9 +1,11 @@
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
+from django.core.mail import send_mail
+from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer
 from dmv.api_response import APIResponse
 
 
@@ -104,7 +106,7 @@ class ContactCreateAPIView(generics.CreateAPIView):
     )
     def post(self, request, *args, **kwargs):
         """
-        Create a new contact submission.
+        Create a new contact submission and send email notification.
         """
         serializer = self.get_serializer(data=request.data)
         
@@ -114,7 +116,34 @@ class ContactCreateAPIView(generics.CreateAPIView):
                 details=serializer.errors
             )
         
-        serializer.save()
+        contact = serializer.save()
+        
+        # Send email notification
+        try:
+            subject = f"New Contact Form Submission from {contact.name}"
+            message = f"""
+New contact form submission received:
+
+Name: {contact.name}
+Email: {contact.email}
+Phone: {contact.phone}
+
+Message:
+{contact.message}
+
+---
+Submitted at: {contact.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.DEFAULT_FROM_EMAIL],
+                fail_silently=True,
+            )
+        except Exception as e:
+            # Log the error but don't fail the request
+            print(f"Failed to send contact notification email: {str(e)}")
         
         return APIResponse.success(
             data=serializer.data,
@@ -122,3 +151,50 @@ class ContactCreateAPIView(generics.CreateAPIView):
             status_code=status.HTTP_201_CREATED
         )
 
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get contact information",
+        description="Retrieve active contact information for the Contact Us page.",
+        tags=["Site Details"],
+    )
+)
+class ContactInfoRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    API endpoint to retrieve contact information.
+    GET /api/site-details/contact-info/
+    
+    Returns the active contact information (address, phones, emails).
+    No authentication required.
+    
+    Returns:
+        200: Active contact information
+        404: No active contact information found
+    """
+    serializer_class = ContactInfoSerializer
+    permission_classes = [AllowAny]
+    
+    def get_object(self):
+        """
+        Return the active ContactInfo instance.
+        """
+        try:
+            return ContactInfo.objects.get(is_active=True)
+        except ContactInfo.DoesNotExist:
+            # Return first available if no active one exists
+            return ContactInfo.objects.first()
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to use standardized response format.
+        """
+        instance = self.get_object()
+        
+        if not instance:
+            return APIResponse.error(
+                message="Contact information not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.get_serializer(instance)
+        return APIResponse.success(data=serializer.data)

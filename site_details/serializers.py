@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo
 
 
 class ClientReviewSerializer(serializers.ModelSerializer):
@@ -84,6 +84,26 @@ class PricingPlanSerializer(serializers.ModelSerializer):
         return ""
 
 
+class ContactInfoSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ContactInfo model.
+    Returns contact page information (address, phones, emails).
+    """
+    
+    class Meta:
+        model = ContactInfo
+        fields = [
+            "id",
+            "address_line1",
+            "address_line2",
+            "phone_primary",
+            "phone_secondary",
+            "email_primary",
+            "email_secondary",
+        ]
+        read_only_fields = ["id"]
+
+
 class ContactSerializer(serializers.ModelSerializer):
     """
     Serializer for Contact model.
@@ -96,7 +116,7 @@ class ContactSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "email",
-            "subject",
+            "phone",
             "message",
             "created_at",
         ]
