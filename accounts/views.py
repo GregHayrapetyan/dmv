@@ -9,8 +9,9 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExam
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
     ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
-    ChangePasswordSerializer,
+    ChangePasswordSerializer, VerifyOTPSerializer,
 )
+from .models import EmailOTP
 from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
@@ -161,8 +162,7 @@ class RequestPasswordResetView(generics.GenericAPIView):
                     OpenApiExample(
                         "Success",
                         value={
-                            "detail": "If this email exists, a reset code has been sent.",
-                            "otp": "123456"
+                            "detail": "If this email exists, a reset code has been sent."
                         },
                     )
                 ]
@@ -177,11 +177,80 @@ class RequestPasswordResetView(generics.GenericAPIView):
                 message="Validation failed",
                 details=ser.errors
             )
-        otp_code = ser.save()
+        ser.save()
         return APIResponse.success(
-            data={"otp": otp_code},
+            data=None,
             message="If this email exists, a reset code has been sent."
         )
+
+
+class VerifyOTPView(generics.GenericAPIView):
+    """
+    Unified OTP verification endpoint.
+    
+    Verifies OTP codes for both email verification and password reset.
+    """
+    serializer_class = VerifyOTPSerializer
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        summary="Verify OTP code",
+        description="""Verify OTP code for email verification or password reset.
+        
+        **Purpose values:**
+        - `verify_email`: Verify email after registration
+        - `reset_password`: Verify code before resetting password
+        
+        Code expires in 10 minutes.""",
+        request=VerifyOTPSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="OTP verified successfully",
+                examples=[
+                    OpenApiExample(
+                        "Email Verification Success",
+                        value={
+                            "success": True,
+                            "data": None,
+                            "message": "Email verified successfully"
+                        },
+                    ),
+                    OpenApiExample(
+                        "Password Reset Verification Success",
+                        value={
+                            "success": True,
+                            "data": None,
+                            "message": "Code verified successfully. You can now reset your password."
+                        },
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Invalid or expired code"),
+        },
+        tags=["Authentication"],
+    )
+    def post(self, request):
+        ser = self.get_serializer(data=request.data)
+        if not ser.is_valid():
+            return APIResponse.validation_error(
+                message="OTP verification failed",
+                details=ser.errors
+            )
+        
+        purpose = request.data.get("purpose")
+        ser.save()
+        
+        # Return appropriate message based on purpose
+        if purpose == "verify_email":
+            message = "Email verified successfully"
+        else:
+            message = "Code verified successfully. You can now reset your password."
+        
+        return APIResponse.success(
+            data=None,
+            message=message
+        )
+
 
 class ConfirmEmailView(generics.GenericAPIView):
     """
@@ -225,16 +294,24 @@ class ConfirmEmailView(generics.GenericAPIView):
 
 class ResetPasswordView(generics.GenericAPIView):
     """
-    Reset password with verification code.
+    Reset password after OTP verification.
     
-    Updates the user's password using the code sent via email.
+    IMPORTANT: You must verify the reset code using /verify-otp/ endpoint first.
+    This endpoint only accepts email and new password.
     """
     serializer_class = ResetPasswordSerializer
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
         summary="Reset password",
-        description="Reset password using the verification code sent to email. Code expires in 10 minutes.",
+        description="""Reset password after verifying the OTP code.
+        
+        **Required Flow:**
+        1. POST /api/accounts/password/forgot/ - Request reset code
+        2. POST /api/accounts/verify-otp/ - Verify the code with purpose='reset_password'
+        3. POST /api/accounts/password/reset/ - Reset password (this endpoint)
+        
+        This endpoint only requires email and new password. The code must be verified first.""",
         request=ResetPasswordSerializer,
         responses={
             200: OpenApiResponse(
@@ -242,11 +319,15 @@ class ResetPasswordView(generics.GenericAPIView):
                 examples=[
                     OpenApiExample(
                         "Success",
-                        value={"detail": "Password updated"},
+                        value={
+                            "success": True,
+                            "data": None,
+                            "message": "Password updated successfully"
+                        },
                     )
                 ]
             ),
-            400: OpenApiResponse(description="Invalid or expired code, or password validation failed"),
+            400: OpenApiResponse(description="Code not verified or password validation failed"),
         },
         tags=["Authentication"],
     )
