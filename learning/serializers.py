@@ -32,7 +32,7 @@ class LessonDetailSerializer(serializers.ModelSerializer):
         if obj.duration_minutes:
             # Convert minutes to seconds: multiply by 60
             duration_seconds = float(obj.duration_minutes) * 60
-            return str(round(duration_seconds, 2))
+            return str(round(duration_seconds))
         return "0"
 
 
@@ -377,7 +377,7 @@ class LessonInCategorySerializer(serializers.ModelSerializer):
         if obj.duration_minutes:
             # Convert minutes to seconds: multiply by 60
             duration_seconds = float(obj.duration_minutes) * 60
-            return str(round(duration_seconds, 2))
+            return str(round(duration_seconds))
         return "0"
 
 
