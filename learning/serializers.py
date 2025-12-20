@@ -362,17 +362,11 @@ class TestStatisticsWithAggregatesSerializer(serializers.Serializer):
 class LessonInCategorySerializer(serializers.ModelSerializer):
     """Serializer for lessons within a category"""
     name = serializers.CharField(source='title')
-    duration = serializers.SerializerMethodField()
+    duration = serializers.DecimalField(source='duration_minutes', max_digits=6, decimal_places=2, coerce_to_string=True)
     
     class Meta:
         model = Lesson
         fields = ('id', 'image', 'name', 'duration', 'order')
-    
-    def get_duration(self, obj):
-        """Format duration as string with 'min' suffix"""
-        if obj.duration_minutes:
-            return f"{int(obj.duration_minutes)} min"
-        return "0 min"
 
 
 class LessonCategoryListSerializer(serializers.ModelSerializer):
