@@ -21,15 +21,19 @@ class LessonListSerializer(serializers.ModelSerializer):
 
 class LessonDetailSerializer(serializers.ModelSerializer):
     """Serializer for lesson detail view (with full content)"""
-    state_names = serializers.SerializerMethodField()
+    duration = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'content', 'video', 'image', 'order', 'duration_minutes', 'created_at', 'state_names')
+        fields = ('id', 'title', 'content', 'video', 'image', 'order', 'duration')
     
-    def get_state_names(self, obj):
-        """Return list of state names this lesson is available for. Empty list means available for all states."""
-        return [state.name for state in obj.states.all()]
+    def get_duration(self, obj):
+        """Convert duration from minutes to seconds"""
+        if obj.duration_minutes:
+            # Convert minutes to seconds: multiply by 60
+            duration_seconds = float(obj.duration_minutes) * 60
+            return str(round(duration_seconds, 2))
+        return "0"
 
 
 class AnswerOptionSerializer(serializers.ModelSerializer):
