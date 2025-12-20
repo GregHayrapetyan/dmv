@@ -18,7 +18,7 @@ from .serializers import (
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
     TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
-    TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer
+    TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer, FavoriteLessonCategorySerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -667,19 +667,23 @@ class RemoveFavoriteLessonView(APIView):
 
 class FavoriteLessonsListView(StandardizedResponseMixin, generics.ListAPIView):
     """
-    List all favorite lessons for the authenticated user.
+    List all favorite lessons for the authenticated user grouped by category.
     
-    Returns all lessons the user has marked as favorite,
-    including lesson details and when it was favorited.
+    Returns favorite lessons organized by their categories with:
+    - Category ID and name
+    - Favorite lessons within each category (id, image, name, duration, order)
+    
+    Only returns categories that have at least one favorite lesson.
     """
-    serializer_class = FavoriteLessonSerializer
+    serializer_class = FavoriteLessonCategorySerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
+    
     @extend_schema(
-        summary="Get my favorite lessons",
-        description="Retrieve all favorite lessons for the authenticated user.",
+        summary="Get my favorite lessons grouped by category",
+        description="Retrieve all favorite lessons for the authenticated user organized by categories.",
         responses={
-            200: FavoriteLessonSerializer(many=True),
+            200: FavoriteLessonCategorySerializer(many=True),
             401: OpenApiResponse(description="Authentication required"),
         },
         tags=["Favorites"],
@@ -687,10 +691,18 @@ class FavoriteLessonsListView(StandardizedResponseMixin, generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
     
+    def list(self, request, *args, **kwargs):
+        """Override list to filter out categories with no favorite lessons"""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # Filter out categories with empty lessons arrays
+        filtered_data = [item for item in serializer.data if item['lessons']]
+        
+        return Response(filtered_data)
+    
     def get_queryset(self):
-        return FavoriteLesson.objects.filter(user=self.request.user).select_related(
-            'lesson'
-        )
+        return LessonCategory.objects.all().prefetch_related('lessons').order_by('name')
 
 
 class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):

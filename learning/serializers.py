@@ -362,11 +362,19 @@ class TestStatisticsWithAggregatesSerializer(serializers.Serializer):
 class LessonInCategorySerializer(serializers.ModelSerializer):
     """Serializer for lessons within a category"""
     name = serializers.CharField(source='title')
-    duration = serializers.DecimalField(source='duration_minutes', max_digits=6, decimal_places=2, coerce_to_string=True)
+    duration = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
         fields = ('id', 'image', 'name', 'duration', 'order')
+    
+    def get_duration(self, obj):
+        """Convert duration from minutes to seconds"""
+        if obj.duration_minutes:
+            # Convert minutes to seconds: multiply by 60
+            duration_seconds = float(obj.duration_minutes) * 60
+            return str(round(duration_seconds, 2))
+        return "0"
 
 
 class LessonCategoryListSerializer(serializers.ModelSerializer):
@@ -397,6 +405,50 @@ class LessonCategoryListSerializer(serializers.ModelSerializer):
                     ).distinct()
             except Exception:
                 pass  # Profile doesn't exist, show all
+        
+        queryset = queryset.order_by('order', 'id')
+        return LessonInCategorySerializer(queryset, many=True, context=self.context).data
+
+
+class FavoriteLessonCategorySerializer(serializers.ModelSerializer):
+    """Serializer for listing favorite lessons grouped by category"""
+    category = serializers.CharField(source='name')
+    lessons = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LessonCategory
+        fields = ('id', 'category', 'lessons')
+    
+    def get_lessons(self, obj):
+        """Get favorite lessons for this category for the authenticated user"""
+        from django.db.models import Count, Q
+        
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return []
+        
+        # Get lesson IDs that are favorited by the user
+        favorite_lesson_ids = FavoriteLesson.objects.filter(
+            user=request.user
+        ).values_list('lesson_id', flat=True)
+        
+        # Filter lessons in this category that are favorited
+        queryset = obj.lessons.filter(
+            id__in=favorite_lesson_ids,
+            is_published=True
+        )
+        
+        # Filter by user's profile state if applicable
+        try:
+            profile = request.user.profile
+            if profile.state:
+                # Show lessons for user's state OR lessons with no states assigned
+                queryset = queryset.annotate(state_count=Count('states'))
+                queryset = queryset.filter(
+                    Q(states=profile.state) | Q(state_count=0)
+                ).distinct()
+        except Exception:
+            pass  # Profile doesn't exist, show all
         
         queryset = queryset.order_by('order', 'id')
         return LessonInCategorySerializer(queryset, many=True, context=self.context).data
