@@ -18,7 +18,8 @@ from .serializers import (
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
     TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
-    TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer, FavoriteLessonCategorySerializer
+    TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer, FavoriteLessonCategorySerializer,
+    CategorySerializer, CategoryDetailSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -786,3 +787,50 @@ class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):
                 pass  # Profile doesn't exist, show all
         
         return queryset.order_by('id')
+
+
+class CategoryListView(StandardizedResponseMixin, generics.ListAPIView):
+    """
+    List all categories with id and name.
+    
+    Returns a simple list of all lesson categories.
+    """
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+    queryset = LessonCategory.objects.all().order_by('name')
+    
+    @extend_schema(
+        summary="List all categories",
+        description="Retrieve all lesson categories with id and name.",
+        responses={
+            200: CategorySerializer(many=True),
+        },
+        tags=["Categories"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+class CategoryDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
+    """
+    Get category details with all videos/lessons.
+    
+    Returns category name and all videos (lessons) within that category.
+    """
+    serializer_class = CategoryDetailSerializer
+    permission_classes = [permissions.AllowAny]
+    queryset = LessonCategory.objects.all()
+    lookup_field = 'pk'
+    
+    @extend_schema(
+        summary="Get category detail with videos",
+        description="Retrieve category details including name and all videos/lessons in that category.",
+        responses={
+            200: CategoryDetailSerializer,
+            404: OpenApiResponse(description="Category not found"),
+        },
+        tags=["Categories"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)

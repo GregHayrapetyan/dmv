@@ -456,3 +456,42 @@ class FavoriteLessonCategorySerializer(serializers.ModelSerializer):
         
         queryset = queryset.order_by('order', 'id')
         return LessonInCategorySerializer(queryset, many=True, context=self.context).data
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    """Serializer for listing categories (id and name only)"""
+    class Meta:
+        model = LessonCategory
+        fields = ('id', 'name')
+
+
+class CategoryDetailSerializer(serializers.ModelSerializer):
+    """Serializer for category detail with all videos/lessons"""
+    videos = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LessonCategory
+        fields = ('id', 'name', 'videos')
+    
+    def get_videos(self, obj):
+        """Get all lessons (videos) for this category, filtered by state if applicable"""
+        from django.db.models import Count, Q
+        
+        request = self.context.get('request')
+        queryset = obj.lessons.filter(is_published=True)
+        
+        # Filter by user's profile state if authenticated
+        if request and request.user.is_authenticated:
+            try:
+                profile = request.user.profile
+                if profile.state:
+                    # Show lessons for user's state OR lessons with no states assigned
+                    queryset = queryset.annotate(state_count=Count('states'))
+                    queryset = queryset.filter(
+                        Q(states=profile.state) | Q(state_count=0)
+                    ).distinct()
+            except Exception:
+                pass  # Profile doesn't exist, show all
+        
+        queryset = queryset.order_by('order', 'id')
+        return LessonInCategorySerializer(queryset, many=True, context=self.context).data

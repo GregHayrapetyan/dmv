@@ -5,11 +5,15 @@ from .views import (
     LessonProgressView, UserLessonProgressListView,
     UserTestAttemptsListView, TestAttemptDetailView,
     AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView,
-    TestStatisticsView
+    TestStatisticsView, CategoryListView, CategoryDetailView
 )
 
 
 urlpatterns = [
+    # Category endpoints
+    path('categories/', CategoryListView.as_view(), name='categories'),
+    path('categories/<int:pk>/', CategoryDetailView.as_view(), name='category-detail'),
+    
     # Lesson endpoints
     path('lessons/', LessonListView.as_view(), name='lessons'),
     path('lessons/<int:pk>/', LessonDetailView.as_view(), name='lesson-detail'),
