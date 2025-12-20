@@ -1,34 +1,70 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from PIL import Image
+import os
+
+
+class LessonCategory(models.Model):
+    """Category for organizing lessons."""
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        verbose_name = "Lesson Category"
+        verbose_name_plural = "Lesson Categories"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+def validate_lesson_image_dimensions(image):
+    """Validate that lesson image is at least 800x500 pixels."""
+    if image:
+        img = Image.open(image)
+        width, height = img.size
+        
+        if width < 800 or height < 500:
+            raise ValidationError(
+                f'Image dimensions must be at least 800x500 pixels. '
+                f'Uploaded image is {width}x{height} pixels.'
+            )
 
 
 class Lesson(models.Model):
     """Single lesson (video, theory, etc.)."""
-
-    class LessonType(models.TextChoices):
-        VIDEO = "video", "Video"
-        THEORY = "theory", "Theory"
-        MIXED = "mixed", "Video + theory"
-
+    # add seconds duration
     title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True)
-    lesson_type = models.CharField(
-        max_length=20,
-        choices=LessonType.choices,
-        default=LessonType.VIDEO,
+    category = models.ForeignKey(
+        LessonCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lessons',
+        help_text="Category for this lesson"
     )
     content = models.TextField(blank=True)  # text, description, extra notes
-    video_url = models.URLField(blank=True)
+    video = models.FileField(upload_to='lessons/videos/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='lessons/images/',
+        blank=True,
+        null=True,
+        validators=[validate_lesson_image_dimensions],
+        help_text="Image must be at least 800x500 pixels"
+    )
     order = models.PositiveIntegerField(
         default=1,
         help_text="Display order"
     )
     is_published = models.BooleanField(default=True)
-    duration_minutes = models.PositiveIntegerField(
+    duration_minutes = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
         null=True,
         blank=True,
-        help_text="Estimated duration in minutes"
+        help_text="Duration in minutes (auto-calculated from video if available)"
     )
     states = models.ManyToManyField(
         'onboarding.State',
@@ -53,12 +89,42 @@ class Lesson(models.Model):
         ordering = ['order', 'id']
         indexes = [
             models.Index(fields=['order']),
-            models.Index(fields=['slug']),
-            models.Index(fields=['lesson_type']),
         ]
 
     def __str__(self):
         return self.title
+    
+    def get_video_duration(self):
+        """Extract video duration in seconds using moviepy."""
+        if not self.video:
+            return None
+        
+        try:
+            from moviepy.editor import VideoFileClip
+            
+            # Open video file and get duration
+            with VideoFileClip(self.video.path) as clip:
+                duration_seconds = clip.duration
+                return duration_seconds
+        except (ImportError, Exception):
+            # If moviepy is not installed or fails, return None
+            pass
+        
+        return None
+    
+    def save(self, *args, **kwargs):
+        """Track if video has changed before saving."""
+        # Store whether video changed for use in post_save signal
+        if self.pk:
+            try:
+                old_instance = Lesson.objects.get(pk=self.pk)
+                self._video_changed = old_instance.video != self.video
+            except Lesson.DoesNotExist:
+                self._video_changed = True
+        else:
+            self._video_changed = bool(self.video)
+        
+        super().save(*args, **kwargs)
 
 
 class Test(models.Model):
@@ -367,3 +433,24 @@ class FavoriteLesson(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.lesson.title}"
+
+
+@receiver(post_save, sender=Lesson)
+def update_lesson_duration(sender, instance, created, **kwargs):
+    """
+    Signal to automatically update lesson duration after video is saved.
+    This runs after the file is saved to disk, so we can read it.
+    """
+    # Check if video changed (tracked in save method)
+    if hasattr(instance, '_video_changed') and instance._video_changed and instance.video:
+        # Get video duration
+        duration_seconds = instance.get_video_duration()
+        
+        if duration_seconds:
+            # Convert to minutes with exact decimal (2 decimal places)
+            duration_minutes = round(duration_seconds / 60, 2)
+            
+            # Only update if different to avoid infinite loop
+            if instance.duration_minutes != duration_minutes:
+                # Use update to avoid triggering save again
+                Lesson.objects.filter(pk=instance.pk).update(duration_minutes=duration_minutes)

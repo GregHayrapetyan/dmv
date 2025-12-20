@@ -10,7 +10,7 @@ from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
 from .models import (
     Lesson, Test, Question, AnswerOption,
-    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
+    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson, LessonCategory
 )
 from .serializers import (
     LessonListSerializer, LessonDetailSerializer,
@@ -18,7 +18,7 @@ from .serializers import (
     TestSubmissionSerializer, TestResultSerializer, QuestionDetailSerializer,
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
     TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
-    TestStatisticsWithAggregatesSerializer
+    TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer
 )
 from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
@@ -29,19 +29,21 @@ logger = logging.getLogger(__name__)
 
 class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
     """
-    List all lessons, optionally filtered by category.
+    List all lessons grouped by category.
     
-    Returns a list of lessons with basic information.
-    Can be filtered by category using query parameter.
+    Returns lessons organized by their categories with:
+    - Category ID and name
+    - Lessons within each category (id, image, name, duration, order)
     """
-    serializer_class = LessonListSerializer
+    serializer_class = LessonCategoryListSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = None
+    
     @extend_schema(
-        summary="List lessons",
-        description="Retrieve all lessons.",
+        summary="List lessons grouped by category",
+        description="Retrieve all lessons organized by their categories.",
         responses={
-            200: LessonListSerializer(many=True),
+            200: LessonCategoryListSerializer(many=True),
         },
         tags=["Lessons"],
     )
@@ -49,24 +51,7 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
         return super().get(request, *args, **kwargs)
     
     def get_queryset(self):
-        from django.db.models import Count
-        queryset = Lesson.objects.all()
-        
-        # Filter by user's profile state if authenticated
-        if self.request.user.is_authenticated:
-            try:
-                profile = self.request.user.profile
-                if profile.state:
-                    # Show lessons for user's state OR lessons with no states assigned (available for all)
-                    # Annotate with state count to identify lessons with no states
-                    queryset = queryset.annotate(state_count=Count('states'))
-                    queryset = queryset.filter(
-                        models.Q(states=profile.state) | models.Q(state_count=0)
-                    ).distinct()
-            except Exception as e:
-                pass  # Profile doesn't exist, show all
-        
-        return queryset.order_by('order', 'id')
+        return LessonCategory.objects.all().prefetch_related('lessons').order_by('name')
 
 
 class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
@@ -789,5 +774,3 @@ class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):
                 pass  # Profile doesn't exist, show all
         
         return queryset.order_by('id')
-
-

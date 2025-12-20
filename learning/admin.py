@@ -1,20 +1,42 @@
 from django.contrib import admin
 from .models import (
-    Lesson, Test, Question, AnswerOption,
+    LessonCategory, Lesson, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
 
+@admin.register(LessonCategory)
+class LessonCategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'lesson_type', 'order', 'is_published', 'duration_minutes', 'test', 'created_at')
-    list_filter = ('lesson_type', 'is_published', 'states')
-    search_fields = ('title', 'slug')
-    prepopulated_fields = {'slug': ('title',)}
+    list_display = ('id', 'title', 'category', 'order', 'is_published', 'duration_minutes', 'test', 'created_at')
+    list_filter = ('is_published', 'category', 'states')
+    search_fields = ('title',)
     list_editable = ('order', 'is_published')
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('states',)
-    raw_id_fields = ('test',)
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('title', 'category', 'content')
+        }),
+        ('Media', {
+            'fields': ('video', 'image')
+        }),
+        ('Settings', {
+            'fields': ('order', 'is_published', 'duration_minutes', 'test')
+        }),
+        ('State Availability', {
+            'fields': ('states',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 class QuestionInline(admin.TabularInline):

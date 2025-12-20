@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db.models import Avg, Count
 from .models import (
     Lesson, Test, Question, AnswerOption,
-    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
+    LessonProgress, TestAttempt, TestAnswer, FavoriteLesson, LessonCategory
 )
 
 
@@ -12,7 +12,7 @@ class LessonListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'slug', 'lesson_type', 'order', 'duration_minutes', 'is_published', 'state_names')
+        fields = ('id', 'title', 'image', 'order', 'duration_minutes', 'is_published', 'state_names')
     
     def get_state_names(self, obj):
         """Return list of state names this lesson is available for. Empty list means available for all states."""
@@ -25,7 +25,7 @@ class LessonDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'slug', 'lesson_type', 'content', 'video_url', 'order', 'duration_minutes', 'created_at', 'state_names')
+        fields = ('id', 'title', 'content', 'video', 'image', 'order', 'duration_minutes', 'created_at', 'state_names')
     
     def get_state_names(self, obj):
         """Return list of state names this lesson is available for. Empty list means available for all states."""
@@ -268,13 +268,11 @@ class TestAttemptListWithStatsSerializer(serializers.Serializer):
 class FavoriteLessonSerializer(serializers.ModelSerializer):
     """Serializer for favorite lessons"""
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
-    lesson_slug = serializers.CharField(source='lesson.slug', read_only=True)
-    lesson_type = serializers.CharField(source='lesson.lesson_type', read_only=True)
     duration_minutes = serializers.IntegerField(source='lesson.duration_minutes', read_only=True)
     
     class Meta:
         model = FavoriteLesson
-        fields = ('id', 'lesson', 'lesson_title', 'lesson_slug', 'lesson_type', 'duration_minutes', 'created_at')
+        fields = ('id', 'lesson', 'lesson_title', 'duration_minutes', 'created_at')
         read_only_fields = ('created_at',)
 
 
@@ -361,3 +359,50 @@ class TestStatisticsWithAggregatesSerializer(serializers.Serializer):
     incorrect_percentage = serializers.FloatField(read_only=True, help_text="Percentage of incorrect answers across all attempts")
 
 
+class LessonInCategorySerializer(serializers.ModelSerializer):
+    """Serializer for lessons within a category"""
+    name = serializers.CharField(source='title')
+    duration = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Lesson
+        fields = ('id', 'image', 'name', 'duration', 'order')
+    
+    def get_duration(self, obj):
+        """Format duration as string with 'min' suffix"""
+        if obj.duration_minutes:
+            return f"{int(obj.duration_minutes)} min"
+        return "0 min"
+
+
+class LessonCategoryListSerializer(serializers.ModelSerializer):
+    """Serializer for listing categories with their lessons"""
+    category = serializers.CharField(source='name')
+    lessons = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LessonCategory
+        fields = ('id', 'category', 'lessons')
+    
+    def get_lessons(self, obj):
+        """Get all lessons for this category, filtered by state if applicable"""
+        from django.db.models import Count, Q
+        
+        request = self.context.get('request')
+        queryset = obj.lessons.filter(is_published=True)
+        
+        # Filter by user's profile state if authenticated
+        if request and request.user.is_authenticated:
+            try:
+                profile = request.user.profile
+                if profile.state:
+                    # Show lessons for user's state OR lessons with no states assigned
+                    queryset = queryset.annotate(state_count=Count('states'))
+                    queryset = queryset.filter(
+                        Q(states=profile.state) | Q(state_count=0)
+                    ).distinct()
+            except Exception:
+                pass  # Profile doesn't exist, show all
+        
+        queryset = queryset.order_by('order', 'id')
+        return LessonInCategorySerializer(queryset, many=True, context=self.context).data
