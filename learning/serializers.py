@@ -22,10 +22,12 @@ class LessonListSerializer(serializers.ModelSerializer):
 class LessonDetailSerializer(serializers.ModelSerializer):
     """Serializer for lesson detail view (with full content)"""
     duration = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
+    test_id = serializers.IntegerField(source='test.id', read_only=True, allow_null=True)
     
     class Meta:
         model = Lesson
-        fields = ('id', 'title', 'content', 'video', 'image', 'order', 'duration')
+        fields = ('id', 'title', 'content', 'video', 'image', 'order', 'duration', 'is_favorite', 'test_id')
     
     def get_duration(self, obj):
         """Convert duration from minutes to seconds"""
@@ -34,6 +36,16 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             duration_seconds = float(obj.duration_minutes) * 60
             return round(duration_seconds)
         return 0
+    
+    def get_is_favorite(self, obj):
+        """Check if this lesson is in user's favorites"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return FavoriteLesson.objects.filter(
+                user=request.user,
+                lesson=obj
+            ).exists()
+        return False
 
 
 class AnswerOptionSerializer(serializers.ModelSerializer):
