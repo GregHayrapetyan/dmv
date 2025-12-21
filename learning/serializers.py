@@ -379,10 +379,11 @@ class LessonInCategorySerializer(serializers.ModelSerializer):
     """Serializer for lessons within a category"""
     name = serializers.CharField(source='title')
     duration = serializers.SerializerMethodField()
+    category_id = serializers.IntegerField(source='category.id', read_only=True, allow_null=True)
     
     class Meta:
         model = Lesson
-        fields = ('id', 'image', 'name', 'duration', 'order')
+        fields = ('id', 'image', 'name', 'duration', 'order', 'category_id')
     
     def get_duration(self, obj):
         """Convert duration from minutes to seconds"""
