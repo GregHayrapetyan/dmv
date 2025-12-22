@@ -157,7 +157,7 @@ class Command(BaseCommand):
                             (test_id, text, question_type, "order", created_at, updated_at, image, video)
                             VALUES (%s, %s, %s, %s, NOW(), NOW(), '', '')
                             RETURNING id
-                        """, [test.id, question_text, Question.QuestionType.MULTIPLE_CHOICE, max_order + 1, 1])
+                        """, [test.id, question_text, Question.QuestionType.MULTIPLE_CHOICE, max_order + 1])
                         question_id = cursor.fetchone()[0]
                     
                     question = Question.objects.get(id=question_id)
