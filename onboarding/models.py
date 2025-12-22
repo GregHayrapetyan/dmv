@@ -16,15 +16,6 @@ class Vehicle(models.Model):
     def __str__(self):
         return self.name
 
-class Knowledge(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    image = models.ImageField(upload_to='knowledge/', null=True, blank=True, help_text="Upload knowledge level icon")
-    image_width = models.PositiveIntegerField(null=True, blank=True, help_text="Image width in pixels")
-    image_height = models.PositiveIntegerField(null=True, blank=True, help_text="Image height in pixels")
-    
-    def __str__(self):
-        return self.name
-
 class Profile(models.Model):
     GENDER_CHOICES = (
         ('male', 'Male'),
@@ -36,7 +27,6 @@ class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     state = models.ForeignKey(State, null=True, blank=True, on_delete=models.SET_NULL)
     vehicle = models.ForeignKey(Vehicle, null=True, blank=True, on_delete=models.SET_NULL)
-    knowledge = models.ForeignKey(Knowledge, null=True, blank=True, on_delete=models.SET_NULL)
     age = models.PositiveIntegerField(null=True, blank=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, null=True, blank=True)
 

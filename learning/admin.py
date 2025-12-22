@@ -47,18 +47,18 @@ class QuestionInline(admin.TabularInline):
 
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'get_lesson', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
-    list_filter = ('is_demo', 'shuffle_questions', 'states')
+    list_display = ('id', 'title', 'get_lesson', 'is_demo', 'get_vehicles', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_filter = ('is_demo', 'shuffle_questions', 'states', 'vehicles')
     search_fields = ('title', 'lesson__title')
     inlines = [QuestionInline]
     readonly_fields = ('created_at', 'updated_at')
-    filter_horizontal = ('states',)
+    filter_horizontal = ('states', 'vehicles')
     fieldsets = (
         ('Basic Information', {
             'fields': ('title', 'description', 'image', 'is_demo')
         }),
-        ('State Availability', {
-            'fields': ('states',)
+        ('Availability', {
+            'fields': ('states', 'vehicles')
         }),
         ('Test Settings', {
             'fields': ('passing_percentage', 'max_attempts', 'time_limit_seconds', 'shuffle_questions', 'shuffle_answers')
@@ -76,6 +76,14 @@ class TestAdmin(admin.ModelAdmin):
         except:
             return None
     get_lesson.short_description = 'Lesson'
+    
+    def get_vehicles(self, obj):
+        """Display vehicle types for this test."""
+        vehicles = obj.vehicles.all()
+        if vehicles.exists():
+            return ", ".join([v.name for v in vehicles])
+        return "All vehicles"
+    get_vehicles.short_description = 'Vehicle Types'
 
 
 class AnswerOptionInline(admin.TabularInline):

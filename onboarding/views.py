@@ -3,8 +3,8 @@ from django.shortcuts import render
 from rest_framework import generics, permissions
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from dmv.api_mixins import StandardizedResponseMixin
-from .models import State, Vehicle, Knowledge, Profile
-from .serializers import StateSerializer, VehicleSerializer, KnowledgeSerializer, ProfileSerializer
+from .models import State, Vehicle, Profile
+from .serializers import StateSerializer, VehicleSerializer, ProfileSerializer
 
 class StateListView(StandardizedResponseMixin, generics.ListAPIView):
     """
@@ -52,35 +52,12 @@ class VehicleListView(StandardizedResponseMixin, generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-class KnowledgeListView(StandardizedResponseMixin, generics.ListAPIView):
-    """
-    List all knowledge levels.
-    
-    Returns a list of all available knowledge levels for user selection during onboarding.
-    No authentication required.
-    """
-    queryset = Knowledge.objects.all().order_by("name")
-    serializer_class = KnowledgeSerializer
-    permission_classes = [permissions.AllowAny]
-    pagination_class = None
-
-    @extend_schema(
-        summary="List all knowledge levels",
-        description="Retrieve a list of all knowledge levels available for user profile selection.",
-        responses={
-            200: KnowledgeSerializer(many=True),
-        },
-        tags=["Onboarding"],
-    )
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
-
 class ProfileRetrieveUpdateView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     """
     Get or update user profile.
     
     Retrieves or updates the authenticated user's onboarding profile,
-    including state, vehicle type, knowledge level, age, and gender.
+    including state, vehicle type, age, and gender.
     Profile is automatically created when user registers.
     """
     serializer_class = ProfileSerializer
@@ -100,7 +77,7 @@ class ProfileRetrieveUpdateView(StandardizedResponseMixin, generics.RetrieveUpda
 
     @extend_schema(
         summary="Update user profile",
-        description="Update the authenticated user's onboarding profile. Can update state, vehicle type, knowledge level, age, and gender.",
+        description="Update the authenticated user's onboarding profile. Can update state, vehicle type, age, and gender.",
         request=ProfileSerializer,
         responses={
             200: ProfileSerializer,

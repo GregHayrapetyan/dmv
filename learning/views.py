@@ -137,16 +137,25 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
         if is_demo is not None:
             queryset = queryset.filter(is_demo=is_demo.lower() == 'true')
         
-        # Filter by user's profile state if authenticated
+        # Filter by user's profile state and vehicle if authenticated
         if self.request.user.is_authenticated:
             try:
                 profile = self.request.user.profile
+                
+                # Filter by state
                 if profile.state:
                     # Show tests for user's state OR tests with no states assigned (available for all)
-                    # Annotate with state count to identify tests with no states
                     queryset = queryset.annotate(state_count=Count('states'))
                     queryset = queryset.filter(
                         models.Q(states=profile.state) | models.Q(state_count=0)
+                    ).distinct()
+                
+                # Filter by vehicle type
+                if profile.vehicle:
+                    # Show tests for user's vehicle OR tests with no vehicles assigned (available for all)
+                    queryset = queryset.annotate(vehicle_count=Count('vehicles'))
+                    queryset = queryset.filter(
+                        models.Q(vehicles=profile.vehicle) | models.Q(vehicle_count=0)
                     ).distinct()
             except Exception as e:
                 pass  # Profile doesn't exist, show all
@@ -785,15 +794,25 @@ class TestStatisticsView(StandardizedResponseMixin, generics.ListAPIView):
         from django.db.models import Count
         queryset = Test.objects.all().prefetch_related('questions')
         
-        # Filter by user's profile state if authenticated
+        # Filter by user's profile state and vehicle if authenticated
         if self.request.user.is_authenticated:
             try:
                 profile = self.request.user.profile
+                
+                # Filter by state
                 if profile.state:
                     # Show tests for user's state OR tests with no states assigned (available for all)
                     queryset = queryset.annotate(state_count=Count('states'))
                     queryset = queryset.filter(
                         models.Q(states=profile.state) | models.Q(state_count=0)
+                    ).distinct()
+                
+                # Filter by vehicle type
+                if profile.vehicle:
+                    # Show tests for user's vehicle OR tests with no vehicles assigned (available for all)
+                    queryset = queryset.annotate(vehicle_count=Count('vehicles'))
+                    queryset = queryset.filter(
+                        models.Q(vehicles=profile.vehicle) | models.Q(vehicle_count=0)
                     ).distinct()
             except Exception as e:
                 pass  # Profile doesn't exist, show all

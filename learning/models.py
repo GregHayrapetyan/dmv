@@ -174,6 +174,12 @@ class Test(models.Model):
         related_name='tests',
         help_text="States where this test is available. Leave empty for all states."
     )
+    vehicles = models.ManyToManyField(
+        'onboarding.Vehicle',
+        blank=True,
+        related_name='tests',
+        help_text="Vehicle types for this test. Leave empty for all vehicle types."
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
