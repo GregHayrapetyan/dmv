@@ -155,7 +155,7 @@ class Command(BaseCommand):
                         cursor.execute("""
                             INSERT INTO learning_question 
                             (test_id, text, question_type, "order", created_at, updated_at, image, video)
-                            VALUES (%s, %s, %s, %s, %s, NOW(), NOW(), '', '')
+                            VALUES (%s, %s, %s, %s, NOW(), NOW(), '', '')
                             RETURNING id
                         """, [test.id, question_text, Question.QuestionType.MULTIPLE_CHOICE, max_order + 1, 1])
                         question_id = cursor.fetchone()[0]
