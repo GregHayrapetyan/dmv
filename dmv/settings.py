@@ -37,13 +37,35 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Wagtail apps
+    'wagtail.contrib.forms',
+    'wagtail.contrib.redirects',
+    'wagtail_modeladmin',
+    'wagtail.embeds',
+    'wagtail.sites',
+    'wagtail.users',
+    'wagtail.snippets',
+    'wagtail.documents',
+    'wagtail.images',
+    'wagtail.search',
+    'wagtail.admin',
+    'wagtail',
+    'wagtail.api.v2',
+    'modelcluster',
+    'taggit',
+    
+    # Third-party apps
     "corsheaders",
     "rest_framework",
     "drf_spectacular",
+    
+    # Custom apps
     "accounts",
     "onboarding",
     "learning",
     "site_details",
+    "cms",
 ]
 # Application definition
 
@@ -59,6 +81,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    
+    # Wagtail middleware
+    'wagtail.contrib.redirects.middleware.RedirectMiddleware',
 ]
 
 ROOT_URLCONF = 'dmv.urls'
@@ -74,6 +99,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.media',
             ],
         },
     },
@@ -282,3 +308,12 @@ LOGGING = {
         },
     },
 }
+
+# Wagtail settings
+WAGTAIL_SITE_NAME = 'MyTest DMV'
+WAGTAILADMIN_BASE_URL = 'http://localhost:8000'
+
+# Use custom User model with Wagtail
+WAGTAIL_USER_EDIT_FORM = 'wagtail.users.forms.UserEditForm'
+WAGTAIL_USER_CREATION_FORM = 'wagtail.users.forms.UserCreationForm'
+WAGTAIL_USER_CUSTOM_FIELDS = ['first_name', 'last_name']

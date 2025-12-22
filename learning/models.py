@@ -141,7 +141,6 @@ class Test(models.Model):
         null=True,
         help_text="Cover image for the test",
     )
-    #TODO add video upload
     time_limit_seconds = models.PositiveIntegerField(
         null=True,
         blank=True,

@@ -25,13 +25,22 @@ A comprehensive Django REST API for a DMV (Department of Motor Vehicles) test pr
 - Automatic scoring and feedback
 - Demo tests for practice
 
+### 📝 Content Management (Wagtail CMS)
+- Marketing pages (About, Contact, Privacy, etc.)
+- Blog system for tips and updates
+- FAQ pages
+- Rich content editor with flexible layouts
+- REST API for headless CMS usage
+- **Unified admin interface** for all models (lessons, tests, reviews, etc.)
+
 ## Tech Stack
 
 - **Framework**: Django 5.2.7
 - **API**: Django REST Framework 3.16.1
+- **CMS**: Wagtail 7.2+
 - **Authentication**: JWT (SimpleJWT)
 - **Documentation**: drf-spectacular (OpenAPI/Swagger)
-- **Database**: SQLite (development) / PostgreSQL (production ready)
+- **Database**: PostgreSQL
 - **Image Processing**: Pillow
 - **CORS**: django-cors-headers
 
@@ -105,6 +114,8 @@ The API will be available at `http://localhost:8000`
 ### Interactive Documentation
 - **Swagger UI**: http://localhost:8000/api/docs/
 - **OpenAPI Schema**: http://localhost:8000/api/schema/
+- **Wagtail CMS Admin**: http://localhost:8000/cms/
+- **Wagtail API**: http://localhost:8000/api/cms/v2/pages/
 
 ### Main Endpoints
 
@@ -130,6 +141,12 @@ The API will be available at `http://localhost:8000`
 - `GET /tests/` - List tests (filter by `?category=<id>&demo=true`)
 - `GET /tests/<id>/` - Get test with questions
 - `POST /tests/<id>/submit/` - Submit test answers
+
+#### CMS (`/api/cms/v2/`)
+- `GET /pages/` - List all CMS pages
+- `GET /pages/<id>/` - Get specific page
+- `GET /images/` - List images
+- `GET /documents/` - List documents
 
 ## Management Commands
 
@@ -158,24 +175,40 @@ dmv/
 │   ├── serializers.py # API serializers
 │   ├── views.py       # Learning API views
 │   └── admin.py       # Enhanced admin interface
+├── cms/               # Wagtail CMS
+│   ├── models.py      # Page models (HomePage, BlogPage, etc.)
+│   ├── api.py         # Wagtail API configuration
+│   └── migrations/    # CMS migrations
 ├── dmv/               # Project settings
 │   ├── settings.py    # Configuration
 │   └── urls.py        # Main URL routing
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Environment variables template
+├── WAGTAIL_INTEGRATION.md  # Wagtail CMS documentation
+├── WAGTAIL_QUICKSTART.md   # Quick start guide
+├── WAGTAIL_MODELADMIN_INTEGRATION.md  # ModelAdmin guide
 └── README.md         # This file
 ```
 
 ## Development
 
-### Admin Interface
-Access the Django admin at `http://localhost:8000/admin/`
+### Admin Interfaces
 
-The admin interface includes:
+**Django Admin**: `http://localhost:8000/admin/`
 - User management with email verification status
 - OTP code monitoring
 - Lesson and test content management
 - Inline editing for questions and answers
+
+**Wagtail CMS Admin**: `http://localhost:8000/cms/`
+- Content page management (Blog, About, FAQ, etc.)
+- **Learning System** - Lessons, Tests, Questions, Progress tracking
+- **Site Details** - Pricing, Reviews, Contact messages, Partners
+- Rich text editing with StreamFields
+- Media library for images and documents
+- Page preview and revision history
+
+See [WAGTAIL_QUICKSTART.md](WAGTAIL_QUICKSTART.md) for CMS setup and [WAGTAIL_MODELADMIN_INTEGRATION.md](WAGTAIL_MODELADMIN_INTEGRATION.md) for managing learning content.
 
 ### Adding Content
 

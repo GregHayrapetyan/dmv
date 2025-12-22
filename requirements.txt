@@ -26,3 +26,5 @@ stripe==7.8.0
 psycopg2-binary==2.9.10
 requests==2.31.0
 moviepy==1.0.3
+wagtail>=5.2
+wagtail-modeladmin>=2.0

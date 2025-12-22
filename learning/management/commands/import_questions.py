@@ -34,10 +34,25 @@ class Command(BaseCommand):
         except json.JSONDecodeError:
             raise CommandError(f'Invalid JSON in file "{file_path}"')
 
+        # Handle both list and single object formats
+        if isinstance(data, list):
+            state_objects = data
+        else:
+            state_objects = [data]
+
+        # Process each state object
+        for state_data in state_objects:
+            self._process_state(state_data, state_filter)
+
+    def _process_state(self, data, state_filter):
+        """Process a single state's questions."""
         # Get state from JSON
         state_name = data.get('state')
         if not state_name:
-            raise CommandError('No "state" field found in JSON file')
+            self.stdout.write(
+                self.style.WARNING('Skipping object without "state" field')
+            )
+            return
 
         # Check if we should process this state
         if state_filter and state_name != state_filter:
@@ -59,7 +74,10 @@ class Command(BaseCommand):
 
         questions_data = data.get('questions', [])
         if not questions_data:
-            raise CommandError('No questions found in JSON file')
+            self.stdout.write(
+                self.style.WARNING(f'No questions found for state "{state_name}"')
+            )
+            return
 
         # Group questions by category
         questions_by_category = {}
@@ -131,13 +149,18 @@ class Command(BaseCommand):
                     max_order = Question.objects.filter(test=test).count()
                     
                     # Create question
-                    question = Question.objects.create(
-                        test=test,
-                        text=question_text,
-                        question_type=Question.QuestionType.MULTIPLE_CHOICE,
-                        order=max_order + 1,
-                        points=1,
-                    )
+                    # Note: Using raw SQL to handle 'weight' field that exists in DB but not in model
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            INSERT INTO learning_question 
+                            (test_id, text, question_type, "order", weight, created_at, updated_at, image, video)
+                            VALUES (%s, %s, %s, %s, %s, NOW(), NOW(), '', '')
+                            RETURNING id
+                        """, [test.id, question_text, Question.QuestionType.MULTIPLE_CHOICE, max_order + 1, 1])
+                        question_id = cursor.fetchone()[0]
+                    
+                    question = Question.objects.get(id=question_id)
 
                     # Handle video and image links if provided
                     video_link = q_data.get('video_link')
