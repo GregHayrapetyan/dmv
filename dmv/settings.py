@@ -124,6 +124,11 @@ DATABASES = {
 
 AUTH_USER_MODEL="accounts.User"
 
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -311,7 +316,7 @@ LOGGING = {
 
 # Wagtail settings
 WAGTAIL_SITE_NAME = 'MyTest DMV'
-WAGTAILADMIN_BASE_URL = 'http://localhost:8000'
+WAGTAILADMIN_BASE_URL = config('WAGTAILADMIN_BASE_URL', default='http://localhost:8000')
 
 # Use custom User model with Wagtail
 WAGTAIL_USER_EDIT_FORM = 'wagtail.users.forms.UserEditForm'
