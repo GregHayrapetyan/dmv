@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer
 from dmv.api_response import APIResponse
 
 
@@ -224,6 +224,41 @@ class PartnerListAPIView(generics.ListAPIView):
         Return only active partners, ordered by display order.
         """
         return Partner.objects.filter(is_active=True)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        Override list to use standardized response format.
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="List main banner content",
+        description="Retrieve all active main banner content sections.",
+        tags=["Site Details"],
+    )
+)
+class MainBannerListAPIView(generics.ListAPIView):
+    """
+    API endpoint to retrieve all active main banner content.
+    GET /api/site-details/main-banner/
+    
+    Returns:
+        200: List of active main banner content with image, title, and description
+    """
+    serializer_class = MainBannerSerializer
+    permission_classes = [AllowAny]
+    pagination_class = None
+    
+    def get_queryset(self):
+        """
+        Return only active main banner content, ordered by display order.
+        """
+        return MainBanner.objects.filter(is_active=True)
     
     def list(self, request, *args, **kwargs):
         """

@@ -1,6 +1,8 @@
 # site_details/models.py
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
+from PIL import Image
 
 
 class PricingPlan(models.Model):
@@ -382,3 +384,76 @@ class Partner(models.Model):
     
     def __str__(self):
         return f"Partner #{self.id}"
+
+
+class MainBanner(models.Model):
+    """
+    Main banner content model.
+    Stores the main hero section content with image, title, and description.
+    Only one instance should be active at a time (singleton pattern).
+    """
+    image = models.ImageField(
+        upload_to="main_banner/images/",
+        help_text="Main banner hero image (minimum dimensions: 1108x1206 pixels)",
+    )
+    
+    title = models.CharField(
+        max_length=200,
+        help_text="Main title for the main banner hero section",
+    )
+    
+    description = models.TextField(
+        help_text="Description text for the main banner hero section",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this main banner content is active",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ("order", "-created_at")
+        verbose_name = "Main Banner"
+        verbose_name_plural = "Main Banners"
+    
+    def __str__(self):
+        return f"{self.title[:50]}"
+    
+    def clean(self):
+        """
+        Validate image dimensions (minimum 1108x1206 pixels).
+        """
+        super().clean()
+        
+        if self.image:
+            try:
+                img = Image.open(self.image)
+                width, height = img.size
+                
+                if width < 1108 or height < 1206:
+                    raise ValidationError({
+                        'image': f'Image dimensions must be at least 1108x1206 pixels. '
+                                f'Current dimensions: {width}x{height} pixels.'
+                    })
+            except Exception as e:
+                if isinstance(e, ValidationError):
+                    raise
+                raise ValidationError({
+                    'image': 'Unable to validate image. Please ensure it is a valid image file.'
+                })
+    
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one MainBanner is active at a time (singleton pattern).
+        """
+        if self.is_active:
+            MainBanner.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)

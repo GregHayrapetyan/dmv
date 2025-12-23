@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner
 
 
 class ClientReviewSerializer(serializers.ModelSerializer):
@@ -138,3 +138,22 @@ class PartnerSerializer(serializers.ModelSerializer):
             "order",
         ]
         read_only_fields = ["id"]
+
+
+class MainBannerSerializer(serializers.ModelSerializer):
+    """
+    Serializer for MainBanner model.
+    Returns main banner content with image, title, and description.
+    """
+    
+    class Meta:
+        model = MainBanner
+        fields = [
+            "id",
+            "image",
+            "title",
+            "description",
+            "order",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]

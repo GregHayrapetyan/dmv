@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import PricingPlan, PlanFeature, ClientReview, Contact, ContactInfo, Partner
+from .models import PricingPlan, PlanFeature, ClientReview, Contact, ContactInfo, Partner, MainBanner
 
 
 class PlanFeatureInline(admin.TabularInline):
@@ -403,6 +403,114 @@ class PartnerAdmin(admin.ModelAdmin):
         """
         if len(obj.description) > 50:
             return f"{obj.description[:50]}..."
+        return obj.description
+    
+    description_preview.short_description = "Description"
+
+
+@admin.register(MainBanner)
+class MainBannerAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing main banner content.
+    """
+    list_display = (
+        "title",
+        "image_preview",
+        "description_preview",
+        "order",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "order",
+        "is_active",
+    )
+    
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "title",
+        "description",
+    )
+    
+    readonly_fields = (
+        "image_preview",
+        "image_dimensions",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Content", {
+            "fields": ("title", "description")
+        }),
+        ("Image", {
+            "fields": ("image", "image_preview", "image_dimensions"),
+            "description": "Image must be at least 1108x1206 pixels"
+        }),
+        ("Display Settings", {
+            "fields": ("order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def image_preview(self, obj):
+        """
+        Display a thumbnail preview of the main banner image.
+        """
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-width: 200px; max-height: 200px; object-fit: contain;" />',
+                obj.image.url
+            )
+        return "No image"
+    
+    image_preview.short_description = "Image Preview"
+    
+    def image_dimensions(self, obj):
+        """
+        Display the actual dimensions of the uploaded image.
+        """
+        if obj.image:
+            try:
+                from PIL import Image
+                img = Image.open(obj.image.path)
+                width, height = img.size
+                
+                # Check if dimensions meet minimum requirements
+                if width >= 1108 and height >= 1206:
+                    color = "green"
+                    status = "✓"
+                else:
+                    color = "red"
+                    status = "✗"
+                
+                return format_html(
+                    '<span style="color: {};">{} {}x{} pixels</span>',
+                    color,
+                    status,
+                    width,
+                    height
+                )
+            except Exception:
+                return "Unable to read dimensions"
+        return "No image uploaded"
+    
+    image_dimensions.short_description = "Image Dimensions"
+    
+    def description_preview(self, obj):
+        """
+        Display truncated description.
+        """
+        if len(obj.description) > 60:
+            return f"{obj.description[:60]}..."
         return obj.description
     
     description_preview.short_description = "Description"
