@@ -20,7 +20,7 @@ from learning.models import (
 
 # Import site_details models
 from site_details.models import (
-    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner
+    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner
 )
 
 
@@ -50,16 +50,22 @@ class TestAdmin(ModelAdmin):
     model = Test
     menu_label = 'Tests'
     menu_icon = 'form'
-    list_display = ('title', 'is_demo', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_display = ('title', 'is_demo', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
     list_filter = ('is_demo', 'states', 'vehicles')
     search_fields = ('title', 'description')
+    
+    def question_count(self, obj):
+        """Display the number of questions in this test."""
+        count = obj.questions.count()
+        return f"{count} question{'s' if count != 1 else ''}"
+    question_count.short_description = 'Questions'
 
 
 class QuestionAdmin(ModelAdmin):
     model = Question
     menu_label = 'Questions'
     menu_icon = 'help'
-    list_display = ('text_preview', 'test', 'question_type', 'order')
+    list_display = ('text_preview', 'test', 'question_type', 'answer_count', 'order')
     list_filter = ('question_type', 'test')
     search_fields = ('text',)
     ordering = ('test', 'order')
@@ -67,6 +73,13 @@ class QuestionAdmin(ModelAdmin):
     def text_preview(self, obj):
         return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text
     text_preview.short_description = 'Question'
+    
+    def answer_count(self, obj):
+        """Display the number of answer options for this question."""
+        count = obj.answer_options.count()
+        correct_count = obj.answer_options.filter(is_correct=True).count()
+        return f"{count} answers ({correct_count} correct)"
+    answer_count.short_description = 'Answers'
 
 
 class AnswerOptionAdmin(ModelAdmin):
@@ -183,6 +196,20 @@ class PartnerAdmin(ModelAdmin):
     description_preview.short_description = 'Description'
 
 
+class MainBannerAdmin(ModelAdmin):
+    model = MainBanner
+    menu_label = 'Main Banner'
+    menu_icon = 'image'
+    list_display = ('title', 'description_preview', 'is_active', 'order', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'description')
+    ordering = ('order', '-created_at')
+    
+    def description_preview(self, obj):
+        return obj.description[:60] + '...' if len(obj.description) > 60 else obj.description
+    description_preview.short_description = 'Description'
+
+
 # ============================================================================
 # MODEL ADMIN GROUPS
 # ============================================================================
@@ -205,6 +232,7 @@ class SiteDetailsGroup(ModelAdminGroup):
     menu_icon = 'cog'
     menu_order = 300
     items = (
+        MainBannerAdmin,
         PricingPlanAdmin,
         PlanFeatureAdmin,
         ClientReviewAdmin,
