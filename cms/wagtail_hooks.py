@@ -15,12 +15,12 @@ from taggit.models import Tag
 
 # Import learning models
 from learning.models import (
-    LessonCategory, Lesson, Test, Question, AnswerOption,
+    LessonCategory, Lesson,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
-# Import CMS models for inline editing
-from cms.models import CMSTest, CMSQuestion, CMSAnswer
+# Import CMS models for test management with inline editing
+from cms.models import CMSTest
 
 # Import site_details models
 from site_details.models import (
@@ -91,39 +91,8 @@ class CMSTestAdmin(ModelAdmin):
     question_count.short_description = 'Questions'
 
 
-class QuestionAdmin(ModelAdmin):
-    model = Question
-    menu_label = 'Questions'
-    menu_icon = 'help'
-    list_display = ('text_preview', 'test', 'question_type', 'answer_count', 'order')
-    list_filter = ('question_type', 'test')
-    search_fields = ('text',)
-    ordering = ('test', 'order')
-    
-    def text_preview(self, obj):
-        return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text
-    text_preview.short_description = 'Question'
-    
-    def answer_count(self, obj):
-        """Display the number of answer options for this question."""
-        count = obj.answer_options.count()
-        correct_count = obj.answer_options.filter(is_correct=True).count()
-        return f"{count} answers ({correct_count} correct)"
-    answer_count.short_description = 'Answers'
-
-
-class AnswerOptionAdmin(ModelAdmin):
-    model = AnswerOption
-    menu_label = 'Answer Options'
-    menu_icon = 'list-ul'
-    list_display = ('text_preview', 'question', 'is_correct', 'order')
-    list_filter = ('is_correct',)
-    search_fields = ('text', 'explanation')
-    ordering = ('question', 'order')
-    
-    def text_preview(self, obj):
-        return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text
-    text_preview.short_description = 'Answer'
+# Questions and Answers are managed inline within CMSTest
+# No separate admin interfaces needed
 
 
 class LessonProgressAdmin(ModelAdmin):
@@ -251,9 +220,7 @@ class LearningGroup(ModelAdminGroup):
     items = (
         LessonCategoryAdmin,
         LessonAdmin,
-        CMSTestAdmin,  # Using CMSTest with inline editing
-        QuestionAdmin,
-        AnswerOptionAdmin,
+        CMSTestAdmin,  # Tests with inline question/answer editing
     )
 
 
