@@ -521,29 +521,5 @@ class DemoTestRequestSerializer(serializers.Serializer):
 
 
 class DemoTestResponseSerializer(serializers.Serializer):
-    """Serializer for demo test response with questions"""
-    test_session_id = serializers.CharField(help_text="Unique session ID for this demo test")
-    state_id = serializers.IntegerField()
-    vehicle_id = serializers.IntegerField()
-    questions = QuestionSerializer(many=True)
-    time_limit_seconds = serializers.IntegerField(allow_null=True)
-
-
-class DemoTestSubmissionSerializer(serializers.Serializer):
-    """Serializer for demo test submission"""
-    answers = serializers.DictField(
-        child=serializers.IntegerField(),
-        help_text="Dictionary mapping question_id to selected answer_option_id"
-    )
-    time_taken_seconds = serializers.IntegerField(required=False, allow_null=True)
-
-
-class DemoTestResultSerializer(serializers.Serializer):
-    """Serializer for demo test results (no persistence)"""
-    correct_answers = serializers.IntegerField()
-    incorrect_answers = serializers.IntegerField()
-    questions_count = serializers.IntegerField()
-    percentage = serializers.FloatField()
-    passed = serializers.BooleanField()
-    questions = QuestionDetailSerializer(many=True)
-    user_answers = serializers.DictField()
+    """Serializer for demo test response with test_id"""
+    test_id = serializers.CharField(help_text="Temporary test ID to use with GET /tests/{id}/?is_demo=true")

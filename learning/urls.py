@@ -6,7 +6,7 @@ from .views import (
     UserTestAttemptsListView, TestAttemptDetailView,
     AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView,
     TestStatisticsView, CategoryListView, CategoryDetailView,
-    DemoTestGenerateView, DemoTestSubmitView
+    DemoTestGenerateView
 )
 
 
@@ -38,5 +38,4 @@ urlpatterns = [
     
     # Demo test endpoints (for non-registered users)
     path('demo-tests/generate/', DemoTestGenerateView.as_view(), name='demo-test-generate'),
-    path('demo-tests/<str:test_session_id>/submit/', DemoTestSubmitView.as_view(), name='demo-test-submit'),
 ]

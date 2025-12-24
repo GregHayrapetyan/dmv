@@ -23,8 +23,7 @@ from .serializers import (
     TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
     TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer, LessonInCategorySerializer,
     CategorySerializer, CategoryDetailSerializer,
-    DemoTestRequestSerializer, DemoTestResponseSerializer, DemoTestSubmissionSerializer, DemoTestResultSerializer,
-    QuestionSerializer
+    DemoTestRequestSerializer, DemoTestResponseSerializer, QuestionSerializer
 )
 from accounts.models import Subscription
 import logging
@@ -169,17 +168,110 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
     @extend_schema(
         summary="Get test detail",
-        description="Retrieve full test details with all questions and answer options. Requires active subscription.",
+        description="Retrieve full test details with all questions and answer options. Requires active subscription unless is_demo=true.",
+        parameters=[
+            OpenApiParameter(
+                name='is_demo',
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description='Set to true for demo test (returns 15 random questions)',
+                required=False,
+            ),
+        ],
         responses={
             200: TestDetailSerializer,
             401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Active subscription required"),
-            404: OpenApiResponse(description="Test not found"),
+            404: OpenApiResponse(description="Test not found or demo session expired"),
         },
         tags=["Tests"],
     )
     def get(self, request, *args, **kwargs):
-        # All tests require authentication and subscription
+        is_demo = request.query_params.get('is_demo', '').lower() == 'true'
+        
+        if is_demo:
+            # Handle demo test request
+            test_id = kwargs.get('pk')
+            
+            # Verify this is a valid demo session
+            demo_session = cache.get(f'demo_test_{test_id}')
+            if not demo_session:
+                return APIResponse.error(
+                    message="Demo test session not found or expired. Please generate a new demo test.",
+                    error_code=ErrorCodes.NOT_FOUND,
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get state and vehicle from session
+            state_id = demo_session.get('state_id')
+            vehicle_id = demo_session.get('vehicle_id')
+            
+            # Find tests matching the criteria
+            from django.db.models import Count, Q
+            from onboarding.models import State, Vehicle
+            
+            try:
+                state = State.objects.get(id=state_id)
+                vehicle = Vehicle.objects.get(id=vehicle_id)
+            except (State.DoesNotExist, Vehicle.DoesNotExist):
+                return APIResponse.error(
+                    message="Invalid state or vehicle in session",
+                    error_code=ErrorCodes.VALIDATION_ERROR,
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+            
+            tests = Test.objects.annotate(
+                state_count=Count('states'),
+                vehicle_count=Count('vehicles')
+            ).filter(
+                Q(states=state) | Q(state_count=0)
+            ).filter(
+                Q(vehicles=vehicle) | Q(vehicle_count=0)
+            ).distinct()
+            
+            if not tests.exists():
+                return APIResponse.error(
+                    message="No tests available for the selected state and vehicle",
+                    error_code=ErrorCodes.NOT_FOUND,
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get 15 random questions from matching tests
+            all_questions = Question.objects.filter(
+                test__in=tests
+            ).prefetch_related('answer_options').order_by('?')
+            
+            if all_questions.count() < 15:
+                return APIResponse.error(
+                    message=f"Insufficient questions available. Found {all_questions.count()}, need 15",
+                    error_code=ErrorCodes.VALIDATION_ERROR,
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Select 15 random questions
+            selected_questions = list(all_questions[:15])
+            random.shuffle(selected_questions)
+            
+            # Store question IDs in cache for potential future use
+            demo_session['question_ids'] = [q.id for q in selected_questions]
+            cache.set(f'demo_test_{test_id}', demo_session, timeout=3600)
+            
+            # Prepare response with demo questions
+            question_serializer = QuestionSerializer(selected_questions, many=True)
+            
+            response_data = {
+                'id': test_id,
+                'questions': question_serializer.data
+            }
+            
+            logger.info(f"Demo test {test_id} accessed with {len(selected_questions)} questions")
+            
+            return APIResponse.success(
+                data=response_data,
+                message="Demo test retrieved successfully"
+            )
+        
+        # Regular test - require authentication and subscription
         if not request.user.is_authenticated:
             return APIResponse.error(
                 message="Authentication required",
@@ -862,20 +954,17 @@ class DemoTestGenerateView(APIView):
     """
     Generate a demo test for non-registered users.
     
-    Accepts state_id and vehicle_id, returns 15 random questions
-    from tests matching those criteria. Creates a temporary session
-    that expires after 1 hour.
+    Creates a temporary test_id that can be used with tests/<id>/?is_demo=true
+    to retrieve 15 random questions. Session expires in 1 hour.
     """
     permission_classes = [permissions.AllowAny]
     
     @extend_schema(
         summary="Generate demo test",
-        description="Generate a demo test with 15 random questions based on state and vehicle selection. No authentication required.",
+        description="Generate a temporary demo test ID. Use this ID with GET /tests/{id}/?is_demo=true to retrieve questions.",
         request=DemoTestRequestSerializer,
         responses={
             200: DemoTestResponseSerializer,
-            400: OpenApiResponse(description="Invalid state or vehicle, or insufficient questions"),
-            404: OpenApiResponse(description="No tests available for selected criteria"),
         },
         tags=["Demo Tests"],
     )
@@ -902,173 +991,26 @@ class DemoTestGenerateView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         
-        # Find tests matching the criteria
-        from django.db.models import Count, Q
-        tests = Test.objects.annotate(
-            state_count=Count('states'),
-            vehicle_count=Count('vehicles')
-        ).filter(
-            Q(states=state) | Q(state_count=0)
-        ).filter(
-            Q(vehicles=vehicle) | Q(vehicle_count=0)
-        ).distinct()
+        # Generate unique temporary test ID
+        session_data = f"demo-{state_id}-{vehicle_id}-{timezone.now().timestamp()}-{random.randint(1000, 9999)}"
+        test_id = hashlib.md5(session_data.encode()).hexdigest()
         
-        if not tests.exists():
-            return APIResponse.error(
-                message="No tests available for the selected state and vehicle",
-                error_code=ErrorCodes.NOT_FOUND,
-                status_code=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Collect all questions from matching tests
-        all_questions = Question.objects.filter(
-            test__in=tests
-        ).prefetch_related('answer_options').order_by('?')
-        
-        if all_questions.count() < 15:
-            return APIResponse.error(
-                message=f"Insufficient questions available. Found {all_questions.count()}, need 15",
-                error_code=ErrorCodes.VALIDATION_ERROR,
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Select 15 random questions
-        selected_questions = list(all_questions[:15])
-        random.shuffle(selected_questions)
-        
-        # Generate unique session ID
-        session_data = f"{state_id}-{vehicle_id}-{timezone.now().timestamp()}-{random.randint(1000, 9999)}"
-        test_session_id = hashlib.md5(session_data.encode()).hexdigest()
-        
-        # Store session data in cache (expires in 1 hour)
-        session_info = {
+        # Store demo session in cache (expires in 1 hour)
+        demo_session = {
+            'created_at': timezone.now().isoformat(),
+            'is_demo': True,
             'state_id': state_id,
-            'vehicle_id': vehicle_id,
-            'question_ids': [q.id for q in selected_questions],
-            'created_at': timezone.now().isoformat()
+            'vehicle_id': vehicle_id
         }
-        cache.set(f'demo_test_{test_session_id}', session_info, timeout=3600)
-        
-        # Prepare response
-        question_serializer = QuestionSerializer(selected_questions, many=True)
+        cache.set(f'demo_test_{test_id}', demo_session, timeout=3600)
         
         response_data = {
-            'test_session_id': test_session_id,
-            'state_id': state_id,
-            'vehicle_id': vehicle_id,
-            'questions': question_serializer.data,
-            'time_limit_seconds': 120  # 2 minutes time limit for demo tests
+            'test_id': test_id
         }
         
-        logger.info(f"Demo test generated. Session: {test_session_id}, State: {state_id}, Vehicle: {vehicle_id}")
+        logger.info(f"Demo test generated with ID: {test_id}, State: {state_id}, Vehicle: {vehicle_id}")
         
         return APIResponse.success(
             data=response_data,
-            message="Demo test generated successfully"
-        )
-
-
-class DemoTestSubmitView(APIView):
-    """
-    Submit demo test answers and get results.
-    
-    Calculates score and returns results without persisting to database.
-    Results are shown only once and not stored.
-    """
-    permission_classes = [permissions.AllowAny]
-    
-    @extend_schema(
-        summary="Submit demo test",
-        description="Submit answers for a demo test. Returns results without saving to database. No authentication required.",
-        request=DemoTestSubmissionSerializer,
-        examples=[
-            OpenApiExample(
-                "Submit Demo Test Answers",
-                value={
-                    "answers": {
-                        "1": 2,
-                        "2": 5,
-                        "3": 8
-                    },
-                    "time_taken_seconds": 450
-                },
-                request_only=True,
-            )
-        ],
-        responses={
-            200: DemoTestResultSerializer,
-            400: OpenApiResponse(description="Invalid session or validation error"),
-            404: OpenApiResponse(description="Session not found or expired"),
-        },
-        tags=["Demo Tests"],
-    )
-    def post(self, request, test_session_id):
-        serializer = DemoTestSubmissionSerializer(data=request.data)
-        if not serializer.is_valid():
-            return APIResponse.validation_error(
-                message="Invalid submission data",
-                details=serializer.errors
-            )
-        
-        answers = serializer.validated_data['answers']
-        
-        # Retrieve session from cache
-        session_info = cache.get(f'demo_test_{test_session_id}')
-        if not session_info:
-            return APIResponse.error(
-                message="Demo test session not found or expired. Please generate a new test.",
-                error_code=ErrorCodes.NOT_FOUND,
-                status_code=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Get questions from session
-        question_ids = session_info['question_ids']
-        questions = Question.objects.filter(
-            id__in=question_ids
-        ).prefetch_related('answer_options').order_by('order')
-        
-        # Calculate results
-        correct_answers = 0
-        incorrect_answers = 0
-        
-        for question in questions:
-            user_answer_id = answers.get(str(question.id))
-            
-            if user_answer_id:
-                try:
-                    selected_option = question.answer_options.get(id=user_answer_id)
-                    if selected_option.is_correct:
-                        correct_answers += 1
-                    else:
-                        incorrect_answers += 1
-                except AnswerOption.DoesNotExist:
-                    incorrect_answers += 1
-            else:
-                incorrect_answers += 1
-        
-        questions_count = questions.count()
-        percentage = (correct_answers / questions_count * 100) if questions_count > 0 else 0
-        passed = percentage >= 70  # Default passing percentage for demo
-        
-        # Prepare detailed results
-        question_serializer = QuestionDetailSerializer(questions, many=True)
-        
-        result_data = {
-            'correct_answers': correct_answers,
-            'incorrect_answers': incorrect_answers,
-            'questions_count': questions_count,
-            'percentage': round(percentage, 2),
-            'passed': passed,
-            'questions': question_serializer.data,
-            'user_answers': answers
-        }
-        
-        # Delete session from cache after submission (one-time use)
-        cache.delete(f'demo_test_{test_session_id}')
-        
-        logger.info(f"Demo test submitted. Session: {test_session_id}, Score: {correct_answers}/{questions_count} ({percentage:.2f}%)")
-        
-        return APIResponse.success(
-            data=result_data,
-            message="Demo test submitted successfully"
+            message="Demo test ID generated successfully. Use this ID with GET /tests/{id}/?is_demo=true"
         )
