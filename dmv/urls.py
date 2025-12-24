@@ -30,7 +30,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # Wagtail admin (CMS backend - keep for content management)
-    # path('cms/', include(wagtailadmin_urls)),
+    path('cms/', include(wagtailadmin_urls)),
     # path('documents/', include(wagtaildocs_urls)),
     
     # API endpoints
