@@ -188,11 +188,10 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     )
     def get(self, request, *args, **kwargs):
         is_demo = request.query_params.get('is_demo', '').lower() == 'true'
+        test_id = kwargs.get('pk')
         
         if is_demo:
             # Handle demo test request
-            test_id = kwargs.get('pk')
-            
             # Verify this is a valid demo session
             demo_session = cache.get(f'demo_test_{test_id}')
             if not demo_session:
@@ -261,6 +260,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             
             response_data = {
                 'id': test_id,
+                'time_limit_seconds': 120,
                 'questions': question_serializer.data
             }
             
@@ -269,6 +269,17 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             return APIResponse.success(
                 data=response_data,
                 message="Demo test retrieved successfully"
+            )
+        
+        # Regular test - validate that pk is an integer
+        try:
+            test_id_int = int(test_id)
+            kwargs['pk'] = test_id_int
+        except (ValueError, TypeError):
+            return APIResponse.error(
+                message="Invalid test ID format. For demo tests, use ?is_demo=true parameter.",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
             )
         
         # Regular test - require authentication and subscription
