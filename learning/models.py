@@ -146,10 +146,6 @@ class Test(models.Model):
         blank=True,
         help_text="Time limit in seconds (if any)",
     )
-    is_demo = models.BooleanField(
-        default=False,
-        help_text="Marks this test as a demo test",
-    )
     passing_percentage = models.PositiveIntegerField(
         default=100,
         help_text="Percentage needed to pass (0-100)"
@@ -185,9 +181,6 @@ class Test(models.Model):
     class Meta:
         verbose_name = "Test"
         verbose_name_plural = "Tests"
-        indexes = [
-            models.Index(fields=['is_demo']),
-        ]
         constraints = [
             models.CheckConstraint(
                 check=models.Q(passing_percentage__gte=0, passing_percentage__lte=100),

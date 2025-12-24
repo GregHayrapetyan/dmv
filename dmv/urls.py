@@ -23,15 +23,15 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
-from cms.api import api_router
+# from cms.api import api_router  # CMS API disabled
 
 urlpatterns = [
     # Django admin
     path('admin/', admin.site.urls),
     
-    # Wagtail admin
-    path('cms/', include(wagtailadmin_urls)),
-    path('documents/', include(wagtaildocs_urls)),
+    # Wagtail admin (CMS backend - keep for content management)
+    # path('cms/', include(wagtailadmin_urls)),
+    # path('documents/', include(wagtaildocs_urls)),
     
     # API endpoints
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -40,13 +40,13 @@ urlpatterns = [
     path("api/onboarding/", include("onboarding.urls")),
     path("api/learning/", include("learning.urls")),
     path("api/site-details/", include("site_details.urls")),
-    path("api/cms/", api_router.urls),
+    # path("api/cms/", api_router.urls),  # CMS API disabled
 ]
 
 # Wagtail pages (should be last to not override other URLs)
-urlpatterns += [
-    path("", include(wagtail_urls)),
-]
+# urlpatterns += [
+#     path("", include(wagtail_urls)),  # CMS frontend pages disabled
+# ]
 
 # Serve media files in development
 if settings.DEBUG:

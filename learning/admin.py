@@ -47,15 +47,15 @@ class QuestionInline(admin.TabularInline):
 
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'get_lesson', 'is_demo', 'get_vehicles', 'passing_percentage', 'time_limit_seconds', 'created_at')
-    list_filter = ('is_demo', 'shuffle_questions', 'states', 'vehicles')
+    list_display = ('id', 'title', 'get_lesson', 'get_vehicles', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_filter = ('shuffle_questions', 'states', 'vehicles')
     search_fields = ('title', 'lesson__title')
     inlines = [QuestionInline]
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('states', 'vehicles')
     fieldsets = (
         ('Basic Information', {
-            'fields': ('title', 'description', 'image', 'is_demo')
+            'fields': ('title', 'description', 'image')
         }),
         ('Availability', {
             'fields': ('states', 'vehicles')

@@ -90,7 +90,7 @@ class TestListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'image', 'lesson_id', 'lesson_title', 'is_demo', 'time_limit_seconds', 'question_count',
+        fields = ('id', 'title', 'image', 'lesson_id', 'lesson_title', 'time_limit_seconds', 'question_count',
                   'passing_percentage', 'max_attempts', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers', 'state_names')
     
     def get_lesson_title(self, obj):
@@ -182,7 +182,7 @@ class TestDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = ('id', 'title', 'image', 'description', 'lesson_id', 'lesson_title', 'time_limit_seconds', 
-                  'is_demo', 'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names')
+                  'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names')
     
     def get_lesson_title(self, obj):
         """Get the title of the lesson this test belongs to."""
@@ -508,3 +508,42 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
         
         queryset = queryset.order_by('order', 'id')
         return LessonInCategorySerializer(queryset, many=True, context=self.context).data
+
+
+# ============================================================================
+# DEMO TEST SERIALIZERS (for non-registered users)
+# ============================================================================
+
+class DemoTestRequestSerializer(serializers.Serializer):
+    """Serializer for demo test generation request"""
+    state_id = serializers.IntegerField(required=True, help_text="State ID for filtering questions")
+    vehicle_id = serializers.IntegerField(required=True, help_text="Vehicle type ID for filtering questions")
+
+
+class DemoTestResponseSerializer(serializers.Serializer):
+    """Serializer for demo test response with questions"""
+    test_session_id = serializers.CharField(help_text="Unique session ID for this demo test")
+    state_id = serializers.IntegerField()
+    vehicle_id = serializers.IntegerField()
+    questions = QuestionSerializer(many=True)
+    time_limit_seconds = serializers.IntegerField(allow_null=True)
+
+
+class DemoTestSubmissionSerializer(serializers.Serializer):
+    """Serializer for demo test submission"""
+    answers = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text="Dictionary mapping question_id to selected answer_option_id"
+    )
+    time_taken_seconds = serializers.IntegerField(required=False, allow_null=True)
+
+
+class DemoTestResultSerializer(serializers.Serializer):
+    """Serializer for demo test results (no persistence)"""
+    correct_answers = serializers.IntegerField()
+    incorrect_answers = serializers.IntegerField()
+    questions_count = serializers.IntegerField()
+    percentage = serializers.FloatField()
+    passed = serializers.BooleanField()
+    questions = QuestionDetailSerializer(many=True)
+    user_answers = serializers.DictField()

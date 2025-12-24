@@ -4,7 +4,10 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db import models
+from django.core.cache import cache
 from decimal import Decimal
+import random
+import hashlib
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
@@ -19,9 +22,10 @@ from .serializers import (
     LessonProgressSerializer, TestAttemptSerializer, TestAttemptListSerializer,
     TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
     TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer, LessonInCategorySerializer,
-    CategorySerializer, CategoryDetailSerializer
+    CategorySerializer, CategoryDetailSerializer,
+    DemoTestRequestSerializer, DemoTestResponseSerializer, DemoTestSubmissionSerializer, DemoTestResultSerializer,
+    QuestionSerializer
 )
-from .permissions import HasActiveSubscriptionOrDemo
 from accounts.models import Subscription
 import logging
 
@@ -110,16 +114,7 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     
     @extend_schema(
         summary="List tests",
-        description="Retrieve all tests. Can filter by demo status.",
-        parameters=[
-            OpenApiParameter(
-                name='demo',
-                type=bool,
-                location=OpenApiParameter.QUERY,
-                description='Filter by demo status (true/false)',
-                required=False,
-            ),
-        ],
+        description="Retrieve all tests.",
         responses={
             200: TestListSerializer(many=True),
         },
@@ -131,11 +126,6 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     def get_queryset(self):
         from django.db.models import Count
         queryset = Test.objects.all()
-        
-        # Filter by demo status
-        is_demo = self.request.query_params.get('demo', None)
-        if is_demo is not None:
-            queryset = queryset.filter(is_demo=is_demo.lower() == 'true')
         
         # Filter by user's profile state and vehicle if authenticated
         if self.request.user.is_authenticated:
@@ -169,7 +159,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     
     Returns complete test details including all questions and answer options.
     Used when a user starts taking a test. Correct answers are not revealed.
-    Demo tests are free, premium tests require subscription.
+    Requires active subscription.
     """
     queryset = Test.objects.all().prefetch_related(
         'questions__answer_options'
@@ -179,40 +169,38 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
     @extend_schema(
         summary="Get test detail",
-        description="Retrieve full test details with all questions and answer options. Demo tests are free, premium tests require subscription.",
+        description="Retrieve full test details with all questions and answer options. Requires active subscription.",
         responses={
             200: TestDetailSerializer,
-            403: OpenApiResponse(description="Active subscription required for premium tests"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active subscription required"),
             404: OpenApiResponse(description="Test not found"),
         },
         tags=["Tests"],
     )
     def get(self, request, *args, **kwargs):
-        test = self.get_object()
-        
-        # Check if test is demo or user has subscription
-        if not test.is_demo:
-            if not request.user.is_authenticated:
-                return APIResponse.error(
-                    message="Authentication required for premium tests",
-                    error_code=ErrorCodes.UNAUTHORIZED,
-                    status_code=status.HTTP_401_UNAUTHORIZED
-                )
+        # All tests require authentication and subscription
+        if not request.user.is_authenticated:
+            return APIResponse.error(
+                message="Authentication required",
+                error_code=ErrorCodes.UNAUTHORIZED,
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
 
-            try:
-                subscription = Subscription.objects.get(user=request.user)
-                if not subscription.has_access():
-                    return APIResponse.error(
-                        message="Active subscription required to access this test",
-                        error_code=ErrorCodes.FORBIDDEN,
-                        status_code=status.HTTP_403_FORBIDDEN
-                    )
-            except Subscription.DoesNotExist:
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            if not subscription.has_access():
                 return APIResponse.error(
                     message="Active subscription required to access this test",
                     error_code=ErrorCodes.FORBIDDEN,
                     status_code=status.HTTP_403_FORBIDDEN
                 )
+        except Subscription.DoesNotExist:
+            return APIResponse.error(
+                message="Active subscription required to access this test",
+                error_code=ErrorCodes.FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN
+            )
 
         return super().get(request, *args, **kwargs)
 
@@ -286,22 +274,21 @@ class TestSubmitView(APIView):
             pk=pk
         )
         
-        # Check if test is demo or user has subscription
-        if not test.is_demo:
-            try:
-                subscription = Subscription.objects.get(user=request.user)
-                if not subscription.has_access():
-                    return APIResponse.error(
-                        message="Active subscription required to submit this test",
-                        error_code=ErrorCodes.FORBIDDEN,
-                        status_code=status.HTTP_403_FORBIDDEN
-                    )
-            except Subscription.DoesNotExist:
+        # All tests require subscription
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            if not subscription.has_access():
                 return APIResponse.error(
                     message="Active subscription required to submit this test",
                     error_code=ErrorCodes.FORBIDDEN,
                     status_code=status.HTTP_403_FORBIDDEN
                 )
+        except Subscription.DoesNotExist:
+            return APIResponse.error(
+                message="Active subscription required to submit this test",
+                error_code=ErrorCodes.FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN
+            )
         
         # Check max attempts if configured
         if test.max_attempts:
@@ -865,3 +852,223 @@ class CategoryDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+
+# ============================================================================
+# DEMO TEST VIEWS (for non-registered users)
+# ============================================================================
+
+class DemoTestGenerateView(APIView):
+    """
+    Generate a demo test for non-registered users.
+    
+    Accepts state_id and vehicle_id, returns 15 random questions
+    from tests matching those criteria. Creates a temporary session
+    that expires after 1 hour.
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        summary="Generate demo test",
+        description="Generate a demo test with 15 random questions based on state and vehicle selection. No authentication required.",
+        request=DemoTestRequestSerializer,
+        responses={
+            200: DemoTestResponseSerializer,
+            400: OpenApiResponse(description="Invalid state or vehicle, or insufficient questions"),
+            404: OpenApiResponse(description="No tests available for selected criteria"),
+        },
+        tags=["Demo Tests"],
+    )
+    def post(self, request):
+        serializer = DemoTestRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Invalid request data",
+                details=serializer.errors
+            )
+        
+        state_id = serializer.validated_data['state_id']
+        vehicle_id = serializer.validated_data['vehicle_id']
+        
+        # Validate state and vehicle exist
+        from onboarding.models import State, Vehicle
+        try:
+            state = State.objects.get(id=state_id)
+            vehicle = Vehicle.objects.get(id=vehicle_id)
+        except (State.DoesNotExist, Vehicle.DoesNotExist):
+            return APIResponse.error(
+                message="Invalid state or vehicle selection",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Find tests matching the criteria
+        from django.db.models import Count, Q
+        tests = Test.objects.annotate(
+            state_count=Count('states'),
+            vehicle_count=Count('vehicles')
+        ).filter(
+            Q(states=state) | Q(state_count=0)
+        ).filter(
+            Q(vehicles=vehicle) | Q(vehicle_count=0)
+        ).distinct()
+        
+        if not tests.exists():
+            return APIResponse.error(
+                message="No tests available for the selected state and vehicle",
+                error_code=ErrorCodes.NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Collect all questions from matching tests
+        all_questions = Question.objects.filter(
+            test__in=tests
+        ).prefetch_related('answer_options').order_by('?')
+        
+        if all_questions.count() < 15:
+            return APIResponse.error(
+                message=f"Insufficient questions available. Found {all_questions.count()}, need 15",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Select 15 random questions
+        selected_questions = list(all_questions[:15])
+        random.shuffle(selected_questions)
+        
+        # Generate unique session ID
+        session_data = f"{state_id}-{vehicle_id}-{timezone.now().timestamp()}-{random.randint(1000, 9999)}"
+        test_session_id = hashlib.md5(session_data.encode()).hexdigest()
+        
+        # Store session data in cache (expires in 1 hour)
+        session_info = {
+            'state_id': state_id,
+            'vehicle_id': vehicle_id,
+            'question_ids': [q.id for q in selected_questions],
+            'created_at': timezone.now().isoformat()
+        }
+        cache.set(f'demo_test_{test_session_id}', session_info, timeout=3600)
+        
+        # Prepare response
+        question_serializer = QuestionSerializer(selected_questions, many=True)
+        
+        response_data = {
+            'test_session_id': test_session_id,
+            'state_id': state_id,
+            'vehicle_id': vehicle_id,
+            'questions': question_serializer.data,
+            'time_limit_seconds': 120  # 2 minutes time limit for demo tests
+        }
+        
+        logger.info(f"Demo test generated. Session: {test_session_id}, State: {state_id}, Vehicle: {vehicle_id}")
+        
+        return APIResponse.success(
+            data=response_data,
+            message="Demo test generated successfully"
+        )
+
+
+class DemoTestSubmitView(APIView):
+    """
+    Submit demo test answers and get results.
+    
+    Calculates score and returns results without persisting to database.
+    Results are shown only once and not stored.
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        summary="Submit demo test",
+        description="Submit answers for a demo test. Returns results without saving to database. No authentication required.",
+        request=DemoTestSubmissionSerializer,
+        examples=[
+            OpenApiExample(
+                "Submit Demo Test Answers",
+                value={
+                    "answers": {
+                        "1": 2,
+                        "2": 5,
+                        "3": 8
+                    },
+                    "time_taken_seconds": 450
+                },
+                request_only=True,
+            )
+        ],
+        responses={
+            200: DemoTestResultSerializer,
+            400: OpenApiResponse(description="Invalid session or validation error"),
+            404: OpenApiResponse(description="Session not found or expired"),
+        },
+        tags=["Demo Tests"],
+    )
+    def post(self, request, test_session_id):
+        serializer = DemoTestSubmissionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Invalid submission data",
+                details=serializer.errors
+            )
+        
+        answers = serializer.validated_data['answers']
+        
+        # Retrieve session from cache
+        session_info = cache.get(f'demo_test_{test_session_id}')
+        if not session_info:
+            return APIResponse.error(
+                message="Demo test session not found or expired. Please generate a new test.",
+                error_code=ErrorCodes.NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get questions from session
+        question_ids = session_info['question_ids']
+        questions = Question.objects.filter(
+            id__in=question_ids
+        ).prefetch_related('answer_options').order_by('order')
+        
+        # Calculate results
+        correct_answers = 0
+        incorrect_answers = 0
+        
+        for question in questions:
+            user_answer_id = answers.get(str(question.id))
+            
+            if user_answer_id:
+                try:
+                    selected_option = question.answer_options.get(id=user_answer_id)
+                    if selected_option.is_correct:
+                        correct_answers += 1
+                    else:
+                        incorrect_answers += 1
+                except AnswerOption.DoesNotExist:
+                    incorrect_answers += 1
+            else:
+                incorrect_answers += 1
+        
+        questions_count = questions.count()
+        percentage = (correct_answers / questions_count * 100) if questions_count > 0 else 0
+        passed = percentage >= 70  # Default passing percentage for demo
+        
+        # Prepare detailed results
+        question_serializer = QuestionDetailSerializer(questions, many=True)
+        
+        result_data = {
+            'correct_answers': correct_answers,
+            'incorrect_answers': incorrect_answers,
+            'questions_count': questions_count,
+            'percentage': round(percentage, 2),
+            'passed': passed,
+            'questions': question_serializer.data,
+            'user_answers': answers
+        }
+        
+        # Delete session from cache after submission (one-time use)
+        cache.delete(f'demo_test_{test_session_id}')
+        
+        logger.info(f"Demo test submitted. Session: {test_session_id}, Score: {correct_answers}/{questions_count} ({percentage:.2f}%)")
+        
+        return APIResponse.success(
+            data=result_data,
+            message="Demo test submitted successfully"
+        )

@@ -5,7 +5,8 @@ from .views import (
     LessonProgressView, UserLessonProgressListView,
     UserTestAttemptsListView, TestAttemptDetailView,
     AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView,
-    TestStatisticsView, CategoryListView, CategoryDetailView
+    TestStatisticsView, CategoryListView, CategoryDetailView,
+    DemoTestGenerateView, DemoTestSubmitView
 )
 
 
@@ -34,4 +35,8 @@ urlpatterns = [
     path('favorites/', FavoriteLessonsListView.as_view(), name='favorite-lessons-list'),
     path('lessons/<int:lesson_id>/favorite/', AddFavoriteLessonView.as_view(), name='add-favorite-lesson'),
     path('lessons/<int:lesson_id>/unfavorite/', RemoveFavoriteLessonView.as_view(), name='remove-favorite-lesson'),
+    
+    # Demo test endpoints (for non-registered users)
+    path('demo-tests/generate/', DemoTestGenerateView.as_view(), name='demo-test-generate'),
+    path('demo-tests/<str:test_session_id>/submit/', DemoTestSubmitView.as_view(), name='demo-test-submit'),
 ]

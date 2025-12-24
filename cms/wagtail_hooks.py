@@ -50,8 +50,8 @@ class TestAdmin(ModelAdmin):
     model = Test
     menu_label = 'Tests'
     menu_icon = 'form'
-    list_display = ('title', 'is_demo', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
-    list_filter = ('is_demo', 'states', 'vehicles')
+    list_display = ('title', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_filter = ('states', 'vehicles')
     search_fields = ('title', 'description')
     
     def question_count(self, obj):
