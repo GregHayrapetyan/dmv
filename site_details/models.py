@@ -406,11 +406,6 @@ class MainBanner(models.Model):
         help_text="Description text for the main banner hero section",
     )
     
-    order = models.PositiveIntegerField(
-        default=0,
-        help_text="Display order (lower numbers appear first)",
-    )
-    
     is_active = models.BooleanField(
         default=True,
         help_text="Whether this main banner content is active",
@@ -420,7 +415,7 @@ class MainBanner(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ("order", "-created_at")
+        ordering = ("-created_at",)
         verbose_name = "Main Banner"
         verbose_name_plural = "Main Banners"
     

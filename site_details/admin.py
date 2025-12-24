@@ -417,13 +417,11 @@ class MainBannerAdmin(admin.ModelAdmin):
         "title",
         "image_preview",
         "description_preview",
-        "order",
         "is_active",
         "created_at",
     )
     
     list_editable = (
-        "order",
         "is_active",
     )
     
@@ -453,7 +451,7 @@ class MainBannerAdmin(admin.ModelAdmin):
             "description": "Image must be at least 1108x1206 pixels"
         }),
         ("Display Settings", {
-            "fields": ("order", "is_active")
+            "fields": ("is_active",)
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),

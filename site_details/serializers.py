@@ -153,7 +153,5 @@ class MainBannerSerializer(serializers.ModelSerializer):
             "image",
             "title",
             "description",
-            "order",
-            "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id"]

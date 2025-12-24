@@ -200,10 +200,10 @@ class MainBannerAdmin(ModelAdmin):
     model = MainBanner
     menu_label = 'Main Banner'
     menu_icon = 'image'
-    list_display = ('title', 'description_preview', 'is_active', 'order', 'created_at')
+    list_display = ('title', 'description_preview', 'is_active', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('title', 'description')
-    ordering = ('order', '-created_at')
+    ordering = ('-created_at',)
     
     def description_preview(self, obj):
         return obj.description[:60] + '...' if len(obj.description) > 60 else obj.description

@@ -256,7 +256,7 @@ class MainBannerListAPIView(generics.ListAPIView):
     
     def get_queryset(self):
         """
-        Return only active main banner content, ordered by display order.
+        Return only active main banner content.
         """
         return MainBanner.objects.filter(is_active=True)
     
