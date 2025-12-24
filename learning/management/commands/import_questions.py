@@ -149,18 +149,12 @@ class Command(BaseCommand):
                     max_order = Question.objects.filter(test=test).count()
                     
                     # Create question
-                    # Note: Using raw SQL to handle 'weight' field that exists in DB but not in model
-                    from django.db import connection
-                    with connection.cursor() as cursor:
-                        cursor.execute("""
-                            INSERT INTO learning_question 
-                            (test_id, text, question_type, "order", created_at, updated_at, image, video)
-                            VALUES (%s, %s, %s, %s, NOW(), NOW(), '', '')
-                            RETURNING id
-                        """, [test.id, question_text, Question.QuestionType.MULTIPLE_CHOICE, max_order + 1])
-                        question_id = cursor.fetchone()[0]
-                    
-                    question = Question.objects.get(id=question_id)
+                    question = Question.objects.create(
+                        test=test,
+                        text=question_text,
+                        question_type=Question.QuestionType.MULTIPLE_CHOICE,
+                        order=max_order + 1
+                    )
 
                     # Handle video and image links if provided
                     video_link = q_data.get('video_link')

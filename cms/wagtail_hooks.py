@@ -3,10 +3,11 @@ Wagtail admin customizations and ModelAdmin registrations.
 This file integrates existing Django models into the Wagtail admin interface.
 """
 from django.contrib import admin
+from django import forms
 from wagtail_modeladmin.options import (
     ModelAdmin, ModelAdminGroup, modeladmin_register
 )
-from wagtail_modeladmin.helpers import PermissionHelper
+from wagtail_modeladmin.helpers import PermissionHelper, ButtonHelper
 from wagtail import hooks
 from wagtail.documents.models import Document
 from wagtail.images.models import Image
@@ -17,6 +18,9 @@ from learning.models import (
     LessonCategory, Lesson, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
+
+# Import CMS models for inline editing
+from cms.models import CMSTest, CMSQuestion, CMSAnswer
 
 # Import site_details models
 from site_details.models import (
@@ -46,13 +50,39 @@ class LessonAdmin(ModelAdmin):
     ordering = ('order', 'id')
 
 
-class TestAdmin(ModelAdmin):
-    model = Test
+class CMSTestAdmin(ModelAdmin):
+    """Test admin with inline question and answer editing."""
+    model = CMSTest
     menu_label = 'Tests'
     menu_icon = 'form'
     list_display = ('title', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
-    list_filter = ('states', 'vehicles')
     search_fields = ('title', 'description')
+    
+    # Define edit handler with inline panels
+    edit_handler = None
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        
+        if self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('title'),
+                    FieldPanel('description'),
+                    FieldPanel('image'),
+                ], heading='Basic Information'),
+                ObjectList([
+                    FieldPanel('passing_percentage'),
+                    FieldPanel('max_attempts'),
+                    FieldPanel('time_limit_seconds'),
+                    FieldPanel('shuffle_questions'),
+                    FieldPanel('shuffle_answers'),
+                ], heading='Test Settings'),
+                ObjectList([
+                    InlinePanel('questions', label="Questions"),
+                ], heading='Questions'),
+            ])
+        return self.edit_handler
     
     def question_count(self, obj):
         """Display the number of questions in this test."""
@@ -221,7 +251,7 @@ class LearningGroup(ModelAdminGroup):
     items = (
         LessonCategoryAdmin,
         LessonAdmin,
-        TestAdmin,
+        CMSTestAdmin,  # Using CMSTest with inline editing
         QuestionAdmin,
         AnswerOptionAdmin,
     )

@@ -1,11 +1,14 @@
 from django.db import models
-from wagtail.models import Page
+from wagtail.models import Page, Orderable
 from wagtail.fields import RichTextField, StreamField
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
 from wagtail.blocks import CharBlock, RichTextBlock, StreamBlock, StructBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.api import APIField
 from wagtail.search import index
+from wagtail.snippets.models import register_snippet
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 
 
 class ContentBlock(StreamBlock):
@@ -177,3 +180,143 @@ class FAQPage(Page):
     
     class Meta:
         verbose_name = "FAQ Page"
+
+
+# Test Management Models for Wagtail CMS
+
+@register_snippet
+class CMSTest(ClusterableModel):
+    """Test snippet for Wagtail CMS with inline questions and answers."""
+    
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    image = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+'
+    )
+    passing_percentage = models.PositiveIntegerField(
+        default=100,
+        help_text="Percentage needed to pass (0-100)"
+    )
+    time_limit_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Time limit in seconds (leave empty for no limit)"
+    )
+    max_attempts = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum allowed attempts (leave empty for unlimited)"
+    )
+    shuffle_questions = models.BooleanField(
+        default=False,
+        help_text="Randomize question order for each attempt"
+    )
+    shuffle_answers = models.BooleanField(
+        default=False,
+        help_text="Randomize answer order for each attempt"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    panels = [
+        MultiFieldPanel([
+            FieldPanel('title'),
+            FieldPanel('description'),
+            FieldPanel('image'),
+        ], heading="Basic Information"),
+        MultiFieldPanel([
+            FieldPanel('passing_percentage'),
+            FieldPanel('time_limit_seconds'),
+            FieldPanel('max_attempts'),
+            FieldPanel('shuffle_questions'),
+            FieldPanel('shuffle_answers'),
+        ], heading="Test Settings"),
+        InlinePanel('questions', label="Questions"),
+    ]
+    
+    def __str__(self):
+        return self.title
+    
+    class Meta:
+        verbose_name = "Test"
+        verbose_name_plural = "Tests"
+
+
+class CMSQuestion(ClusterableModel, Orderable):
+    """Question within a test."""
+    
+    QUESTION_TYPES = [
+        ('multiple_choice', 'Multiple Choice'),
+        ('true_false', 'True/False'),
+    ]
+    
+    test = ParentalKey(
+        CMSTest,
+        on_delete=models.CASCADE,
+        related_name='questions'
+    )
+    text = models.TextField(help_text="Question text")
+    image = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text="Optional image for the question"
+    )
+    question_type = models.CharField(
+        max_length=20,
+        choices=QUESTION_TYPES,
+        default='multiple_choice'
+    )
+    
+    panels = [
+        FieldPanel('text'),
+        FieldPanel('image'),
+        FieldPanel('question_type'),
+        InlinePanel('answers', label="Answer Options", min_num=2),
+    ]
+    
+    def __str__(self):
+        return f"Question: {self.text[:50]}"
+    
+    class Meta:
+        verbose_name = "Question"
+        verbose_name_plural = "Questions"
+
+
+class CMSAnswer(Orderable):
+    """Answer option for a question."""
+    
+    question = ParentalKey(
+        CMSQuestion,
+        on_delete=models.CASCADE,
+        related_name='answers'
+    )
+    text = models.TextField(help_text="Answer text")
+    is_correct = models.BooleanField(
+        default=False,
+        help_text="Check if this is the correct answer"
+    )
+    explanation = models.TextField(
+        blank=True,
+        help_text="Optional explanation for this answer"
+    )
+    
+    panels = [
+        FieldPanel('text'),
+        FieldPanel('is_correct'),
+        FieldPanel('explanation'),
+    ]
+    
+    def __str__(self):
+        prefix = "✓" if self.is_correct else "✗"
+        return f"{prefix} {self.text[:50]}"
+    
+    class Meta:
+        verbose_name = "Answer Option"
+        verbose_name_plural = "Answer Options"
