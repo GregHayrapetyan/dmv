@@ -516,6 +516,7 @@ class MainBannerAdmin(admin.ModelAdmin):
     
     search_fields = (
         "title",
+        "title2",
         "description",
     )
     
@@ -528,7 +529,7 @@ class MainBannerAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ("Content", {
-            "fields": ("title", "description")
+            "fields": ("title", "title2", "description")
         }),
         ("Image", {
             "fields": ("image", "image_preview", "image_dimensions"),

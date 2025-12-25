@@ -444,6 +444,13 @@ class MainBanner(models.Model):
         help_text="Main title for the main banner hero section",
     )
     
+    title2 = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Secondary title for the main banner hero section",
+    )
+    
     description = models.TextField(
         help_text="Description text for the main banner hero section",
     )

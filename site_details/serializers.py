@@ -153,6 +153,7 @@ class MainBannerSerializer(serializers.ModelSerializer):
             "id",
             "image",
             "title",
+            "title2",
             "description",
         ]
         read_only_fields = ["id"]
