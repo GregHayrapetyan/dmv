@@ -237,34 +237,47 @@ class PartnerListAPIView(generics.ListAPIView):
 
 @extend_schema_view(
     get=extend_schema(
-        summary="List main banner content",
-        description="Retrieve all active main banner content sections.",
+        summary="Get main banner content",
+        description="Retrieve active main banner content.",
         tags=["Site Details"],
     )
 )
-class MainBannerListAPIView(generics.ListAPIView):
+class MainBannerRetrieveAPIView(generics.RetrieveAPIView):
     """
-    API endpoint to retrieve all active main banner content.
+    API endpoint to retrieve main banner content.
     GET /api/site-details/main-banner/
     
+    Returns the active main banner content (image, title, description).
+    No authentication required.
+    
     Returns:
-        200: List of active main banner content with image, title, and description
+        200: Active main banner content
+        404: No active main banner content found
     """
     serializer_class = MainBannerSerializer
     permission_classes = [AllowAny]
-    pagination_class = None
     
-    def get_queryset(self):
+    def get_object(self):
         """
-        Return only active main banner content.
+        Return the active MainBanner instance.
         """
-        return MainBanner.objects.filter(is_active=True)
+        try:
+            return MainBanner.objects.get(is_active=True)
+        except MainBanner.DoesNotExist:
+            # Return first available if no active one exists
+            return MainBanner.objects.first()
     
-    def list(self, request, *args, **kwargs):
+    def retrieve(self, request, *args, **kwargs):
         """
-        Override list to use standardized response format.
+        Override retrieve to use standardized response format.
         """
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
+        instance = self.get_object()
         
+        if not instance:
+            return APIResponse.error(
+                message="Main banner content not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.get_serializer(instance)
         return APIResponse.success(data=serializer.data)
