@@ -5,7 +5,7 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
 from wagtail.snippets.models import register_snippet
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from PIL import Image
 
@@ -187,6 +187,7 @@ class PlanFeature(Orderable):
         upload_to="plan_features/icons/",
         blank=True,
         null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['svg'])],
         help_text="Custom SVG icon (overrides icon_type if provided). Upload .svg files only.",
     )
     
