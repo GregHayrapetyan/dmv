@@ -124,6 +124,15 @@ DATABASES = {
 
 AUTH_USER_MODEL="accounts.User"
 
+# Cache configuration
+# Using database cache for persistence across server restarts and multiple workers
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'cache_table',
+    }
+}
+
 # Authentication backends
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
