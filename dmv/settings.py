@@ -204,6 +204,7 @@ REST_FRAMEWORK = {
         "anon": "100/hour",
         "user": "1000/hour",
         "otp": "5/hour",  # Custom throttle for OTP endpoints
+        "auth": "30/minute",  # Authentication endpoints (login, register, etc.)
     },
     "EXCEPTION_HANDLER": "dmv.exception_handler.custom_exception_handler",
 }

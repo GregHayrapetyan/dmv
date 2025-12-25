@@ -11,6 +11,7 @@ from .serializers import (
     ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
     ChangePasswordSerializer,
 )
+from .throttling import AuthRateThrottle
 from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
@@ -49,6 +50,7 @@ class RegisterView(generics.CreateAPIView):
     """
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -72,6 +74,7 @@ class LoginView(generics.GenericAPIView):
     """
     serializer_class = LoginSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         summary="Login user",
@@ -149,6 +152,7 @@ class RequestPasswordResetView(generics.GenericAPIView):
     """
     serializer_class = RequestPasswordResetSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         summary="Request password reset",
@@ -191,6 +195,7 @@ class ConfirmEmailView(generics.GenericAPIView):
     """
     serializer_class = ConfirmEmailSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         summary="Confirm email address",
@@ -231,6 +236,7 @@ class ResetPasswordView(generics.GenericAPIView):
     """
     serializer_class = ResetPasswordSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         summary="Reset password",
@@ -272,6 +278,7 @@ class GoogleLoginView(generics.GenericAPIView):
     """
     serializer_class = GoogleLoginSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         summary="Google OAuth login",
@@ -532,6 +539,7 @@ class CookieTokenRefreshView(TokenRefreshView):
     to include it in the request body.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = []  # No throttling on token refresh
     
     @extend_schema(
         summary="Refresh access token",
