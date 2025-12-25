@@ -184,7 +184,14 @@ class ClientReview(models.Model):
     """
     avatar = models.ImageField(
         upload_to="reviews/avatars/",
-        help_text="Client avatar/profile image",
+        help_text="Client avatar/profile image (minimum dimensions: 112x112 pixels)",
+    )
+    
+    image = models.ImageField(
+        upload_to="reviews/images/",
+        blank=True,
+        null=True,
+        help_text="Client review image (minimum dimensions: 800x600 pixels)",
     )
     
     name = models.CharField(
@@ -229,6 +236,41 @@ class ClientReview(models.Model):
         ordering = ("order", "-created_at")
         verbose_name = "Client Review"
         verbose_name_plural = "Client Reviews"
+    
+    def clean(self):
+        """
+        Validate avatar dimensions (minimum 112x112 pixels) and image dimensions (minimum 800x600 pixels).
+        """
+        super().clean()
+        
+        errors = {}
+        
+        # Validate avatar dimensions
+        if self.avatar:
+            try:
+                img = Image.open(self.avatar)
+                width, height = img.size
+                
+                if width < 112 or height < 112:
+                    errors['avatar'] = f'Avatar dimensions must be at least 112x112 pixels. Current dimensions: {width}x{height} pixels.'
+            except Exception as e:
+                if not isinstance(e, ValidationError):
+                    errors['avatar'] = 'Unable to validate avatar. Please ensure it is a valid image file.'
+        
+        # Validate review image dimensions
+        if self.image:
+            try:
+                img = Image.open(self.image)
+                width, height = img.size
+                
+                if width < 800 or height < 600:
+                    errors['image'] = f'Image dimensions must be at least 800x600 pixels. Current dimensions: {width}x{height} pixels.'
+            except Exception as e:
+                if not isinstance(e, ValidationError):
+                    errors['image'] = 'Unable to validate image. Please ensure it is a valid image file.'
+        
+        if errors:
+            raise ValidationError(errors)
     
     def __str__(self):
         return f"{self.name} - {self.rating} stars"

@@ -4,6 +4,7 @@ This file integrates existing Django models into the Wagtail admin interface.
 """
 from django.contrib import admin
 from django import forms
+from django.utils.html import format_html
 from wagtail_modeladmin.options import (
     ModelAdmin, ModelAdminGroup, modeladmin_register
 )
@@ -156,10 +157,53 @@ class ClientReviewAdmin(ModelAdmin):
     model = ClientReview
     menu_label = 'Client Reviews'
     menu_icon = 'openquote'
-    list_display = ('name', 'job_title', 'rating', 'is_active', 'order', 'created_at')
+    list_display = ('name', 'job_title', 'rating', 'avatar_preview', 'image_preview', 'is_active', 'created_at')
     list_filter = ('rating', 'is_active')
     search_fields = ('name', 'job_title', 'review_text')
     ordering = ('order', '-created_at')
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, MultiFieldPanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    MultiFieldPanel([
+                        FieldPanel('name'),
+                        FieldPanel('job_title'),
+                    ], heading='Client Information'),
+                    MultiFieldPanel([
+                        FieldPanel('avatar'),
+                        FieldPanel('image'),
+                    ], heading='Images'),
+                    MultiFieldPanel([
+                        FieldPanel('rating'),
+                        FieldPanel('review_text'),
+                    ], heading='Review Details'),
+                    FieldPanel('is_active'),
+                ], heading='Content'),
+            ])
+        return self.edit_handler
+    
+    def avatar_preview(self, obj):
+        """Display a thumbnail preview of the avatar image."""
+        if obj.avatar:
+            return format_html(
+                '<img src="{}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" />',
+                obj.avatar.url
+            )
+        return '-'
+    avatar_preview.short_description = 'Avatar'
+    
+    def image_preview(self, obj):
+        """Display a thumbnail preview of the review image."""
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-width: 60px; max-height: 45px; object-fit: cover;" />',
+                obj.image.url
+            )
+        return '-'
+    image_preview.short_description = 'Review Image'
 
 
 class ContactInfoAdmin(ModelAdmin):

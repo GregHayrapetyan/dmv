@@ -154,6 +154,7 @@ class ClientReviewAdmin(admin.ModelAdmin):
         "job_title",
         "rating_display",
         "avatar_preview",
+        "image_preview",
         "order",
         "is_active",
         "created_at",
@@ -178,13 +179,21 @@ class ClientReviewAdmin(admin.ModelAdmin):
     
     readonly_fields = (
         "avatar_preview",
+        "avatar_dimensions",
+        "image_preview",
+        "image_dimensions",
         "created_at",
         "updated_at",
     )
     
     fieldsets = (
         ("Client Information", {
-            "fields": ("name", "job_title", "avatar", "avatar_preview")
+            "fields": ("name", "job_title", "avatar", "avatar_preview", "avatar_dimensions"),
+            "description": "Avatar image (minimum dimensions: 112x112 pixels)"
+        }),
+        ("Review Image", {
+            "fields": ("image", "image_preview", "image_dimensions"),
+            "description": "Optional review image (minimum dimensions: 800x600 pixels)"
         }),
         ("Review Details", {
             "fields": ("rating", "review_text")
@@ -211,6 +220,37 @@ class ClientReviewAdmin(admin.ModelAdmin):
     
     avatar_preview.short_description = "Avatar Preview"
     
+    def avatar_dimensions(self, obj):
+        """
+        Display the actual dimensions of the uploaded avatar image.
+        """
+        if obj.avatar:
+            try:
+                from PIL import Image
+                img = Image.open(obj.avatar.path)
+                width, height = img.size
+                
+                # Check if dimensions meet minimum requirements
+                if width >= 112 and height >= 112:
+                    color = "green"
+                    status = "✓"
+                else:
+                    color = "red"
+                    status = "✗"
+                
+                return format_html(
+                    '<span style="color: {};">{} {}x{} pixels</span>',
+                    color,
+                    status,
+                    width,
+                    height
+                )
+            except Exception:
+                return "Unable to read dimensions"
+        return "No avatar uploaded"
+    
+    avatar_dimensions.short_description = "Avatar Dimensions"
+    
     def rating_display(self, obj):
         """
         Display rating as stars.
@@ -219,6 +259,50 @@ class ClientReviewAdmin(admin.ModelAdmin):
         return format_html('<span style="font-size: 16px;">{}</span>', stars)
     
     rating_display.short_description = "Rating"
+    
+    def image_preview(self, obj):
+        """
+        Display a thumbnail preview of the review image.
+        """
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-width: 100px; max-height: 75px; object-fit: cover;" />',
+                obj.image.url
+            )
+        return "No image"
+    
+    image_preview.short_description = "Review Image"
+    
+    def image_dimensions(self, obj):
+        """
+        Display the actual dimensions of the uploaded review image.
+        """
+        if obj.image:
+            try:
+                from PIL import Image
+                img = Image.open(obj.image.path)
+                width, height = img.size
+                
+                # Check if dimensions meet minimum requirements
+                if width >= 800 and height >= 600:
+                    color = "green"
+                    status = "✓"
+                else:
+                    color = "red"
+                    status = "✗"
+                
+                return format_html(
+                    '<span style="color: {};">{} {}x{} pixels</span>',
+                    color,
+                    status,
+                    width,
+                    height
+                )
+            except Exception:
+                return "Unable to read dimensions"
+        return "No image uploaded"
+    
+    image_dimensions.short_description = "Image Dimensions"
 
 
 @admin.register(ContactInfo)

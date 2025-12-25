@@ -13,6 +13,7 @@ class ClientReviewSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "avatar",
+            "image",
             "name",
             "job_title",
             "rating",
