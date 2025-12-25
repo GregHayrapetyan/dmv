@@ -26,6 +26,7 @@ class ClientReviewListAPIView(generics.ListAPIView):
     """
     serializer_class = ClientReviewSerializer
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
     pagination_class = None
     
     def get_queryset(self):
@@ -61,6 +62,7 @@ class PricingPlanListAPIView(generics.ListAPIView):
     """
     serializer_class = PricingPlanSerializer
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public pricing data
     
     def get_queryset(self):
         """
@@ -173,6 +175,7 @@ class ContactInfoRetrieveAPIView(generics.RetrieveAPIView):
     """
     serializer_class = ContactInfoSerializer
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
     
     def get_object(self):
         """
@@ -217,6 +220,7 @@ class PartnerListAPIView(generics.ListAPIView):
     """
     serializer_class = PartnerSerializer
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
     pagination_class = None
     
     def get_queryset(self):
@@ -256,6 +260,7 @@ class MainBannerRetrieveAPIView(generics.RetrieveAPIView):
     """
     serializer_class = MainBannerSerializer
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
     
     def get_object(self):
         """
