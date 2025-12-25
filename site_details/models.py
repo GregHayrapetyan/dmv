@@ -183,11 +183,11 @@ class PlanFeature(Orderable):
         help_text="Icon to display next to the feature",
     )
     
-    icon = models.ImageField(
+    icon = models.FileField(
         upload_to="plan_features/icons/",
         blank=True,
         null=True,
-        help_text="Custom uploaded icon (overrides icon_type if provided)",
+        help_text="Custom SVG icon (overrides icon_type if provided). Upload .svg files only.",
     )
     
     order = models.PositiveIntegerField(
@@ -213,6 +213,14 @@ class PlanFeature(Orderable):
         ordering = ("order",)
         verbose_name = "Plan Feature"
         verbose_name_plural = "Plan Features"
+    
+    def get_icon_url(self):
+        """
+        Return the icon URL, prioritizing custom uploaded icon over icon_type.
+        """
+        if self.icon:
+            return self.icon.url
+        return f"/static/{self.icon_type}"
     
     def __str__(self):
         status = "✓" if self.is_included else "✗"

@@ -29,6 +29,7 @@ class PlanFeatureSerializer(serializers.ModelSerializer):
     Serializer for PlanFeature model.
     Returns feature details including text, icon, and inclusion status.
     """
+    icon_url = serializers.SerializerMethodField()
     
     class Meta:
         model = PlanFeature
@@ -38,10 +39,17 @@ class PlanFeatureSerializer(serializers.ModelSerializer):
             "is_included",
             "icon_type",
             "icon",
+            "icon_url",
             "detail_text",
             "order",
         ]
         read_only_fields = ["id"]
+    
+    def get_icon_url(self, obj):
+        """
+        Return the icon URL, prioritizing custom uploaded icon over icon_type.
+        """
+        return obj.get_icon_url()
 
 
 class PricingPlanSerializer(serializers.ModelSerializer):
