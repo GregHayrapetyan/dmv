@@ -130,27 +130,20 @@ class FavoriteLessonAdmin(ModelAdmin):
 # ============================================================================
 
 class PricingPlanAdmin(ModelAdmin):
+    """Pricing Plan admin with inline feature editing."""
     model = PricingPlan
     menu_label = 'Pricing Plans'
     menu_icon = 'tag'
-    list_display = ('title', 'price_new', 'is_featured', 'is_active', 'order')
+    list_display = ('title', 'price_new', 'feature_count', 'is_featured', 'is_active', 'order')
     list_filter = ('is_featured', 'is_active')
     search_fields = ('title', 'description')
     ordering = ('order',)
-
-
-class PlanFeatureAdmin(ModelAdmin):
-    model = PlanFeature
-    menu_label = 'Plan Features'
-    menu_icon = 'list-ul'
-    list_display = ('text_preview', 'plan', 'is_included', 'order')
-    list_filter = ('is_included', 'plan')
-    search_fields = ('text', 'detail_text')
-    ordering = ('plan', 'order')
     
-    def text_preview(self, obj):
-        return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text
-    text_preview.short_description = 'Feature'
+    def feature_count(self, obj):
+        """Display the number of features in this plan."""
+        count = obj.features.count()
+        return f"{count} feature{'s' if count != 1 else ''}"
+    feature_count.short_description = 'Features'
 
 
 class ClientReviewAdmin(ModelAdmin):
@@ -275,7 +268,6 @@ class SiteDetailsGroup(ModelAdminGroup):
     items = (
         MainBannerAdmin,
         PricingPlanAdmin,
-        PlanFeatureAdmin,
         ClientReviewAdmin,
         ContactInfoAdmin,
         ContactAdmin,

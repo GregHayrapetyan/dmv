@@ -1,11 +1,17 @@
 # site_details/models.py
 from django.db import models
+from wagtail.models import Orderable
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
+from wagtail.snippets.models import register_snippet
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from PIL import Image
 
 
-class PricingPlan(models.Model):
+@register_snippet
+class PricingPlan(ClusterableModel):
     """
     Pricing plan model for DMV test preparation packages.
     Represents different subscription tiers (e.g., 7-Day Express, 30-Day All-Access).
@@ -103,6 +109,34 @@ class PricingPlan(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    panels = [
+        MultiFieldPanel([
+            FieldPanel('subtitle'),
+            FieldPanel('title'),
+            FieldPanel('description'),
+        ], heading="Plan Information"),
+        MultiFieldPanel([
+            FieldPanel('price_old'),
+            FieldPanel('price_period'),
+            FieldPanel('price_new'),
+            FieldPanel('discount_amount'),
+        ], heading="Pricing"),
+        MultiFieldPanel([
+            FieldPanel('button_text'),
+            FieldPanel('button_url'),
+        ], heading="Call to Action"),
+        MultiFieldPanel([
+            FieldPanel('stripe_price_id_monthly'),
+            FieldPanel('stripe_price_id_one_time'),
+        ], heading="Stripe Integration"),
+        MultiFieldPanel([
+            FieldPanel('is_featured'),
+            FieldPanel('order'),
+            FieldPanel('is_active'),
+        ], heading="Display Settings"),
+        InlinePanel('features', label="Plan Features"),
+    ]
+    
     class Meta:
         ordering = ("order",)
         verbose_name = "Pricing Plan"
@@ -112,7 +146,7 @@ class PricingPlan(models.Model):
         return f"{self.title} - ${self.price_new}"
 
 
-class PlanFeature(models.Model):
+class PlanFeature(Orderable):
     """
     Individual features/benefits included in a pricing plan.
     Each feature can be marked as included or not included (grayed out).
@@ -125,7 +159,7 @@ class PlanFeature(models.Model):
         ("pricing_icons/simulation.svg", "Simulation"),
     ]
     
-    plan = models.ForeignKey(
+    plan = ParentalKey(
         PricingPlan,
         on_delete=models.CASCADE,
         related_name="features",
@@ -166,6 +200,14 @@ class PlanFeature(models.Model):
         blank=True,
         help_text="Optional detailed description (shown on hover/click)",
     )
+    
+    panels = [
+        FieldPanel('text'),
+        FieldPanel('is_included'),
+        FieldPanel('icon_type'),
+        FieldPanel('icon'),
+        FieldPanel('detail_text'),
+    ]
     
     class Meta:
         ordering = ("order",)
