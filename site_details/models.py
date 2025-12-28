@@ -346,6 +346,7 @@ class ContactInfo(models.Model):
     
     phone_primary = models.CharField(
         max_length=20,
+        blank=True,
         help_text="Primary phone number (e.g., 011 580606)",
     )
     
