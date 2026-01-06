@@ -1,9 +1,108 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ClientReview, Contact, ContactInfo, Partner, MainBanner
+from .models import (
+    ClientReview, Contact, ContactInfo, Partner, MainBanner, 
+    HowItWorks, HowItWorksStep, PricingPlan, PlanFeature
+)
 
-# Note: PricingPlan and PlanFeature are now managed through Wagtail CMS
-# using ClusterableModel and InlinePanel for better inline editing experience
+
+class PlanFeatureInline(admin.TabularInline):
+    """
+    Inline admin for plan features.
+    """
+    model = PlanFeature
+    extra = 1
+    fields = ('text', 'is_included', 'icon_type', 'icon', 'detail_text', 'order')
+    ordering = ('order',)
+
+
+@admin.register(PricingPlan)
+class PricingPlanAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing pricing plans.
+    """
+    list_display = (
+        "title",
+        "subtitle",
+        "price_display",
+        "features_count",
+        "is_featured",
+        "is_active",
+        "order",
+        "created_at",
+    )
+    
+    list_editable = (
+        "is_featured",
+        "is_active",
+        "order",
+    )
+    
+    list_filter = (
+        "is_featured",
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "title",
+        "subtitle",
+        "description",
+    )
+    
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Plan Information", {
+            "fields": ("subtitle", "title", "description")
+        }),
+        ("Pricing", {
+            "fields": ("price_old", "price_period", "price_new", "discount_amount")
+        }),
+        ("Call to Action", {
+            "fields": ("button_text", "button_url")
+        }),
+        ("Stripe Integration", {
+            "fields": ("stripe_price_id_monthly", "stripe_price_id_one_time"),
+            "classes": ("collapse",)
+        }),
+        ("Display Settings", {
+            "fields": ("is_featured", "order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    inlines = [PlanFeatureInline]
+    
+    def price_display(self, obj):
+        """
+        Display pricing information.
+        """
+        if obj.price_old:
+            return format_html(
+                '<span style="text-decoration: line-through; color: #999;">${}</span> → <strong>${}</strong>',
+                obj.price_old,
+                obj.price_new
+            )
+        return format_html('<strong>${}</strong>', obj.price_new)
+    
+    price_display.short_description = "Price"
+    
+    def features_count(self, obj):
+        """
+        Display the number of features in this plan.
+        """
+        count = obj.features.count()
+        included = obj.features.filter(is_included=True).count()
+        return format_html('<strong>{}</strong> features ({} included)', count, included)
+    
+    features_count.short_description = "Features"
 
 
 @admin.register(ClientReview)
@@ -456,4 +555,90 @@ class MainBannerAdmin(admin.ModelAdmin):
         return obj.description
     
     description_preview.short_description = "Description"
+
+
+class HowItWorksStepInline(admin.TabularInline):
+    """
+    Inline admin for How It Works steps.
+    """
+    model = HowItWorksStep
+    extra = 1
+    fields = ('step_number', 'title', 'description', 'icon', 'order')
+    ordering = ('order',)
+
+
+@admin.register(HowItWorks)
+class HowItWorksAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing How It Works section.
+    """
+    list_display = (
+        "title",
+        "section_header",
+        "background_preview",
+        "steps_count",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "is_active",
+    )
+    
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "section_header",
+        "title",
+        "description",
+    )
+    
+    readonly_fields = (
+        "background_preview",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Content", {
+            "fields": ("section_header", "title", "description")
+        }),
+        ("Background Image", {
+            "fields": ("background_image", "background_preview"),
+        }),
+        ("Display Settings", {
+            "fields": ("is_active",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    inlines = [HowItWorksStepInline]
+    
+    def background_preview(self, obj):
+        """
+        Display a thumbnail preview of the background image.
+        """
+        if obj.background_image:
+            return format_html(
+                '<img src="{}" style="max-width: 300px; max-height: 200px; object-fit: cover;" />',
+                obj.background_image.url
+            )
+        return "No background image"
+    
+    background_preview.short_description = "Background Preview"
+    
+    def steps_count(self, obj):
+        """
+        Display the number of steps in this section.
+        """
+        count = obj.steps.count()
+        return format_html('<strong>{}</strong> steps', count)
+    
+    steps_count.short_description = "Steps"
 

@@ -1,17 +1,11 @@
 # site_details/models.py
 from django.db import models
-from wagtail.models import Orderable
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
-from wagtail.snippets.models import register_snippet
-from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from PIL import Image
 
 
-@register_snippet
-class PricingPlan(ClusterableModel):
+class PricingPlan(models.Model):
     """
     Pricing plan model for DMV test preparation packages.
     Represents different subscription tiers (e.g., 7-Day Express, 30-Day All-Access).
@@ -109,34 +103,6 @@ class PricingPlan(ClusterableModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    panels = [
-        MultiFieldPanel([
-            FieldPanel('subtitle'),
-            FieldPanel('title'),
-            FieldPanel('description'),
-        ], heading="Plan Information"),
-        MultiFieldPanel([
-            FieldPanel('price_old'),
-            FieldPanel('price_period'),
-            FieldPanel('price_new'),
-            FieldPanel('discount_amount'),
-        ], heading="Pricing"),
-        MultiFieldPanel([
-            FieldPanel('button_text'),
-            FieldPanel('button_url'),
-        ], heading="Call to Action"),
-        MultiFieldPanel([
-            FieldPanel('stripe_price_id_monthly'),
-            FieldPanel('stripe_price_id_one_time'),
-        ], heading="Stripe Integration"),
-        MultiFieldPanel([
-            FieldPanel('is_featured'),
-            FieldPanel('order'),
-            FieldPanel('is_active'),
-        ], heading="Display Settings"),
-        InlinePanel('features', label="Plan Features"),
-    ]
-    
     class Meta:
         ordering = ("order",)
         verbose_name = "Pricing Plan"
@@ -146,7 +112,7 @@ class PricingPlan(ClusterableModel):
         return f"{self.title} - ${self.price_new}"
 
 
-class PlanFeature(Orderable):
+class PlanFeature(models.Model):
     """
     Individual features/benefits included in a pricing plan.
     Each feature can be marked as included or not included (grayed out).
@@ -159,7 +125,7 @@ class PlanFeature(Orderable):
         ("pricing_icons/simulation.svg", "Simulation"),
     ]
     
-    plan = ParentalKey(
+    plan = models.ForeignKey(
         PricingPlan,
         on_delete=models.CASCADE,
         related_name="features",
@@ -201,14 +167,6 @@ class PlanFeature(Orderable):
         blank=True,
         help_text="Optional detailed description (shown on hover/click)",
     )
-    
-    panels = [
-        FieldPanel('text'),
-        FieldPanel('is_included'),
-        FieldPanel('icon_type'),
-        FieldPanel('icon'),
-        FieldPanel('detail_text'),
-    ]
     
     class Meta:
         ordering = ("order",)
@@ -553,3 +511,108 @@ class MainBanner(models.Model):
         if self.is_active:
             MainBanner.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
         super().save(*args, **kwargs)
+
+
+class HowItWorks(models.Model):
+    """
+    How It Works section model.
+    Stores the "How It Works" section content with background image, header, title, description,
+    and individual steps explaining the process.
+    Only one instance should be active at a time (singleton pattern).
+    """
+    # Background image
+    background_image = models.ImageField(
+        upload_to="how_it_works/backgrounds/",
+        help_text="Background image for the How It Works section (e.g., cars in parking lot)",
+    )
+    
+    # Section header
+    section_header = models.CharField(
+        max_length=100,
+        default="HOW IT WORKS",
+        help_text="Section header text (e.g., 'HOW IT WORKS')",
+    )
+    
+    # Main title
+    title = models.CharField(
+        max_length=200,
+        help_text="Main title (e.g., '4 simple steps to get road-ready')",
+    )
+    
+    # Description
+    description = models.TextField(
+        help_text="Description text below the title (e.g., 'Remote assistants will work to ensure you can do your job well, regardless of where you are')",
+    )
+    
+    # Display settings
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this How It Works section is active",
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "How It Works Section"
+        verbose_name_plural = "How It Works Sections"
+    
+    def __str__(self):
+        return f"{self.title[:50]}"
+    
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one HowItWorks is active at a time (singleton pattern).
+        """
+        if self.is_active:
+            HowItWorks.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+
+class HowItWorksStep(models.Model):
+    """
+    Individual step in the How It Works section.
+    Each step has a number, title, and description.
+    """
+    how_it_works = models.ForeignKey(
+        HowItWorks,
+        on_delete=models.CASCADE,
+        related_name="steps",
+        help_text="The How It Works section this step belongs to",
+    )
+    
+    step_number = models.CharField(
+        max_length=10,
+        help_text="Step number (e.g., '01', '02', '03', '04')",
+    )
+    
+    title = models.CharField(
+        max_length=200,
+        help_text="Step title (e.g., 'Sign up or start for free', 'Choose a test option')",
+    )
+    
+    description = models.TextField(
+        help_text="Step description (e.g., 'The world's largest and most liquid platform with spot, futures and options trading')",
+    )
+    
+    # Optional icon/image for the step
+    icon = models.ImageField(
+        upload_to="how_it_works/step_icons/",
+        blank=True,
+        null=True,
+        help_text="Optional icon/image for this step",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    class Meta:
+        ordering = ("order",)
+        verbose_name = "How It Works Step"
+        verbose_name_plural = "How It Works Steps"
+    
+    def __str__(self):
+        return f"Step {self.step_number}: {self.title[:30]}"

@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Wagtail apps
-    'wagtail.contrib.forms',
     'wagtail.contrib.redirects',
     'wagtail_modeladmin',
     'wagtail.embeds',

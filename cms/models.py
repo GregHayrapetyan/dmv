@@ -1,14 +1,11 @@
 from django.db import models
-from wagtail.models import Page, Orderable
+from wagtail.models import Page
 from wagtail.fields import RichTextField, StreamField
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.blocks import CharBlock, RichTextBlock, StreamBlock, StructBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.api import APIField
 from wagtail.search import index
-from wagtail.snippets.models import register_snippet
-from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
 
 
 class ContentBlock(StreamBlock):
@@ -182,10 +179,9 @@ class FAQPage(Page):
         verbose_name = "FAQ Page"
 
 
-# Test Management Models for Wagtail CMS
+# Test Management Models
 
-@register_snippet
-class CMSTest(ClusterableModel):
+class CMSTest(models.Model):
     """Test snippet for Wagtail CMS with inline questions and answers."""
     
     title = models.CharField(max_length=255)
@@ -222,22 +218,6 @@ class CMSTest(ClusterableModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    panels = [
-        MultiFieldPanel([
-            FieldPanel('title'),
-            FieldPanel('description'),
-            FieldPanel('image'),
-        ], heading="Basic Information"),
-        MultiFieldPanel([
-            FieldPanel('passing_percentage'),
-            FieldPanel('time_limit_seconds'),
-            FieldPanel('max_attempts'),
-            FieldPanel('shuffle_questions'),
-            FieldPanel('shuffle_answers'),
-        ], heading="Test Settings"),
-        InlinePanel('questions', label="Questions"),
-    ]
-    
     def __str__(self):
         return self.title
     
@@ -246,7 +226,7 @@ class CMSTest(ClusterableModel):
         verbose_name_plural = "Tests"
 
 
-class CMSQuestion(ClusterableModel, Orderable):
+class CMSQuestion(models.Model):
     """Question within a test."""
     
     QUESTION_TYPES = [
@@ -254,10 +234,14 @@ class CMSQuestion(ClusterableModel, Orderable):
         ('true_false', 'True/False'),
     ]
     
-    test = ParentalKey(
+    test = models.ForeignKey(
         CMSTest,
         on_delete=models.CASCADE,
         related_name='questions'
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order"
     )
     text = models.TextField(help_text="Question text")
     image = models.ForeignKey(
@@ -274,28 +258,26 @@ class CMSQuestion(ClusterableModel, Orderable):
         default='multiple_choice'
     )
     
-    panels = [
-        FieldPanel('text'),
-        FieldPanel('image'),
-        FieldPanel('question_type'),
-        InlinePanel('answers', label="Answer Options", min_num=2),
-    ]
-    
     def __str__(self):
         return f"Question: {self.text[:50]}"
     
     class Meta:
+        ordering = ('order',)
         verbose_name = "Question"
         verbose_name_plural = "Questions"
 
 
-class CMSAnswer(Orderable):
+class CMSAnswer(models.Model):
     """Answer option for a question."""
     
-    question = ParentalKey(
+    question = models.ForeignKey(
         CMSQuestion,
         on_delete=models.CASCADE,
         related_name='answers'
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order"
     )
     text = models.TextField(help_text="Answer text")
     is_correct = models.BooleanField(
@@ -307,16 +289,11 @@ class CMSAnswer(Orderable):
         help_text="Optional explanation for this answer"
     )
     
-    panels = [
-        FieldPanel('text'),
-        FieldPanel('is_correct'),
-        FieldPanel('explanation'),
-    ]
-    
     def __str__(self):
         prefix = "✓" if self.is_correct else "✗"
         return f"{prefix} {self.text[:50]}"
     
     class Meta:
+        ordering = ('order',)
         verbose_name = "Answer Option"
         verbose_name_plural = "Answer Options"

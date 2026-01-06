@@ -25,8 +25,11 @@ from cms.models import CMSTest
 
 # Import site_details models
 from site_details.models import (
-    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner
+    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks
 )
+
+# Import accounts models
+from accounts.models import Subscription
 
 
 # ============================================================================
@@ -246,6 +249,58 @@ class MainBannerAdmin(ModelAdmin):
     description_preview.short_description = 'Description'
 
 
+class HowItWorksAdmin(ModelAdmin):
+    model = HowItWorks
+    menu_label = 'How It Works'
+    menu_icon = 'list-ol'
+    list_display = ('title', 'section_header', 'steps_count', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'section_header', 'description')
+    ordering = ('-created_at',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, MultiFieldPanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('background_image'),
+                ], heading='Background'),
+                ObjectList([
+                    FieldPanel('section_header'),
+                    FieldPanel('title'),
+                    FieldPanel('description'),
+                ], heading='Content'),
+                ObjectList([
+                    FieldPanel('is_active'),
+                ], heading='Display Settings'),
+            ])
+        return self.edit_handler
+    
+    def steps_count(self, obj):
+        """Display the number of steps in this section."""
+        count = obj.steps.count()
+        return format_html('<strong>{}</strong> steps', count)
+    steps_count.short_description = 'Steps'
+
+
+# ============================================================================
+# ACCOUNTS - ModelAdmin Classes (for Settings menu)
+# ============================================================================
+
+class SubscriptionAdmin(ModelAdmin):
+    model = Subscription
+    menu_label = 'Subscriptions'
+    menu_icon = 'user'
+    list_display = ('user', 'status', 'stripe_customer_id', 'current_period_end', 'cancel_at_period_end', 'created_at')
+    list_filter = ('status', 'cancel_at_period_end')
+    search_fields = ('user__email', 'stripe_customer_id', 'stripe_subscription_id')
+    ordering = ('-created_at',)
+    
+    # Add to Settings menu instead of main menu
+    add_to_settings_menu = True
+
+
 # ============================================================================
 # MODEL ADMIN GROUPS
 # ============================================================================
@@ -267,6 +322,7 @@ class SiteDetailsGroup(ModelAdminGroup):
     menu_order = 300
     items = (
         MainBannerAdmin,
+        HowItWorksAdmin,
         PricingPlanAdmin,
         ClientReviewAdmin,
         ContactInfoAdmin,
@@ -279,6 +335,9 @@ class SiteDetailsGroup(ModelAdminGroup):
 modeladmin_register(LearningGroup)
 modeladmin_register(SiteDetailsGroup)
 
+# Register Subscriptions separately (will appear in Settings menu)
+modeladmin_register(SubscriptionAdmin)
+
 
 # ============================================================================
 # CUSTOM WAGTAIL HOOKS
@@ -287,9 +346,17 @@ modeladmin_register(SiteDetailsGroup)
 @hooks.register('construct_main_menu')
 def hide_default_pages_menu_item(request, menu_items):
     """
-    Customize the main menu - hide Documents, Images, and Tags menu items.
+    Customize the main menu - hide Documents, Images, Tags, Reports, Snippets, and Help menu items.
     """
-    menu_items[:] = [item for item in menu_items if item.name not in ['documents', 'images', 'tags']]
+    menu_items[:] = [item for item in menu_items if item.name not in ['documents', 'images', 'tags', 'reports', 'snippets', 'help']]
+
+
+@hooks.register('construct_settings_menu')
+def hide_settings_menu_items(request, menu_items):
+    """
+    Hide specific items from the Settings menu: Workflows, Workflow tasks, Sites, Collections, and Redirects.
+    """
+    menu_items[:] = [item for item in menu_items if item.name not in ['workflows', 'workflow-tasks', 'sites', 'collections', 'redirects']]
 
 
 @hooks.register('construct_homepage_panels')
