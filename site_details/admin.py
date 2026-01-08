@@ -415,7 +415,7 @@ class PartnerAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ("Partner Information", {
-            "fields": ("logo", "logo_preview", "description")
+            "fields": ("logo", "logo_preview", "description", "website_url")
         }),
         ("Display Settings", {
             "fields": ("order", "is_active")

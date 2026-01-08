@@ -135,7 +135,7 @@ class ContactSerializer(serializers.ModelSerializer):
 class PartnerSerializer(serializers.ModelSerializer):
     """
     Serializer for Partner model.
-    Returns partner information with logo and description.
+    Returns partner information with logo, description, and website URL.
     """
     
     class Meta:
@@ -144,6 +144,7 @@ class PartnerSerializer(serializers.ModelSerializer):
             "id",
             "logo",
             "description",
+            "website_url",
             "order",
         ]
         read_only_fields = ["id"]

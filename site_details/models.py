@@ -418,6 +418,13 @@ class Partner(models.Model):
         help_text="Partner description (e.g., 'Great potential for cooperation with Ineco Bank for over 10 years')",
     )
     
+    website_url = models.URLField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Partner's official website URL (e.g., 'https://www.partner.com')",
+    )
+    
     order = models.PositiveIntegerField(
         default=0,
         help_text="Display order (lower numbers appear first)",
