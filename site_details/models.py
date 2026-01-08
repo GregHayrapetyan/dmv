@@ -3,6 +3,8 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from PIL import Image
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 
 
 class PricingPlan(models.Model):
@@ -513,7 +515,7 @@ class MainBanner(models.Model):
         super().save(*args, **kwargs)
 
 
-class HowItWorks(models.Model):
+class HowItWorks(ClusterableModel):
     """
     How It Works section model.
     Stores the "How It Works" section content with background image, header, title, description,
@@ -575,7 +577,7 @@ class HowItWorksStep(models.Model):
     Individual step in the How It Works section.
     Each step has a number, title, and description.
     """
-    how_it_works = models.ForeignKey(
+    how_it_works = ParentalKey(
         HowItWorks,
         on_delete=models.CASCADE,
         related_name="steps",

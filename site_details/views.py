@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer
 from dmv.api_response import APIResponse
 
 
@@ -281,6 +281,55 @@ class MainBannerRetrieveAPIView(generics.RetrieveAPIView):
         if not instance:
             return APIResponse.error(
                 message="Main banner content not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.get_serializer(instance)
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get How It Works section",
+        description="Retrieve active How It Works section with all steps.",
+        tags=["Site Details"],
+    )
+)
+class HowItWorksRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    API endpoint to retrieve How It Works section content.
+    GET /api/site-details/how-it-works/
+    
+    Returns the active How It Works section with all steps.
+    No authentication required.
+    
+    Returns:
+        200: Active How It Works section with steps
+        404: No active How It Works section found
+    """
+    serializer_class = HowItWorksSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
+    
+    def get_object(self):
+        """
+        Return the active HowItWorks instance with prefetched steps.
+        """
+        try:
+            return HowItWorks.objects.prefetch_related('steps').get(is_active=True)
+        except HowItWorks.DoesNotExist:
+            # Return first available if no active one exists
+            return HowItWorks.objects.prefetch_related('steps').first()
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to use standardized response format.
+        """
+        instance = self.get_object()
+        
+        if not instance:
+            return APIResponse.error(
+                message="How It Works section not found",
                 status_code=status.HTTP_404_NOT_FOUND
             )
         

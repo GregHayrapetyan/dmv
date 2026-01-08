@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep
 
 
 class ClientReviewSerializer(serializers.ModelSerializer):
@@ -163,5 +163,44 @@ class MainBannerSerializer(serializers.ModelSerializer):
             "title",
             "title2",
             "description",
+        ]
+        read_only_fields = ["id"]
+
+
+class HowItWorksStepSerializer(serializers.ModelSerializer):
+    """
+    Serializer for HowItWorksStep model.
+    Returns individual step details with number, title, description, and optional icon.
+    """
+    
+    class Meta:
+        model = HowItWorksStep
+        fields = [
+            "id",
+            "step_number",
+            "title",
+            "description",
+            "icon",
+            "order",
+        ]
+        read_only_fields = ["id"]
+
+
+class HowItWorksSerializer(serializers.ModelSerializer):
+    """
+    Serializer for HowItWorks model with nested steps.
+    Returns complete How It Works section with all steps.
+    """
+    steps = HowItWorksStepSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = HowItWorks
+        fields = [
+            "id",
+            "background_image",
+            "section_header",
+            "title",
+            "description",
+            "steps",
         ]
         read_only_fields = ["id"]

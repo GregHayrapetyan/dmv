@@ -25,7 +25,7 @@ from cms.models import CMSTest
 
 # Import site_details models
 from site_details.models import (
-    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks
+    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep
 )
 
 # Import accounts models
@@ -250,6 +250,7 @@ class MainBannerAdmin(ModelAdmin):
 
 
 class HowItWorksAdmin(ModelAdmin):
+    """How It Works admin with inline step editing."""
     model = HowItWorks
     menu_label = 'How It Works'
     menu_icon = 'list-ol'
@@ -259,7 +260,7 @@ class HowItWorksAdmin(ModelAdmin):
     ordering = ('-created_at',)
     
     def get_edit_handler(self):
-        from wagtail.admin.panels import FieldPanel, MultiFieldPanel, TabbedInterface, ObjectList
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
         
         if not hasattr(self, 'edit_handler') or self.edit_handler is None:
             self.edit_handler = TabbedInterface([
@@ -271,6 +272,9 @@ class HowItWorksAdmin(ModelAdmin):
                     FieldPanel('title'),
                     FieldPanel('description'),
                 ], heading='Content'),
+                ObjectList([
+                    InlinePanel('steps', label="Steps"),
+                ], heading='Steps'),
                 ObjectList([
                     FieldPanel('is_active'),
                 ], heading='Display Settings'),
