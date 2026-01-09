@@ -154,7 +154,9 @@ class MainBannerSerializer(serializers.ModelSerializer):
     """
     Serializer for MainBanner model.
     Returns main banner content with image, title, description, stats, button, and video.
+    The 'link' field returns either video URL or button_link based on use_video_as_button_link.
     """
+    link = serializers.SerializerMethodField()
     
     class Meta:
         model = MainBanner
@@ -169,8 +171,21 @@ class MainBannerSerializer(serializers.ModelSerializer):
             "button_name",
             "button_link",
             "video",
+            "use_video_as_button_link",
+            "link",
         ]
         read_only_fields = ["id"]
+    
+    def get_link(self, obj):
+        """
+        Return full video URL if use_video_as_button_link is True, otherwise return button_link.
+        """
+        if obj.use_video_as_button_link and obj.video:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.video.url)
+            return obj.video.url
+        return obj.button_link
 
 
 class HowItWorksStepSerializer(serializers.ModelSerializer):

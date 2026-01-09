@@ -477,14 +477,12 @@ class MainBanner(models.Model):
     # Statistics text fields
     stat_text1 = models.CharField(
         max_length=100,
-        blank=True,
         default="",
         help_text="First statistic text (e.g., '2200+ Success attempts')",
     )
     
     stat_text2 = models.CharField(
         max_length=100,
-        blank=True,
         default="",
         help_text="Second statistic text (e.g., '2350+ Success attempts')",
     )
@@ -492,7 +490,6 @@ class MainBanner(models.Model):
     # Button fields
     button_name = models.CharField(
         max_length=100,
-        blank=True,
         default="",
         help_text="Button text (e.g., 'Video Guide')",
     )
@@ -501,7 +498,7 @@ class MainBanner(models.Model):
         max_length=500,
         blank=True,
         default="",
-        help_text="Button URL or link (auto-filled if video is uploaded)",
+        help_text="Button URL or link (required if 'Use video as button link' is unchecked)",
     )
     
     # Video field
@@ -509,8 +506,13 @@ class MainBanner(models.Model):
         upload_to="main_banner/videos/",
         blank=True,
         null=True,
-        validators=[FileExtensionValidator(allowed_extensions=['mp4', 'webm', 'ogg', 'mov', 'avi'])],
-        help_text="Optional video file (mp4, webm, ogg, mov, avi). Button link will be auto-set to this video's URL.",
+        validators=[FileExtensionValidator(allowed_extensions=['webm'])],
+        help_text="Video file - webm only (required if 'Use video as button link' is checked)",
+    )
+    
+    use_video_as_button_link = models.BooleanField(
+        default=False,
+        help_text="Check to use video as button link (makes video required). Uncheck to use button link (makes button link required).",
     )
     
     is_active = models.BooleanField(
@@ -532,42 +534,47 @@ class MainBanner(models.Model):
     def clean(self):
         """
         Validate image dimensions (minimum 1108x1206 pixels).
+        Validate that video is uploaded if use_video_as_button_link is checked.
+        Validate that either button_link or video is provided (at least one required).
         """
         super().clean()
         
+        errors = {}
+        
+        # Validate image dimensions
         if self.image:
             try:
                 img = Image.open(self.image)
                 width, height = img.size
                 
                 if width < 1108 or height < 1206:
-                    raise ValidationError({
-                        'image': f'Image dimensions must be at least 1108x1206 pixels. '
-                                f'Current dimensions: {width}x{height} pixels.'
-                    })
+                    errors['image'] = f'Image dimensions must be at least 1108x1206 pixels. ' \
+                                     f'Current dimensions: {width}x{height} pixels.'
             except Exception as e:
-                if isinstance(e, ValidationError):
-                    raise
-                raise ValidationError({
-                    'image': 'Unable to validate image. Please ensure it is a valid image file.'
-                })
+                if not isinstance(e, ValidationError):
+                    errors['image'] = 'Unable to validate image. Please ensure it is a valid image file.'
+        
+        # Validate based on use_video_as_button_link checkbox
+        if self.use_video_as_button_link:
+            # If checkbox is True, video is required
+            if not self.video:
+                errors['video'] = 'Video upload is required when "Use video as button link" is checked.'
+        else:
+            # If checkbox is False, button_link is required
+            if not self.button_link:
+                errors['button_link'] = 'Button link is required when "Use video as button link" is not checked.'
+        
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         """
         Ensure only one MainBanner is active at a time (singleton pattern).
-        Auto-set button_link to video URL if video is uploaded.
         """
         if self.is_active:
             MainBanner.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
         
-        # Save first to ensure video file is stored
         super().save(*args, **kwargs)
-        
-        # Auto-set button_link to video URL if video exists and button_link is not manually set
-        if self.video and not self.button_link:
-            self.button_link = self.video.url
-            # Update only the button_link field to avoid recursion
-            MainBanner.objects.filter(pk=self.pk).update(button_link=self.button_link)
 
 
 class HowItWorks(ClusterableModel):

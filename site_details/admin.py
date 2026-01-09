@@ -499,11 +499,11 @@ class MainBannerAdmin(admin.ModelAdmin):
         }),
         ("Button", {
             "fields": ("button_name", "button_link"),
-            "description": "Optional call-to-action button (button_link auto-filled if video uploaded)"
+            "description": "Call-to-action button. Button link is required when 'Use video as button link' is unchecked."
         }),
         ("Video", {
-            "fields": ("video", "video_preview"),
-            "description": "Optional video file. When uploaded, button_link will be automatically set to the video URL."
+            "fields": ("video", "video_preview", "use_video_as_button_link"),
+            "description": "Video file (webm format only). Check 'Use video as button link' to require video upload. Uncheck to require button link instead."
         }),
         ("Image", {
             "fields": ("image", "image_preview", "image_dimensions"),
