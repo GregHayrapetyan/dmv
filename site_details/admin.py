@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from .models import (
     ClientReview, Contact, ContactInfo, Partner, MainBanner, 
     HowItWorks, HowItWorksStep, PricingPlan, PlanFeature,
-    TrustSafety, TrustSafetyFeature
+    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep
 )
 
 
@@ -814,4 +814,76 @@ class TrustSafetyAdmin(admin.ModelAdmin):
         return format_html('<strong>{}</strong> features', count)
     
     features_count.short_description = "Features"
+
+
+class SuccessStepInline(admin.TabularInline):
+    """
+    Inline admin for Success Steps.
+    """
+    model = SuccessStep
+    extra = 1
+    fields = ('icon', 'title', 'description', 'order')
+    ordering = ('order',)
+
+
+@admin.register(SuccessSteps)
+class SuccessStepsAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing Success Steps section.
+    """
+    list_display = (
+        "title",
+        "button_text",
+        "steps_count",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "is_active",
+    )
+    
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "title",
+        "description",
+        "button_text",
+    )
+    
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Content", {
+            "fields": ("title", "description")
+        }),
+        ("Button", {
+            "fields": ("button_text", "button_link"),
+            "description": "Call-to-action button"
+        }),
+        ("Display Settings", {
+            "fields": ("is_active",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    inlines = [SuccessStepInline]
+    
+    def steps_count(self, obj):
+        """
+        Display the number of steps in this section.
+        """
+        count = obj.steps.count()
+        return format_html('<strong>{}</strong> steps', count)
+    
+    steps_count.short_description = "Steps"
 

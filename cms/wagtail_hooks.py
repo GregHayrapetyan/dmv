@@ -26,7 +26,7 @@ from cms.models import CMSTest
 # Import site_details models
 from site_details.models import (
     PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep,
-    TrustSafety, TrustSafetyFeature
+    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep
 )
 
 # Import accounts models
@@ -334,6 +334,45 @@ class TrustSafetyAdmin(ModelAdmin):
     features_count.short_description = 'Features'
 
 
+class SuccessStepsAdmin(ModelAdmin):
+    """Success Steps admin with inline step editing."""
+    model = SuccessSteps
+    menu_label = 'Success Steps'
+    menu_icon = 'success'
+    list_display = ('title', 'button_text', 'steps_count', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'description', 'button_text')
+    ordering = ('-created_at',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('title'),
+                    FieldPanel('description'),
+                ], heading='Content'),
+                ObjectList([
+                    FieldPanel('button_text'),
+                    FieldPanel('button_link'),
+                ], heading='Button'),
+                ObjectList([
+                    InlinePanel('steps', label="Steps"),
+                ], heading='Steps'),
+                ObjectList([
+                    FieldPanel('is_active'),
+                ], heading='Display Settings'),
+            ])
+        return self.edit_handler
+    
+    def steps_count(self, obj):
+        """Display the number of steps in this section."""
+        count = obj.steps.count()
+        return format_html('<strong>{}</strong> steps', count)
+    steps_count.short_description = 'Steps'
+
+
 # ============================================================================
 # ACCOUNTS - ModelAdmin Classes (for Settings menu)
 # ============================================================================
@@ -373,6 +412,7 @@ class SiteDetailsGroup(ModelAdminGroup):
     items = (
         MainBannerAdmin,
         HowItWorksAdmin,
+        SuccessStepsAdmin,
         TrustSafetyAdmin,
         PricingPlanAdmin,
         ClientReviewAdmin,

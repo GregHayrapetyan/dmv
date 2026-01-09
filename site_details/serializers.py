@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep
 
 
 class ClientReviewSerializer(serializers.ModelSerializer):
@@ -279,3 +279,41 @@ class TrustSafetySerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.video.url)
             return obj.video.url
         return None
+
+
+class SuccessStepSerializer(serializers.ModelSerializer):
+    """
+    Serializer for SuccessStep model.
+    Returns individual step details with icon, title, and description.
+    """
+    
+    class Meta:
+        model = SuccessStep
+        fields = [
+            "id",
+            "icon",
+            "title",
+            "description",
+            "order",
+        ]
+        read_only_fields = ["id"]
+
+
+class SuccessStepsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for SuccessSteps model with nested steps.
+    Returns complete Success Steps section with all steps.
+    """
+    steps = SuccessStepSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = SuccessSteps
+        fields = [
+            "id",
+            "title",
+            "description",
+            "button_text",
+            "button_link",
+            "steps",
+        ]
+        read_only_fields = ["id"]

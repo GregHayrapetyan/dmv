@@ -819,3 +819,101 @@ class TrustSafetyFeature(models.Model):
     
     def __str__(self):
         return f"Feature {self.number}: {self.title[:30]}"
+
+
+class SuccessSteps(models.Model):
+    """
+    Success Steps section model.
+    Stores the "Reach your success in three steps" section content with title, description,
+    button, and individual steps explaining the process.
+    Only one instance should be active at a time (singleton pattern).
+    """
+    # Main title
+    title = models.CharField(
+        max_length=200,
+        default="Reach your success in three steps.",
+        help_text="Main title (e.g., 'Reach your success in three steps.')",
+    )
+    
+    # Description
+    description = models.TextField(
+        help_text="Description text below the title (e.g., 'Lorem ipsum dolor sit amet, consectetur adipiscing elit...')",
+    )
+    
+    # Button
+    button_text = models.CharField(
+        max_length=100,
+        default="DEMO TEST",
+        help_text="Button text (e.g., 'DEMO TEST')",
+    )
+    
+    button_link = models.CharField(
+        max_length=500,
+        default="",
+        help_text="Button URL or link",
+    )
+    
+    # Display settings
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this Success Steps section is active",
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Success Steps Section"
+        verbose_name_plural = "Success Steps Sections"
+    
+    def __str__(self):
+        return f"{self.title[:50]}"
+    
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one SuccessSteps is active at a time (singleton pattern).
+        """
+        if self.is_active:
+            SuccessSteps.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+
+class SuccessStep(models.Model):
+    """
+    Individual step in the Success Steps section.
+    Each step has an icon, title, and description.
+    """
+    success_steps = models.ForeignKey(
+        SuccessSteps,
+        on_delete=models.CASCADE,
+        related_name="steps",
+        help_text="The Success Steps section this step belongs to",
+    )
+    
+    icon = models.ImageField(
+        upload_to="success_steps/icons/",
+        help_text="Icon/image for this step (e.g., sign up icon, practice icon, exam icon)",
+    )
+    
+    title = models.CharField(
+        max_length=200,
+        help_text="Step title (e.g., 'Sign Up in Seconds', 'Practice All Tests', 'Pass Your Exam')",
+    )
+    
+    description = models.TextField(
+        help_text="Step description (e.g., 'Enter your name, email and password.')",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    class Meta:
+        ordering = ("order",)
+        verbose_name = "Success Step"
+        verbose_name_plural = "Success Steps"
+    
+    def __str__(self):
+        return f"{self.title[:30]}"

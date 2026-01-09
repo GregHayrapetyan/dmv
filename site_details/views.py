@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer
 from dmv.api_response import APIResponse
 
 
@@ -383,4 +383,53 @@ class TrustSafetyRetrieveAPIView(generics.RetrieveAPIView):
             )
         
         serializer = self.get_serializer(instance, context={'request': request})
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get Success Steps section",
+        description="Retrieve active Success Steps section with all steps.",
+        tags=["Site Details"],
+    )
+)
+class SuccessStepsRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    API endpoint to retrieve Success Steps section content.
+    GET /api/site-details/success-steps/
+    
+    Returns the active Success Steps section with all steps.
+    No authentication required.
+    
+    Returns:
+        200: Active Success Steps section with steps
+        404: No active Success Steps section found
+    """
+    serializer_class = SuccessStepsSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
+    
+    def get_object(self):
+        """
+        Return the active SuccessSteps instance with prefetched steps.
+        """
+        try:
+            return SuccessSteps.objects.prefetch_related('steps').get(is_active=True)
+        except SuccessSteps.DoesNotExist:
+            # Return first available if no active one exists
+            return SuccessSteps.objects.prefetch_related('steps').first()
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to use standardized response format.
+        """
+        instance = self.get_object()
+        
+        if not instance:
+            return APIResponse.error(
+                message="Success Steps section not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.get_serializer(instance)
         return APIResponse.success(data=serializer.data)
