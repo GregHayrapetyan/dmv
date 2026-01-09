@@ -501,7 +501,16 @@ class MainBanner(models.Model):
         max_length=500,
         blank=True,
         default="",
-        help_text="Button URL or link",
+        help_text="Button URL or link (auto-filled if video is uploaded)",
+    )
+    
+    # Video field
+    video = models.FileField(
+        upload_to="main_banner/videos/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['mp4', 'webm', 'ogg', 'mov', 'avi'])],
+        help_text="Optional video file (mp4, webm, ogg, mov, avi). Button link will be auto-set to this video's URL.",
     )
     
     is_active = models.BooleanField(
@@ -546,10 +555,19 @@ class MainBanner(models.Model):
     def save(self, *args, **kwargs):
         """
         Ensure only one MainBanner is active at a time (singleton pattern).
+        Auto-set button_link to video URL if video is uploaded.
         """
         if self.is_active:
             MainBanner.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        
+        # Save first to ensure video file is stored
         super().save(*args, **kwargs)
+        
+        # Auto-set button_link to video URL if video exists and button_link is not manually set
+        if self.video and not self.button_link:
+            self.button_link = self.video.url
+            # Update only the button_link field to avoid recursion
+            MainBanner.objects.filter(pk=self.pk).update(button_link=self.button_link)
 
 
 class HowItWorks(ClusterableModel):

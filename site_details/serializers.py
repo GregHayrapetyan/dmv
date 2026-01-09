@@ -153,7 +153,7 @@ class PartnerSerializer(serializers.ModelSerializer):
 class MainBannerSerializer(serializers.ModelSerializer):
     """
     Serializer for MainBanner model.
-    Returns main banner content with image, title, description, stats, and button.
+    Returns main banner content with image, title, description, stats, button, and video.
     """
     
     class Meta:
@@ -168,6 +168,7 @@ class MainBannerSerializer(serializers.ModelSerializer):
             "stat_text2",
             "button_name",
             "button_link",
+            "video",
         ]
         read_only_fields = ["id"]
 

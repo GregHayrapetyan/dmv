@@ -484,6 +484,7 @@ class MainBannerAdmin(admin.ModelAdmin):
     readonly_fields = (
         "image_preview",
         "image_dimensions",
+        "video_preview",
         "created_at",
         "updated_at",
     )
@@ -498,7 +499,11 @@ class MainBannerAdmin(admin.ModelAdmin):
         }),
         ("Button", {
             "fields": ("button_name", "button_link"),
-            "description": "Optional call-to-action button"
+            "description": "Optional call-to-action button (button_link auto-filled if video uploaded)"
+        }),
+        ("Video", {
+            "fields": ("video", "video_preview"),
+            "description": "Optional video file. When uploaded, button_link will be automatically set to the video URL."
         }),
         ("Image", {
             "fields": ("image", "image_preview", "image_dimensions"),
@@ -566,6 +571,20 @@ class MainBannerAdmin(admin.ModelAdmin):
         return obj.description
     
     description_preview.short_description = "Description"
+    
+    def video_preview(self, obj):
+        """
+        Display video player preview or link.
+        """
+        if obj.video:
+            return format_html(
+                '<video width="320" height="240" controls><source src="{}" type="video/mp4">Your browser does not support the video tag.</video><br><small>URL: {}</small>',
+                obj.video.url,
+                obj.video.url
+            )
+        return "No video uploaded"
+    
+    video_preview.short_description = "Video Preview"
 
 
 class HowItWorksStepInline(admin.TabularInline):
