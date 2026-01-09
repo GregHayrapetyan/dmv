@@ -821,7 +821,7 @@ class TrustSafetyFeature(models.Model):
         return f"Feature {self.number}: {self.title[:30]}"
 
 
-class SuccessSteps(models.Model):
+class SuccessSteps(ClusterableModel):
     """
     Success Steps section model.
     Stores the "Reach your success in three steps" section content with title, description,
@@ -884,7 +884,7 @@ class SuccessStep(models.Model):
     Individual step in the Success Steps section.
     Each step has an icon, title, and description.
     """
-    success_steps = models.ForeignKey(
+    success_steps = ParentalKey(
         SuccessSteps,
         on_delete=models.CASCADE,
         related_name="steps",
