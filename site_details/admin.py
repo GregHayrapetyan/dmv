@@ -476,6 +476,9 @@ class MainBannerAdmin(admin.ModelAdmin):
         "title",
         "title2",
         "description",
+        "stat_text1",
+        "stat_text2",
+        "button_name",
     )
     
     readonly_fields = (
@@ -488,6 +491,14 @@ class MainBannerAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Content", {
             "fields": ("title", "title2", "description")
+        }),
+        ("Statistics", {
+            "fields": ("stat_text1", "stat_text2"),
+            "description": "Optional statistics text (e.g., '2200+ Success attempts')"
+        }),
+        ("Button", {
+            "fields": ("button_name", "button_link"),
+            "description": "Optional call-to-action button"
         }),
         ("Image", {
             "fields": ("image", "image_preview", "image_dimensions"),

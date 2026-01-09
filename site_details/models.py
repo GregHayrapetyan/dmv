@@ -474,6 +474,36 @@ class MainBanner(models.Model):
         help_text="Description text for the main banner hero section",
     )
     
+    # Statistics text fields
+    stat_text1 = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="First statistic text (e.g., '2200+ Success attempts')",
+    )
+    
+    stat_text2 = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Second statistic text (e.g., '2350+ Success attempts')",
+    )
+    
+    # Button fields
+    button_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Button text (e.g., 'Video Guide')",
+    )
+    
+    button_link = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Button URL or link",
+    )
+    
     is_active = models.BooleanField(
         default=True,
         help_text="Whether this main banner content is active",

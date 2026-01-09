@@ -251,7 +251,7 @@ class MainBannerRetrieveAPIView(generics.RetrieveAPIView):
     API endpoint to retrieve main banner content.
     GET /api/site-details/main-banner/
     
-    Returns the active main banner content (image, title, description).
+    Returns the active main banner content (image, titles, description, stats, button).
     No authentication required.
     
     Returns:
