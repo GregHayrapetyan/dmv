@@ -25,7 +25,8 @@ from cms.models import CMSTest
 
 # Import site_details models
 from site_details.models import (
-    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep
+    PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep,
+    TrustSafety, TrustSafetyFeature
 )
 
 # Import accounts models
@@ -288,6 +289,51 @@ class HowItWorksAdmin(ModelAdmin):
     steps_count.short_description = 'Steps'
 
 
+class TrustSafetyAdmin(ModelAdmin):
+    """Trust & Safety admin with inline feature editing."""
+    model = TrustSafety
+    menu_label = 'Trust & Safety'
+    menu_icon = 'shield'
+    list_display = ('title', 'section_header', 'features_count', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'section_header', 'button_text')
+    ordering = ('-created_at',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('section_header'),
+                    FieldPanel('title'),
+                ], heading='Content'),
+                ObjectList([
+                    FieldPanel('image'),
+                ], heading='Image'),
+                ObjectList([
+                    FieldPanel('video'),
+                ], heading='Video'),
+                ObjectList([
+                    FieldPanel('button_text'),
+                    FieldPanel('button_link'),
+                ], heading='Button'),
+                ObjectList([
+                    InlinePanel('features', label="Features"),
+                ], heading='Features'),
+                ObjectList([
+                    FieldPanel('is_active'),
+                ], heading='Display Settings'),
+            ])
+        return self.edit_handler
+    
+    def features_count(self, obj):
+        """Display the number of features in this section."""
+        count = obj.features.count()
+        return format_html('<strong>{}</strong> features', count)
+    features_count.short_description = 'Features'
+
+
 # ============================================================================
 # ACCOUNTS - ModelAdmin Classes (for Settings menu)
 # ============================================================================
@@ -327,6 +373,7 @@ class SiteDetailsGroup(ModelAdminGroup):
     items = (
         MainBannerAdmin,
         HowItWorksAdmin,
+        TrustSafetyAdmin,
         PricingPlanAdmin,
         ClientReviewAdmin,
         ContactInfoAdmin,

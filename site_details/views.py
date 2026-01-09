@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer
 from dmv.api_response import APIResponse
 
 
@@ -334,4 +334,53 @@ class HowItWorksRetrieveAPIView(generics.RetrieveAPIView):
             )
         
         serializer = self.get_serializer(instance)
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get Trust & Safety section",
+        description="Retrieve active Trust & Safety section with all features.",
+        tags=["Site Details"],
+    )
+)
+class TrustSafetyRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    API endpoint to retrieve Trust & Safety section content.
+    GET /api/site-details/trust-safety/
+    
+    Returns the active Trust & Safety section with all features.
+    No authentication required.
+    
+    Returns:
+        200: Active Trust & Safety section with features
+        404: No active Trust & Safety section found
+    """
+    serializer_class = TrustSafetySerializer
+    permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
+    
+    def get_object(self):
+        """
+        Return the active TrustSafety instance with prefetched features.
+        """
+        try:
+            return TrustSafety.objects.prefetch_related('features').get(is_active=True)
+        except TrustSafety.DoesNotExist:
+            # Return first available if no active one exists
+            return TrustSafety.objects.prefetch_related('features').first()
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to use standardized response format.
+        """
+        instance = self.get_object()
+        
+        if not instance:
+            return APIResponse.error(
+                message="Trust & Safety section not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.get_serializer(instance, context={'request': request})
         return APIResponse.success(data=serializer.data)

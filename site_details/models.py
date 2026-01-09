@@ -680,3 +680,142 @@ class HowItWorksStep(models.Model):
     
     def __str__(self):
         return f"Step {self.step_number}: {self.title[:30]}"
+
+
+class TrustSafety(ClusterableModel):
+    """
+    Trust & Safety section model.
+    Stores the "Trust & Safety" section content with image, header, title,
+    video button, registration button, and individual features.
+    Only one instance should be active at a time (singleton pattern).
+    """
+    # Section header
+    section_header = models.CharField(
+        max_length=100,
+        default="TRUST & SAFETY",
+        help_text="Section header text (e.g., 'TRUST & SAFETY')",
+    )
+    
+    # Main title
+    title = models.CharField(
+        max_length=200,
+        help_text="Main title (e.g., 'It's fast and profitable with us')",
+    )
+    
+    # Main image
+    image = models.ImageField(
+        upload_to="trust_safety/images/",
+        help_text="Main image for the Trust & Safety section (minimum dimensions: 800x600 pixels)",
+    )
+    
+    # Video file
+    video = models.FileField(
+        upload_to="trust_safety/videos/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])],
+        help_text="Video file - webm or mp4 format",
+    )
+    
+    # Button
+    button_text = models.CharField(
+        max_length=100,
+        default="Start Registration",
+        help_text="Button text (e.g., 'Start Registration')",
+    )
+    
+    button_link = models.CharField(
+        max_length=500,
+        default="",
+        help_text="Button URL or link",
+    )
+    
+    # Display settings
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this Trust & Safety section is active",
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Trust & Safety Section"
+        verbose_name_plural = "Trust & Safety Sections"
+    
+    def __str__(self):
+        return f"{self.title[:50]}"
+    
+    def clean(self):
+        """
+        Validate image dimensions (minimum 800x600 pixels).
+        """
+        super().clean()
+        
+        errors = {}
+        
+        # Validate image dimensions
+        if self.image:
+            try:
+                img = Image.open(self.image)
+                width, height = img.size
+                
+                if width < 800 or height < 600:
+                    errors['image'] = f'Image dimensions must be at least 800x600 pixels. ' \
+                                     f'Current dimensions: {width}x{height} pixels.'
+            except Exception as e:
+                if not isinstance(e, ValidationError):
+                    errors['image'] = 'Unable to validate image. Please ensure it is a valid image file.'
+        
+        if errors:
+            raise ValidationError(errors)
+    
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one TrustSafety is active at a time (singleton pattern).
+        """
+        if self.is_active:
+            TrustSafety.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        
+        super().save(*args, **kwargs)
+
+
+class TrustSafetyFeature(models.Model):
+    """
+    Individual feature in the Trust & Safety section.
+    Each feature has a number, title, and description.
+    """
+    trust_safety = ParentalKey(
+        TrustSafety,
+        on_delete=models.CASCADE,
+        related_name="features",
+        help_text="The Trust & Safety section this feature belongs to",
+    )
+    
+    number = models.CharField(
+        max_length=10,
+        help_text="Feature number (e.g., '1', '2', '3')",
+    )
+    
+    title = models.CharField(
+        max_length=200,
+        help_text="Feature title (e.g., 'Updated questionnaire', 'From the official database')",
+    )
+    
+    description = models.TextField(
+        help_text="Feature description (e.g., 'Lorem ipsum dolor sit amet consectetur. Auctor')",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    class Meta:
+        ordering = ("order",)
+        verbose_name = "Trust & Safety Feature"
+        verbose_name_plural = "Trust & Safety Features"
+    
+    def __str__(self):
+        return f"Feature {self.number}: {self.title[:30]}"

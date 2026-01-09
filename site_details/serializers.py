@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature
 
 
 class ClientReviewSerializer(serializers.ModelSerializer):
@@ -225,3 +225,57 @@ class HowItWorksSerializer(serializers.ModelSerializer):
             "steps",
         ]
         read_only_fields = ["id"]
+
+
+class TrustSafetyFeatureSerializer(serializers.ModelSerializer):
+    """
+    Serializer for TrustSafetyFeature model.
+    Returns individual feature details with number, title, and description.
+    """
+    
+    class Meta:
+        model = TrustSafetyFeature
+        fields = [
+            "id",
+            "number",
+            "title",
+            "description",
+            "order",
+        ]
+        read_only_fields = ["id"]
+
+
+class TrustSafetySerializer(serializers.ModelSerializer):
+    """
+    Serializer for TrustSafety model with nested features.
+    Returns complete Trust & Safety section with all features.
+    The 'video_path' field returns the full URL path to the uploaded video file.
+    """
+    features = TrustSafetyFeatureSerializer(many=True, read_only=True)
+    video_path = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TrustSafety
+        fields = [
+            "id",
+            "section_header",
+            "title",
+            "image",
+            "video",
+            "video_path",
+            "button_text",
+            "button_link",
+            "features",
+        ]
+        read_only_fields = ["id"]
+    
+    def get_video_path(self, obj):
+        """
+        Return full video URL path if video is uploaded.
+        """
+        if obj.video:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.video.url)
+            return obj.video.url
+        return None

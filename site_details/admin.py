@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     ClientReview, Contact, ContactInfo, Partner, MainBanner, 
-    HowItWorks, HowItWorksStep, PricingPlan, PlanFeature
+    HowItWorks, HowItWorksStep, PricingPlan, PlanFeature,
+    TrustSafety, TrustSafetyFeature
 )
 
 
@@ -671,4 +672,146 @@ class HowItWorksAdmin(admin.ModelAdmin):
         return format_html('<strong>{}</strong> steps', count)
     
     steps_count.short_description = "Steps"
+
+
+class TrustSafetyFeatureInline(admin.TabularInline):
+    """
+    Inline admin for Trust & Safety features.
+    """
+    model = TrustSafetyFeature
+    extra = 1
+    fields = ('number', 'title', 'description', 'order')
+    ordering = ('order',)
+
+
+@admin.register(TrustSafety)
+class TrustSafetyAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing Trust & Safety section.
+    """
+    list_display = (
+        "title",
+        "section_header",
+        "image_preview",
+        "features_count",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "is_active",
+    )
+    
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "section_header",
+        "title",
+        "button_text",
+    )
+    
+    readonly_fields = (
+        "image_preview",
+        "image_dimensions",
+        "video_preview",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Content", {
+            "fields": ("section_header", "title")
+        }),
+        ("Image", {
+            "fields": ("image", "image_preview", "image_dimensions"),
+            "description": "Image must be at least 800x600 pixels"
+        }),
+        ("Video", {
+            "fields": ("video", "video_preview"),
+            "description": "Optional video file (webm or mp4 format)"
+        }),
+        ("Button", {
+            "fields": ("button_text", "button_link"),
+            "description": "Call-to-action button"
+        }),
+        ("Display Settings", {
+            "fields": ("is_active",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    inlines = [TrustSafetyFeatureInline]
+    
+    def image_preview(self, obj):
+        """
+        Display a thumbnail preview of the Trust & Safety image.
+        """
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-width: 200px; max-height: 150px; object-fit: contain;" />',
+                obj.image.url
+            )
+        return "No image"
+    
+    image_preview.short_description = "Image Preview"
+    
+    def image_dimensions(self, obj):
+        """
+        Display the actual dimensions of the uploaded image.
+        """
+        if obj.image:
+            try:
+                from PIL import Image
+                img = Image.open(obj.image.path)
+                width, height = img.size
+                
+                # Check if dimensions meet minimum requirements
+                if width >= 800 and height >= 600:
+                    color = "green"
+                    status = "✓"
+                else:
+                    color = "red"
+                    status = "✗"
+                
+                return format_html(
+                    '<span style="color: {};">{} {}x{} pixels</span>',
+                    color,
+                    status,
+                    width,
+                    height
+                )
+            except Exception:
+                return "Unable to read dimensions"
+        return "No image uploaded"
+    
+    image_dimensions.short_description = "Image Dimensions"
+    
+    def video_preview(self, obj):
+        """
+        Display video player preview or link.
+        """
+        if obj.video:
+            return format_html(
+                '<video width="320" height="240" controls><source src="{}" type="video/mp4">Your browser does not support the video tag.</video><br><small>URL: {}</small>',
+                obj.video.url,
+                obj.video.url
+            )
+        return "No video uploaded"
+    
+    video_preview.short_description = "Video Preview"
+    
+    def features_count(self, obj):
+        """
+        Display the number of features in this section.
+        """
+        count = obj.features.count()
+        return format_html('<strong>{}</strong> features', count)
+    
+    features_count.short_description = "Features"
 

@@ -7,6 +7,7 @@ from .views import (
     PartnerListAPIView,
     MainBannerRetrieveAPIView,
     HowItWorksRetrieveAPIView,
+    TrustSafetyRetrieveAPIView,
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path("partners/", PartnerListAPIView.as_view(), name="partners-list"),
     path("main-banner/", MainBannerRetrieveAPIView.as_view(), name="main-banner"),
     path("how-it-works/", HowItWorksRetrieveAPIView.as_view(), name="how-it-works"),
+    path("trust-safety/", TrustSafetyRetrieveAPIView.as_view(), name="trust-safety"),
 ]
