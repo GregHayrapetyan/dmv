@@ -8,7 +8,7 @@ from drf_spectacular.utils import extend_schema_field
 import secrets
 import logging
 from .models import EmailOTP, Subscription
-
+from .email_utils import send_verification_email, send_password_reset_email
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -43,18 +43,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             purpose="verify_email",
             expires_at=timezone.now() + timedelta(minutes=10),
         )
-        try:
-            send_mail(
-                "Verify your email",
-                f"Your verification code is: {code}",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-            logger.info(f"Verification email sent to {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
-            raise serializers.ValidationError("Failed to send verification email. Please try again.")
+        # Send email asynchronously to avoid blocking the request
+        send_verification_email(user.email, code)
         return user
 
 class LoginSerializer(serializers.Serializer):
@@ -143,18 +133,8 @@ class RequestPasswordResetSerializer(serializers.Serializer):
             purpose="reset_password",
             expires_at=timezone.now() + timedelta(minutes=10),
         )
-        try:
-            send_mail(
-                "Reset password",
-                f"Your password reset code is: {code}",
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
-            logger.info(f"Password reset email sent to {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
-            raise serializers.ValidationError("Failed to send reset email. Please try again.")
+        # Send email asynchronously to avoid blocking the request
+        send_password_reset_email(user.email, code)
         
         # Return the code so it can be included in the response
         return code
