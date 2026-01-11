@@ -231,11 +231,12 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Email settings
-# Use environment variable to determine email backend
-if DEBUG:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Allow override via EMAIL_BACKEND env var, otherwise use DEBUG to determine
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend' if DEBUG 
+    else 'django.core.mail.backends.smtp.EmailBackend'
+)
 
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
