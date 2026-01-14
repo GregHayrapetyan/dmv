@@ -20,7 +20,7 @@ from learning.models import (
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson
 )
 
-# Import CMS models for test management with inline editing
+# Import CMS models for test management
 from cms.models import CMSTest
 
 # Import site_details models
@@ -63,13 +63,10 @@ class CMSTestAdmin(ModelAdmin):
     list_display = ('title', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
     search_fields = ('title', 'description')
     
-    # Define edit handler with inline panels
-    edit_handler = None
-    
     def get_edit_handler(self):
         from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
         
-        if self.edit_handler is None:
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
             self.edit_handler = TabbedInterface([
                 ObjectList([
                     FieldPanel('title'),
@@ -97,7 +94,6 @@ class CMSTestAdmin(ModelAdmin):
 
 
 # Questions and Answers are managed inline within CMSTest
-# No separate admin interfaces needed
 
 
 class LessonProgressAdmin(ModelAdmin):
@@ -401,7 +397,7 @@ class LearningGroup(ModelAdminGroup):
     items = (
         LessonCategoryAdmin,
         LessonAdmin,
-        CMSTestAdmin,  # Tests with inline question/answer editing
+        CMSTestAdmin,  # Questions and answers managed inline
     )
 
 

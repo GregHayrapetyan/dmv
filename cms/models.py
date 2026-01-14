@@ -1,11 +1,13 @@
 from django.db import models
 from wagtail.models import Page
 from wagtail.fields import RichTextField, StreamField
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
 from wagtail.blocks import CharBlock, RichTextBlock, StreamBlock, StructBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.api import APIField
 from wagtail.search import index
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 
 
 class ContentBlock(StreamBlock):
@@ -181,7 +183,7 @@ class FAQPage(Page):
 
 # Test Management Models
 
-class CMSTest(models.Model):
+class CMSTest(ClusterableModel):
     """Test snippet for Wagtail CMS with inline questions and answers."""
     
     title = models.CharField(max_length=255)
@@ -226,7 +228,7 @@ class CMSTest(models.Model):
         verbose_name_plural = "Tests"
 
 
-class CMSQuestion(models.Model):
+class CMSQuestion(ClusterableModel):
     """Question within a test."""
     
     QUESTION_TYPES = [
@@ -234,7 +236,7 @@ class CMSQuestion(models.Model):
         ('true_false', 'True/False'),
     ]
     
-    test = models.ForeignKey(
+    test = ParentalKey(
         CMSTest,
         on_delete=models.CASCADE,
         related_name='questions'
@@ -258,6 +260,14 @@ class CMSQuestion(models.Model):
         default='multiple_choice'
     )
     
+    panels = [
+        FieldPanel('text'),
+        FieldPanel('image'),
+        FieldPanel('question_type'),
+        FieldPanel('order'),
+        InlinePanel('answers', label="Answer Options"),
+    ]
+    
     def __str__(self):
         return f"Question: {self.text[:50]}"
     
@@ -270,7 +280,7 @@ class CMSQuestion(models.Model):
 class CMSAnswer(models.Model):
     """Answer option for a question."""
     
-    question = models.ForeignKey(
+    question = ParentalKey(
         CMSQuestion,
         on_delete=models.CASCADE,
         related_name='answers'
@@ -288,6 +298,13 @@ class CMSAnswer(models.Model):
         blank=True,
         help_text="Optional explanation for this answer"
     )
+    
+    panels = [
+        FieldPanel('text'),
+        FieldPanel('is_correct'),
+        FieldPanel('explanation'),
+        FieldPanel('order'),
+    ]
     
     def __str__(self):
         prefix = "✓" if self.is_correct else "✗"
