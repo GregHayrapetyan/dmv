@@ -81,8 +81,9 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
     except (Test.DoesNotExist, Question.DoesNotExist):
         return
     
-    # Check if corresponding AnswerOption exists
-    answer, answer_created = AnswerOption.objects.get_or_create(
+    # Use update_or_create to handle both creation and updates
+    # Match by question and text (unique identifier for an answer)
+    answer, answer_created = AnswerOption.objects.update_or_create(
         question=question,
         text=instance.text,
         defaults={
@@ -91,13 +92,6 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
             'order': instance.order,
         }
     )
-    
-    # If answer already exists, update it
-    if not answer_created:
-        answer.is_correct = instance.is_correct
-        answer.explanation = instance.explanation
-        answer.order = instance.order
-        answer.save()
 
 
 @receiver(post_delete, sender=CMSTest)
