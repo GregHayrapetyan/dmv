@@ -185,6 +185,7 @@ class Command(BaseCommand):
                     # Create answer options
                     answers = q_data.get('answers', [])
                     correct_index = q_data.get('correct')
+                    explanation = q_data.get('explanation', '')
 
                     if not answers:
                         self.stdout.write(
@@ -197,10 +198,14 @@ class Command(BaseCommand):
                     for idx, answer_text in enumerate(answers):
                         is_correct = (idx == correct_index)
                         
+                        # Add explanation to the correct answer
+                        answer_explanation = explanation if is_correct else ''
+                        
                         AnswerOption.objects.create(
                             question=question,
                             text=answer_text,
                             is_correct=is_correct,
+                            explanation=answer_explanation,
                             order=idx + 1,
                         )
                         stats['answers_created'] += 1
