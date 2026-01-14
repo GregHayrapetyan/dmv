@@ -7,7 +7,7 @@ class CMSAnswerInline(admin.TabularInline):
     """Inline admin for answer options."""
     model = CMSAnswer
     extra = 2
-    fields = ('text', 'is_correct', 'explanation', 'order')
+    fields = ('text', 'is_correct', 'order')
     ordering = ('order',)
 
 
@@ -15,7 +15,7 @@ class CMSQuestionInline(admin.StackedInline):
     """Inline admin for questions."""
     model = CMSQuestion
     extra = 1
-    fields = ('text', 'image', 'question_type', 'order')
+    fields = ('text', 'image', 'question_type', 'explanation', 'order')
     ordering = ('order',)
     show_change_link = True
 
@@ -120,7 +120,7 @@ class CMSQuestionAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ("Question Details", {
-            "fields": ("test", "text", "image", "question_type", "order")
+            "fields": ("test", "text", "image", "question_type", "explanation", "order")
         }),
     )
     

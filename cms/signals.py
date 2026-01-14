@@ -58,6 +58,7 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
         text=instance.text,
         defaults={
             'question_type': instance.question_type,
+            'explanation': instance.explanation,
             'order': instance.order,
         }
     )
@@ -65,6 +66,7 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
     # If question already exists, update it
     if not question_created:
         question.question_type = instance.question_type
+        question.explanation = instance.explanation
         question.order = instance.order
         question.save()
 
@@ -88,7 +90,6 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
         text=instance.text,
         defaults={
             'is_correct': instance.is_correct,
-            'explanation': instance.explanation,
             'order': instance.order,
         }
     )

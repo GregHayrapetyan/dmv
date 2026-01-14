@@ -225,6 +225,10 @@ class Question(models.Model):
         choices=QuestionType.choices,
         default=QuestionType.MULTIPLE_CHOICE,
     )
+    explanation = models.TextField(
+        blank=True,
+        help_text="Explanation for the correct answer"
+    )
     order = models.PositiveIntegerField(
         default=1,
         help_text="Display order of the question in the test",
@@ -269,11 +273,6 @@ class AnswerOption(models.Model):
     )
     text = models.TextField()
     is_correct = models.BooleanField(default=False)
-    explanation = models.TextField(
-        blank=True,
-        help_text="Explanation for why this option is correct/incorrect "
-                  "(can be shown after answering)",
-    )
     order = models.PositiveIntegerField(
         default=1,
         help_text="Display order of the answer option",

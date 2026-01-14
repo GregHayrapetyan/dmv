@@ -259,11 +259,16 @@ class CMSQuestion(ClusterableModel):
         choices=QUESTION_TYPES,
         default='multiple_choice'
     )
+    explanation = models.TextField(
+        blank=True,
+        help_text="Explanation for the correct answer"
+    )
     
     panels = [
         FieldPanel('text'),
         FieldPanel('image'),
         FieldPanel('question_type'),
+        FieldPanel('explanation'),
         FieldPanel('order'),
         InlinePanel('answers', label="Answer Options"),
     ]
@@ -294,15 +299,10 @@ class CMSAnswer(models.Model):
         default=False,
         help_text="Check if this is the correct answer"
     )
-    explanation = models.TextField(
-        blank=True,
-        help_text="Optional explanation for this answer"
-    )
     
     panels = [
         FieldPanel('text'),
         FieldPanel('is_correct'),
-        FieldPanel('explanation'),
         FieldPanel('order'),
     ]
     

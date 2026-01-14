@@ -51,14 +51,14 @@ class LessonDetailSerializer(serializers.ModelSerializer):
 class AnswerOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerOption
-        fields = ('id', 'text', 'is_correct', 'explanation', 'order')
+        fields = ('id', 'text', 'is_correct', 'order')
 
 
 class AnswerOptionDetailSerializer(serializers.ModelSerializer):
     """Used after submission to show correct answers"""
     class Meta:
         model = AnswerOption
-        fields = ('id', 'text', 'is_correct', 'explanation', 'order')
+        fields = ('id', 'text', 'is_correct', 'order')
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -75,7 +75,7 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'question_type', 'order', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'explanation', 'order', 'answer_options')
 
 
 class TestListSerializer(serializers.ModelSerializer):

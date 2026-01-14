@@ -5,7 +5,7 @@ from learning.models import Test, Question, AnswerOption
 
 
 class Command(BaseCommand):
-    help = 'Update existing answer options with explanations from questions.json'
+    help = 'Update existing questions with explanations from questions.json'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -35,7 +35,7 @@ class Command(BaseCommand):
 
         stats = {
             'questions_processed': 0,
-            'answers_updated': 0,
+            'questions_updated': 0,
             'questions_not_found': 0,
         }
 
@@ -73,30 +73,24 @@ class Command(BaseCommand):
                 for question in questions:
                     stats['questions_processed'] += 1
                     
-                    # Get the correct answer option
-                    answer_options = list(question.answer_options.all().order_by('order'))
-                    
-                    if correct_index is not None and correct_index < len(answer_options):
-                        correct_answer = answer_options[correct_index]
-                        
-                        # Update explanation if it's different
-                        if correct_answer.explanation != explanation:
-                            with transaction.atomic():
-                                correct_answer.explanation = explanation
-                                correct_answer.save()
-                                stats['answers_updated'] += 1
-                                
-                                self.stdout.write(
-                                    self.style.SUCCESS(
-                                        f'  Updated explanation for: {question_text[:50]}...'
-                                    )
+                    # Update explanation if it's different
+                    if question.explanation != explanation:
+                        with transaction.atomic():
+                            question.explanation = explanation
+                            question.save()
+                            stats['questions_updated'] += 1
+                            
+                            self.stdout.write(
+                                self.style.SUCCESS(
+                                    f'  Updated explanation for: {question_text[:50]}...'
                                 )
+                            )
 
         # Print summary
         self.stdout.write('\n' + '='*60)
         self.stdout.write(self.style.SUCCESS('Update completed!'))
         self.stdout.write('='*60)
         self.stdout.write(f'Questions processed: {stats["questions_processed"]}')
-        self.stdout.write(f'Answers updated: {stats["answers_updated"]}')
+        self.stdout.write(f'Questions updated: {stats["questions_updated"]}')
         self.stdout.write(f'Questions not found: {stats["questions_not_found"]}')
         self.stdout.write('='*60)

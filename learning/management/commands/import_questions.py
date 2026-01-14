@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from learning.models import Test, Question, AnswerOption
 from onboarding.models import State
+from cms.models import CMSTest, CMSQuestion, CMSAnswer
 
 
 class Command(BaseCommand):
@@ -95,6 +96,7 @@ class Command(BaseCommand):
             'questions_created': 0,
             'questions_skipped': 0,
             'answers_created': 0,
+            'cms_synced': 0,
         }
 
         # Process each category
@@ -148,11 +150,15 @@ class Command(BaseCommand):
                     # Get the next order number for this test
                     max_order = Question.objects.filter(test=test).count()
                     
+                    # Get explanation from JSON
+                    explanation = q_data.get('explanation', '')
+                    
                     # Create question
                     question = Question.objects.create(
                         test=test,
                         text=question_text,
                         question_type=Question.QuestionType.MULTIPLE_CHOICE,
+                        explanation=explanation,
                         order=max_order + 1
                     )
 
@@ -185,7 +191,6 @@ class Command(BaseCommand):
                     # Create answer options
                     answers = q_data.get('answers', [])
                     correct_index = q_data.get('correct')
-                    explanation = q_data.get('explanation', '')
 
                     if not answers:
                         self.stdout.write(
@@ -198,14 +203,10 @@ class Command(BaseCommand):
                     for idx, answer_text in enumerate(answers):
                         is_correct = (idx == correct_index)
                         
-                        # Add explanation to the correct answer
-                        answer_explanation = explanation if is_correct else ''
-                        
                         AnswerOption.objects.create(
                             question=question,
                             text=answer_text,
                             is_correct=is_correct,
-                            explanation=answer_explanation,
                             order=idx + 1,
                         )
                         stats['answers_created'] += 1
@@ -215,6 +216,12 @@ class Command(BaseCommand):
                         f'(correct: {answers[correct_index] if correct_index is not None else "None"})'
                     )
 
+        # Sync to CMS after importing
+        self.stdout.write('\n' + '-'*60)
+        self.stdout.write('Syncing to CMS...')
+        stats['cms_synced'] = self._sync_to_cms()
+        self.stdout.write(self.style.SUCCESS(f'Synced {stats["cms_synced"]} CMS questions'))
+        
         # Print summary
         self.stdout.write('\n' + '='*60)
         self.stdout.write(self.style.SUCCESS('Import completed!'))
@@ -225,4 +232,28 @@ class Command(BaseCommand):
         self.stdout.write(f'Questions created: {stats["questions_created"]}')
         self.stdout.write(f'Questions skipped (duplicates): {stats["questions_skipped"]}')
         self.stdout.write(f'Answers created: {stats["answers_created"]}')
+        self.stdout.write(f'CMS questions synced: {stats["cms_synced"]}')
         self.stdout.write('='*60)
+    
+    def _sync_to_cms(self):
+        """Sync explanations from learning.Question to cms.CMSQuestion."""
+        synced = 0
+        
+        for cms_question in CMSQuestion.objects.all():
+            # Skip if already has explanation
+            if cms_question.explanation:
+                continue
+            
+            # Try to find matching learning.Question by text and test title
+            try:
+                test = Test.objects.get(title=cms_question.test.title)
+                learning_question = Question.objects.get(test=test, text=cms_question.text)
+                
+                if learning_question.explanation:
+                    cms_question.explanation = learning_question.explanation
+                    cms_question.save()
+                    synced += 1
+            except (Test.DoesNotExist, Question.DoesNotExist, Question.MultipleObjectsReturned):
+                pass
+        
+        return synced
