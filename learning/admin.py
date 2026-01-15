@@ -57,6 +57,30 @@ class TestAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('title', 'description', 'image')
         }),
+        ('English Translation', {
+            'fields': ('title_en', 'description_en'),
+            'classes': ('collapse',)
+        }),
+        ('Russian Translation', {
+            'fields': ('title_ru', 'description_ru'),
+            'classes': ('collapse',)
+        }),
+        ('Armenian Translation', {
+            'fields': ('title_hy', 'description_hy'),
+            'classes': ('collapse',)
+        }),
+        ('Hindi Translation', {
+            'fields': ('title_hi', 'description_hi'),
+            'classes': ('collapse',)
+        }),
+        ('Spanish Translation', {
+            'fields': ('title_es', 'description_es'),
+            'classes': ('collapse',)
+        }),
+        ('Chinese Translation', {
+            'fields': ('title_zh', 'description_zh'),
+            'classes': ('collapse',)
+        }),
         ('Availability', {
             'fields': ('states', 'vehicles')
         }),

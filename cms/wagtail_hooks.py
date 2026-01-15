@@ -43,6 +43,32 @@ class LessonCategoryAdmin(ModelAdmin):
     menu_icon = 'folder-open-inverse'
     list_display = ('name',)
     search_fields = ('name',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('name'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('name_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('name_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('name_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('name_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('name_zh'),
+                ], heading='Chinese'),
+            ])
+        return self.edit_handler
 
 
 class LessonAdmin(ModelAdmin):
@@ -53,6 +79,48 @@ class LessonAdmin(ModelAdmin):
     list_filter = ('is_published', 'category', 'states')
     search_fields = ('title', 'content')
     ordering = ('order', 'id')
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList, MultiFieldPanel
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('title'),
+                    FieldPanel('content'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('title_ru'),
+                    FieldPanel('content_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('title_hy'),
+                    FieldPanel('content_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('title_hi'),
+                    FieldPanel('content_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('title_es'),
+                    FieldPanel('content_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('title_zh'),
+                    FieldPanel('content_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    FieldPanel('category'),
+                    FieldPanel('video'),
+                    FieldPanel('image'),
+                    FieldPanel('order'),
+                    FieldPanel('is_published'),
+                    FieldPanel('duration_minutes'),
+                    FieldPanel('states'),
+                    FieldPanel('test'),
+                ], heading='Settings'),
+            ])
+        return self.edit_handler
 
 
 class CMSTestAdmin(ModelAdmin):
@@ -64,16 +132,36 @@ class CMSTestAdmin(ModelAdmin):
     search_fields = ('title', 'description')
     
     def get_edit_handler(self):
-        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList, MultiFieldPanel
         
         if not hasattr(self, 'edit_handler') or self.edit_handler is None:
             self.edit_handler = TabbedInterface([
                 ObjectList([
                     FieldPanel('title'),
                     FieldPanel('description'),
-                    FieldPanel('image'),
-                ], heading='Basic Information'),
+                ], heading='English'),
                 ObjectList([
+                    FieldPanel('title_ru'),
+                    FieldPanel('description_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('title_hy'),
+                    FieldPanel('description_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('title_hi'),
+                    FieldPanel('description_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('title_es'),
+                    FieldPanel('description_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('title_zh'),
+                    FieldPanel('description_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    FieldPanel('image'),
                     FieldPanel('passing_percentage'),
                     FieldPanel('max_attempts'),
                     FieldPanel('time_limit_seconds'),

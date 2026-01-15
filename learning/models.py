@@ -10,6 +10,21 @@ import os
 class LessonCategory(models.Model):
     """Category for organizing lessons."""
     name = models.CharField(max_length=100, unique=True)
+    
+    # Multilingual fields - Russian
+    name_ru = models.CharField(max_length=100, blank=True, verbose_name="Name (Russian)")
+    
+    # Multilingual fields - Armenian
+    name_hy = models.CharField(max_length=100, blank=True, verbose_name="Name (Armenian)")
+    
+    # Multilingual fields - Hindi
+    name_hi = models.CharField(max_length=100, blank=True, verbose_name="Name (Hindi)")
+    
+    # Multilingual fields - Spanish
+    name_es = models.CharField(max_length=100, blank=True, verbose_name="Name (Spanish)")
+    
+    # Multilingual fields - Chinese
+    name_zh = models.CharField(max_length=100, blank=True, verbose_name="Name (Chinese)")
 
     class Meta:
         verbose_name = "Lesson Category"
@@ -37,6 +52,27 @@ class Lesson(models.Model):
     """Single lesson (video, theory, etc.)."""
     # add seconds duration
     title = models.CharField(max_length=255)
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=255, blank=True, verbose_name="Title (Russian)")
+    content_ru = models.TextField(blank=True, verbose_name="Content (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=255, blank=True, verbose_name="Title (Armenian)")
+    content_hy = models.TextField(blank=True, verbose_name="Content (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=255, blank=True, verbose_name="Title (Hindi)")
+    content_hi = models.TextField(blank=True, verbose_name="Content (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=255, blank=True, verbose_name="Title (Spanish)")
+    content_es = models.TextField(blank=True, verbose_name="Content (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=255, blank=True, verbose_name="Title (Chinese)")
+    content_zh = models.TextField(blank=True, verbose_name="Content (Chinese)")
+    
     category = models.ForeignKey(
         LessonCategory,
         on_delete=models.SET_NULL,
@@ -135,6 +171,31 @@ class Test(models.Model):
 
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    
+    # Multilingual fields - English
+    title_en = models.CharField(max_length=255, blank=True, verbose_name="Title (English)")
+    description_en = models.TextField(blank=True, verbose_name="Description (English)")
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=255, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=255, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=255, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=255, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=255, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    
     image = models.ImageField(
         upload_to="test_images/",
         blank=True,

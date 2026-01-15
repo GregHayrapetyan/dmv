@@ -186,8 +186,29 @@ class FAQPage(Page):
 class CMSTest(ClusterableModel):
     """Test snippet for Wagtail CMS with inline questions and answers."""
     
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
+    title = models.CharField(max_length=255, help_text="English title")
+    description = models.TextField(blank=True, help_text="English description")
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=255, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=255, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=255, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=255, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=255, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    
     image = models.ForeignKey(
         'wagtailimages.Image',
         null=True,
@@ -245,7 +266,28 @@ class CMSQuestion(ClusterableModel):
         default=0,
         help_text="Display order"
     )
-    text = models.TextField(help_text="Question text")
+    text = models.TextField(help_text="Question text (English)")
+    
+    # Multilingual fields - Russian
+    text_ru = models.TextField(blank=True, verbose_name="Text (Russian)")
+    explanation_ru = models.TextField(blank=True, verbose_name="Explanation (Russian)")
+    
+    # Multilingual fields - Armenian
+    text_hy = models.TextField(blank=True, verbose_name="Text (Armenian)")
+    explanation_hy = models.TextField(blank=True, verbose_name="Explanation (Armenian)")
+    
+    # Multilingual fields - Hindi
+    text_hi = models.TextField(blank=True, verbose_name="Text (Hindi)")
+    explanation_hi = models.TextField(blank=True, verbose_name="Explanation (Hindi)")
+    
+    # Multilingual fields - Spanish
+    text_es = models.TextField(blank=True, verbose_name="Text (Spanish)")
+    explanation_es = models.TextField(blank=True, verbose_name="Explanation (Spanish)")
+    
+    # Multilingual fields - Chinese
+    text_zh = models.TextField(blank=True, verbose_name="Text (Chinese)")
+    explanation_zh = models.TextField(blank=True, verbose_name="Explanation (Chinese)")
+    
     image = models.ForeignKey(
         'wagtailimages.Image',
         null=True,
@@ -261,15 +303,25 @@ class CMSQuestion(ClusterableModel):
     )
     explanation = models.TextField(
         blank=True,
-        help_text="Explanation for the correct answer"
+        help_text="Explanation for the correct answer (English)"
     )
     
     panels = [
-        FieldPanel('text'),
         FieldPanel('image'),
         FieldPanel('question_type'),
-        FieldPanel('explanation'),
         FieldPanel('order'),
+        FieldPanel('text'),
+        FieldPanel('explanation'),
+        FieldPanel('text_ru'),
+        FieldPanel('explanation_ru'),
+        FieldPanel('text_hy'),
+        FieldPanel('explanation_hy'),
+        FieldPanel('text_hi'),
+        FieldPanel('explanation_hi'),
+        FieldPanel('text_es'),
+        FieldPanel('explanation_es'),
+        FieldPanel('text_zh'),
+        FieldPanel('explanation_zh'),
         InlinePanel('answers', label="Answer Options"),
     ]
     
@@ -294,16 +346,37 @@ class CMSAnswer(models.Model):
         default=0,
         help_text="Display order"
     )
-    text = models.TextField(help_text="Answer text")
+    text = models.TextField(help_text="Answer text (English)")
+    
+    # Multilingual fields - Russian
+    text_ru = models.TextField(blank=True, verbose_name="Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    text_hy = models.TextField(blank=True, verbose_name="Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    text_hi = models.TextField(blank=True, verbose_name="Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    text_es = models.TextField(blank=True, verbose_name="Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    text_zh = models.TextField(blank=True, verbose_name="Text (Chinese)")
+    
     is_correct = models.BooleanField(
         default=False,
         help_text="Check if this is the correct answer"
     )
     
     panels = [
-        FieldPanel('text'),
-        FieldPanel('is_correct'),
         FieldPanel('order'),
+        FieldPanel('is_correct'),
+        FieldPanel('text'),
+        FieldPanel('text_ru'),
+        FieldPanel('text_hy'),
+        FieldPanel('text_hi'),
+        FieldPanel('text_es'),
+        FieldPanel('text_zh'),
     ]
     
     def __str__(self):
