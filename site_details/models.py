@@ -7,7 +7,7 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 
 
-class PricingPlan(models.Model):
+class PricingPlan(ClusterableModel):
     """
     Pricing plan model for DMV test preparation packages.
     Represents different subscription tiers (e.g., 7-Day Express, 30-Day All-Access).
@@ -72,6 +72,41 @@ class PricingPlan(models.Model):
         help_text="URL or route for the CTA button",
     )
     
+    # Multilingual fields - Russian
+    subtitle_ru = models.CharField(max_length=100, blank=True, verbose_name="Subtitle (Russian)")
+    title_ru = models.CharField(max_length=100, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    price_period_ru = models.CharField(max_length=50, blank=True, verbose_name="Price Period (Russian)")
+    button_text_ru = models.CharField(max_length=50, blank=True, verbose_name="Button Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    subtitle_hy = models.CharField(max_length=100, blank=True, verbose_name="Subtitle (Armenian)")
+    title_hy = models.CharField(max_length=100, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    price_period_hy = models.CharField(max_length=50, blank=True, verbose_name="Price Period (Armenian)")
+    button_text_hy = models.CharField(max_length=50, blank=True, verbose_name="Button Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    subtitle_hi = models.CharField(max_length=100, blank=True, verbose_name="Subtitle (Hindi)")
+    title_hi = models.CharField(max_length=100, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    price_period_hi = models.CharField(max_length=50, blank=True, verbose_name="Price Period (Hindi)")
+    button_text_hi = models.CharField(max_length=50, blank=True, verbose_name="Button Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    subtitle_es = models.CharField(max_length=100, blank=True, verbose_name="Subtitle (Spanish)")
+    title_es = models.CharField(max_length=100, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    price_period_es = models.CharField(max_length=50, blank=True, verbose_name="Price Period (Spanish)")
+    button_text_es = models.CharField(max_length=50, blank=True, verbose_name="Button Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    subtitle_zh = models.CharField(max_length=100, blank=True, verbose_name="Subtitle (Chinese)")
+    title_zh = models.CharField(max_length=100, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    price_period_zh = models.CharField(max_length=50, blank=True, verbose_name="Price Period (Chinese)")
+    button_text_zh = models.CharField(max_length=50, blank=True, verbose_name="Button Text (Chinese)")
+    
     # Display settings
     is_featured = models.BooleanField(
         default=False,
@@ -127,7 +162,7 @@ class PlanFeature(models.Model):
         ("pricing_icons/simulation.svg", "Simulation"),
     ]
     
-    plan = models.ForeignKey(
+    plan = ParentalKey(
         PricingPlan,
         on_delete=models.CASCADE,
         related_name="features",
@@ -169,6 +204,26 @@ class PlanFeature(models.Model):
         blank=True,
         help_text="Optional detailed description (shown on hover/click)",
     )
+    
+    # Multilingual fields - Russian
+    text_ru = models.CharField(max_length=255, blank=True, verbose_name="Text (Russian)")
+    detail_text_ru = models.TextField(blank=True, verbose_name="Detail Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    text_hy = models.CharField(max_length=255, blank=True, verbose_name="Text (Armenian)")
+    detail_text_hy = models.TextField(blank=True, verbose_name="Detail Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    text_hi = models.CharField(max_length=255, blank=True, verbose_name="Text (Hindi)")
+    detail_text_hi = models.TextField(blank=True, verbose_name="Detail Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    text_es = models.CharField(max_length=255, blank=True, verbose_name="Text (Spanish)")
+    detail_text_es = models.TextField(blank=True, verbose_name="Detail Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    text_zh = models.CharField(max_length=255, blank=True, verbose_name="Text (Chinese)")
+    detail_text_zh = models.TextField(blank=True, verbose_name="Detail Text (Chinese)")
     
     class Meta:
         ordering = ("order",)
@@ -224,6 +279,26 @@ class ClientReview(models.Model):
     review_text = models.TextField(
         help_text="The review/testimonial text",
     )
+    
+    # Multilingual fields - Russian
+    job_title_ru = models.CharField(max_length=100, blank=True, verbose_name="Job Title (Russian)")
+    review_text_ru = models.TextField(blank=True, verbose_name="Review Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    job_title_hy = models.CharField(max_length=100, blank=True, verbose_name="Job Title (Armenian)")
+    review_text_hy = models.TextField(blank=True, verbose_name="Review Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    job_title_hi = models.CharField(max_length=100, blank=True, verbose_name="Job Title (Hindi)")
+    review_text_hi = models.TextField(blank=True, verbose_name="Review Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    job_title_es = models.CharField(max_length=100, blank=True, verbose_name="Job Title (Spanish)")
+    review_text_es = models.TextField(blank=True, verbose_name="Review Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    job_title_zh = models.CharField(max_length=100, blank=True, verbose_name="Job Title (Chinese)")
+    review_text_zh = models.TextField(blank=True, verbose_name="Review Text (Chinese)")
     
     order = models.PositiveIntegerField(
         default=0,
@@ -494,6 +569,46 @@ class MainBanner(models.Model):
         help_text="Button text (e.g., 'Video Guide')",
     )
     
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    title2_ru = models.CharField(max_length=200, blank=True, verbose_name="Secondary Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    stat_text1_ru = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 1 (Russian)")
+    stat_text2_ru = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 2 (Russian)")
+    button_name_ru = models.CharField(max_length=100, blank=True, verbose_name="Button Name (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    title2_hy = models.CharField(max_length=200, blank=True, verbose_name="Secondary Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    stat_text1_hy = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 1 (Armenian)")
+    stat_text2_hy = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 2 (Armenian)")
+    button_name_hy = models.CharField(max_length=100, blank=True, verbose_name="Button Name (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    title2_hi = models.CharField(max_length=200, blank=True, verbose_name="Secondary Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    stat_text1_hi = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 1 (Hindi)")
+    stat_text2_hi = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 2 (Hindi)")
+    button_name_hi = models.CharField(max_length=100, blank=True, verbose_name="Button Name (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    title2_es = models.CharField(max_length=200, blank=True, verbose_name="Secondary Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    stat_text1_es = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 1 (Spanish)")
+    stat_text2_es = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 2 (Spanish)")
+    button_name_es = models.CharField(max_length=100, blank=True, verbose_name="Button Name (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    title2_zh = models.CharField(max_length=200, blank=True, verbose_name="Secondary Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    stat_text1_zh = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 1 (Chinese)")
+    stat_text2_zh = models.CharField(max_length=100, blank=True, verbose_name="Stat Text 2 (Chinese)")
+    button_name_zh = models.CharField(max_length=100, blank=True, verbose_name="Button Name (Chinese)")
+    
     button_link = models.CharField(
         max_length=500,
         blank=True,
@@ -608,6 +723,31 @@ class HowItWorks(ClusterableModel):
         help_text="Description text below the title (e.g., 'Remote assistants will work to ensure you can do your job well, regardless of where you are')",
     )
     
+    # Multilingual fields - Russian
+    section_header_ru = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Russian)")
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    section_header_hy = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Armenian)")
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    section_header_hi = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Hindi)")
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    section_header_es = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Spanish)")
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    section_header_zh = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Chinese)")
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    
     # Display settings
     is_active = models.BooleanField(
         default=True,
@@ -659,6 +799,26 @@ class HowItWorksStep(models.Model):
     description = models.TextField(
         help_text="Step description (e.g., 'The world's largest and most liquid platform with spot, futures and options trading')",
     )
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
     
     # Optional icon/image for the step
     icon = models.ImageField(
@@ -729,6 +889,31 @@ class TrustSafety(ClusterableModel):
         default="",
         help_text="Button URL or link",
     )
+    
+    # Multilingual fields - Russian
+    section_header_ru = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Russian)")
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    button_text_ru = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    section_header_hy = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Armenian)")
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    button_text_hy = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    section_header_hi = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Hindi)")
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    button_text_hi = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    section_header_es = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Spanish)")
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    button_text_es = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    section_header_zh = models.CharField(max_length=100, blank=True, verbose_name="Section Header (Chinese)")
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    button_text_zh = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Chinese)")
     
     # Display settings
     is_active = models.BooleanField(
@@ -807,6 +992,26 @@ class TrustSafetyFeature(models.Model):
         help_text="Feature description (e.g., 'Lorem ipsum dolor sit amet consectetur. Auctor')",
     )
     
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    
     order = models.PositiveIntegerField(
         default=0,
         help_text="Display order (lower numbers appear first)",
@@ -852,6 +1057,31 @@ class SuccessSteps(ClusterableModel):
         default="",
         help_text="Button URL or link",
     )
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    button_text_ru = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    button_text_hy = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    button_text_hi = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    button_text_es = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    button_text_zh = models.CharField(max_length=100, blank=True, verbose_name="Button Text (Chinese)")
     
     # Display settings
     is_active = models.BooleanField(
@@ -904,6 +1134,26 @@ class SuccessStep(models.Model):
     description = models.TextField(
         help_text="Step description (e.g., 'Enter your name, email and password.')",
     )
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
     
     order = models.PositiveIntegerField(
         default=0,

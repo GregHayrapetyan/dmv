@@ -227,6 +227,70 @@ class PricingPlanAdmin(ModelAdmin):
     search_fields = ('title', 'description')
     ordering = ('order',)
     
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList, MultiFieldPanel
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('subtitle'),
+                    FieldPanel('title'),
+                    FieldPanel('description'),
+                    FieldPanel('price_period'),
+                    FieldPanel('button_text'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('subtitle_ru'),
+                    FieldPanel('title_ru'),
+                    FieldPanel('description_ru'),
+                    FieldPanel('price_period_ru'),
+                    FieldPanel('button_text_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('subtitle_hy'),
+                    FieldPanel('title_hy'),
+                    FieldPanel('description_hy'),
+                    FieldPanel('price_period_hy'),
+                    FieldPanel('button_text_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('subtitle_hi'),
+                    FieldPanel('title_hi'),
+                    FieldPanel('description_hi'),
+                    FieldPanel('price_period_hi'),
+                    FieldPanel('button_text_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('subtitle_es'),
+                    FieldPanel('title_es'),
+                    FieldPanel('description_es'),
+                    FieldPanel('price_period_es'),
+                    FieldPanel('button_text_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('subtitle_zh'),
+                    FieldPanel('title_zh'),
+                    FieldPanel('description_zh'),
+                    FieldPanel('price_period_zh'),
+                    FieldPanel('button_text_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    InlinePanel('features', label="Features"),
+                ], heading='Features'),
+                ObjectList([
+                    FieldPanel('price_old'),
+                    FieldPanel('price_new'),
+                    FieldPanel('discount_amount'),
+                    FieldPanel('button_url'),
+                    FieldPanel('is_featured'),
+                    FieldPanel('is_active'),
+                    FieldPanel('order'),
+                    FieldPanel('stripe_price_id_monthly'),
+                    FieldPanel('stripe_price_id_one_time'),
+                ], heading='Settings'),
+            ])
+        return self.edit_handler
+    
     def feature_count(self, obj):
         """Display the number of features in this plan."""
         count = obj.features.count()
@@ -249,20 +313,37 @@ class ClientReviewAdmin(ModelAdmin):
         if not hasattr(self, 'edit_handler') or self.edit_handler is None:
             self.edit_handler = TabbedInterface([
                 ObjectList([
-                    MultiFieldPanel([
-                        FieldPanel('name'),
-                        FieldPanel('job_title'),
-                    ], heading='Client Information'),
-                    MultiFieldPanel([
-                        FieldPanel('avatar'),
-                        FieldPanel('image'),
-                    ], heading='Images'),
-                    MultiFieldPanel([
-                        FieldPanel('rating'),
-                        FieldPanel('review_text'),
-                    ], heading='Review Details'),
+                    FieldPanel('name'),
+                    FieldPanel('job_title'),
+                    FieldPanel('review_text'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('job_title_ru'),
+                    FieldPanel('review_text_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('job_title_hy'),
+                    FieldPanel('review_text_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('job_title_hi'),
+                    FieldPanel('review_text_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('job_title_es'),
+                    FieldPanel('review_text_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('job_title_zh'),
+                    FieldPanel('review_text_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    FieldPanel('avatar'),
+                    FieldPanel('image'),
+                    FieldPanel('rating'),
+                    FieldPanel('order'),
                     FieldPanel('is_active'),
-                ], heading='Content'),
+                ], heading='Settings'),
             ])
         return self.edit_handler
     
@@ -329,6 +410,69 @@ class MainBannerAdmin(ModelAdmin):
     search_fields = ('title', 'description')
     ordering = ('-created_at',)
     
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('title'),
+                    FieldPanel('title2'),
+                    FieldPanel('description'),
+                    FieldPanel('stat_text1'),
+                    FieldPanel('stat_text2'),
+                    FieldPanel('button_name'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('title_ru'),
+                    FieldPanel('title2_ru'),
+                    FieldPanel('description_ru'),
+                    FieldPanel('stat_text1_ru'),
+                    FieldPanel('stat_text2_ru'),
+                    FieldPanel('button_name_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('title_hy'),
+                    FieldPanel('title2_hy'),
+                    FieldPanel('description_hy'),
+                    FieldPanel('stat_text1_hy'),
+                    FieldPanel('stat_text2_hy'),
+                    FieldPanel('button_name_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('title_hi'),
+                    FieldPanel('title2_hi'),
+                    FieldPanel('description_hi'),
+                    FieldPanel('stat_text1_hi'),
+                    FieldPanel('stat_text2_hi'),
+                    FieldPanel('button_name_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('title_es'),
+                    FieldPanel('title2_es'),
+                    FieldPanel('description_es'),
+                    FieldPanel('stat_text1_es'),
+                    FieldPanel('stat_text2_es'),
+                    FieldPanel('button_name_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('title_zh'),
+                    FieldPanel('title2_zh'),
+                    FieldPanel('description_zh'),
+                    FieldPanel('stat_text1_zh'),
+                    FieldPanel('stat_text2_zh'),
+                    FieldPanel('button_name_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    FieldPanel('image'),
+                    FieldPanel('video'),
+                    FieldPanel('button_link'),
+                    FieldPanel('use_video_as_button_link'),
+                    FieldPanel('is_active'),
+                ], heading='Settings'),
+            ])
+        return self.edit_handler
+    
     def description_preview(self, obj):
         return obj.description[:60] + '...' if len(obj.description) > 60 else obj.description
     description_preview.short_description = 'Description'
@@ -350,19 +494,42 @@ class HowItWorksAdmin(ModelAdmin):
         if not hasattr(self, 'edit_handler') or self.edit_handler is None:
             self.edit_handler = TabbedInterface([
                 ObjectList([
-                    FieldPanel('background_image'),
-                ], heading='Background'),
-                ObjectList([
                     FieldPanel('section_header'),
                     FieldPanel('title'),
                     FieldPanel('description'),
-                ], heading='Content'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('section_header_ru'),
+                    FieldPanel('title_ru'),
+                    FieldPanel('description_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('section_header_hy'),
+                    FieldPanel('title_hy'),
+                    FieldPanel('description_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('section_header_hi'),
+                    FieldPanel('title_hi'),
+                    FieldPanel('description_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('section_header_es'),
+                    FieldPanel('title_es'),
+                    FieldPanel('description_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('section_header_zh'),
+                    FieldPanel('title_zh'),
+                    FieldPanel('description_zh'),
+                ], heading='Chinese'),
                 ObjectList([
                     InlinePanel('steps', label="Steps"),
                 ], heading='Steps'),
                 ObjectList([
+                    FieldPanel('background_image'),
                     FieldPanel('is_active'),
-                ], heading='Display Settings'),
+                ], heading='Settings'),
             ])
         return self.edit_handler
     
@@ -391,23 +558,42 @@ class TrustSafetyAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('section_header'),
                     FieldPanel('title'),
-                ], heading='Content'),
-                ObjectList([
-                    FieldPanel('image'),
-                ], heading='Image'),
-                ObjectList([
-                    FieldPanel('video'),
-                ], heading='Video'),
-                ObjectList([
                     FieldPanel('button_text'),
-                    FieldPanel('button_link'),
-                ], heading='Button'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('section_header_ru'),
+                    FieldPanel('title_ru'),
+                    FieldPanel('button_text_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('section_header_hy'),
+                    FieldPanel('title_hy'),
+                    FieldPanel('button_text_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('section_header_hi'),
+                    FieldPanel('title_hi'),
+                    FieldPanel('button_text_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('section_header_es'),
+                    FieldPanel('title_es'),
+                    FieldPanel('button_text_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('section_header_zh'),
+                    FieldPanel('title_zh'),
+                    FieldPanel('button_text_zh'),
+                ], heading='Chinese'),
                 ObjectList([
                     InlinePanel('features', label="Features"),
                 ], heading='Features'),
                 ObjectList([
+                    FieldPanel('image'),
+                    FieldPanel('video'),
+                    FieldPanel('button_link'),
                     FieldPanel('is_active'),
-                ], heading='Display Settings'),
+                ], heading='Settings'),
             ])
         return self.edit_handler
     
@@ -436,17 +622,40 @@ class SuccessStepsAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('title'),
                     FieldPanel('description'),
-                ], heading='Content'),
-                ObjectList([
                     FieldPanel('button_text'),
-                    FieldPanel('button_link'),
-                ], heading='Button'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('title_ru'),
+                    FieldPanel('description_ru'),
+                    FieldPanel('button_text_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('title_hy'),
+                    FieldPanel('description_hy'),
+                    FieldPanel('button_text_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('title_hi'),
+                    FieldPanel('description_hi'),
+                    FieldPanel('button_text_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('title_es'),
+                    FieldPanel('description_es'),
+                    FieldPanel('button_text_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('title_zh'),
+                    FieldPanel('description_zh'),
+                    FieldPanel('button_text_zh'),
+                ], heading='Chinese'),
                 ObjectList([
                     InlinePanel('steps', label="Steps"),
                 ], heading='Steps'),
                 ObjectList([
+                    FieldPanel('button_link'),
                     FieldPanel('is_active'),
-                ], heading='Display Settings'),
+                ], heading='Settings'),
             ])
         return self.edit_handler
     
