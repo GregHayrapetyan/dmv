@@ -730,7 +730,7 @@ modeladmin_register(SubscriptionAdmin)
 @hooks.register('construct_main_menu')
 def hide_default_pages_menu_item(request, menu_items):
     """
-    Customize the main menu - hide Documents, Images, Tags, Reports, Snippets, and Help menu items.
+    Customize the main menu - hide docs, Images, Tags, Reports, Snippets, and Help menu items.
     """
     menu_items[:] = [item for item in menu_items if item.name not in ['documents', 'images', 'tags', 'reports', 'snippets', 'help']]
 
