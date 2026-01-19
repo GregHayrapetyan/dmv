@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.db.models import Q
 
 from rest_framework import generics, permissions
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -8,19 +9,24 @@ from .serializers import StateSerializer, VehicleSerializer, ProfileSerializer
 
 class StateListView(StandardizedResponseMixin, generics.ListAPIView):
     """
-    List all US states.
+    List US states that have tests or lessons.
     
-    Returns a list of all available US states for user selection during onboarding.
+    Returns a list of US states that have at least one test or lesson available.
     No authentication required.
     """
-    queryset = State.objects.all().order_by("name")
     serializer_class = StateSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = None
 
+    def get_queryset(self):
+        # Only return states that have tests or lessons
+        return State.objects.filter(
+            Q(tests__isnull=False) | Q(lessons__isnull=False)
+        ).distinct().order_by("name")
+
     @extend_schema(
-        summary="List all states",
-        description="Retrieve a list of all US states available for user profile selection.",
+        summary="List states with content",
+        description="Retrieve a list of US states that have tests or lessons available.",
         responses={
             200: StateSerializer(many=True),
         },
@@ -31,19 +37,24 @@ class StateListView(StandardizedResponseMixin, generics.ListAPIView):
 
 class VehicleListView(StandardizedResponseMixin, generics.ListAPIView):
     """
-    List all vehicle types.
+    List vehicle types that have tests.
     
-    Returns a list of all available vehicle types for user selection during onboarding.
+    Returns a list of vehicle types that have at least one test available.
     No authentication required.
     """
-    queryset = Vehicle.objects.all().order_by("name")
     serializer_class = VehicleSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = None
 
+    def get_queryset(self):
+        # Only return vehicles that have tests
+        return Vehicle.objects.filter(
+            tests__isnull=False
+        ).distinct().order_by("name")
+
     @extend_schema(
-        summary="List all vehicle types",
-        description="Retrieve a list of all vehicle types available for user profile selection.",
+        summary="List vehicle types with content",
+        description="Retrieve a list of vehicle types that have tests available.",
         responses={
             200: VehicleSerializer(many=True),
         },

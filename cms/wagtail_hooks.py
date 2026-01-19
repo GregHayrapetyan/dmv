@@ -32,6 +32,9 @@ from site_details.models import (
 # Import accounts models
 from accounts.models import Subscription
 
+# Import onboarding models
+from onboarding.models import State, Vehicle
+
 
 # ============================================================================
 # LEARNING SYSTEM - ModelAdmin Classes
@@ -715,9 +718,97 @@ class SiteDetailsGroup(ModelAdminGroup):
     )
 
 
+# ============================================================================
+# ONBOARDING - ModelAdmin Classes
+# ============================================================================
+
+class StateAdmin(ModelAdmin):
+    model = State
+    menu_label = 'States'
+    menu_icon = 'site'
+    list_display = ('name',)
+    search_fields = ('name',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('name'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('name_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('name_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('name_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('name_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('name_zh'),
+                ], heading='Chinese'),
+            ])
+        return self.edit_handler
+
+
+class VehicleAdmin(ModelAdmin):
+    model = Vehicle
+    menu_label = 'Vehicles'
+    menu_icon = 'car'
+    list_display = ('name', 'image')
+    search_fields = ('name',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('name'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('name_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('name_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('name_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('name_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('name_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    FieldPanel('image'),
+                    FieldPanel('image_width'),
+                    FieldPanel('image_height'),
+                ], heading='Settings'),
+            ])
+        return self.edit_handler
+
+
+class OnboardingGroup(ModelAdminGroup):
+    menu_label = 'Onboarding'
+    menu_icon = 'user'
+    menu_order = 350
+    items = (
+        StateAdmin,
+        VehicleAdmin,
+    )
+
+
 # Register the groups
 modeladmin_register(LearningGroup)
 modeladmin_register(SiteDetailsGroup)
+modeladmin_register(OnboardingGroup)
 
 # Register Subscriptions separately (will appear in Settings menu)
 modeladmin_register(SubscriptionAdmin)
