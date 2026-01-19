@@ -47,7 +47,14 @@ class VehicleListView(StandardizedResponseMixin, generics.ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        # Only return vehicles that have tests
+        from learning.models import Test
+        
+        # Check if any test has no vehicle restriction (available for all vehicles)
+        if Test.objects.filter(vehicles__isnull=True).exists():
+            # Return all vehicles since at least one test is available for all
+            return Vehicle.objects.all().order_by("name")
+        
+        # Only return vehicles that have tests explicitly assigned
         return Vehicle.objects.filter(
             tests__isnull=False
         ).distinct().order_by("name")
