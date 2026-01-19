@@ -1,6 +1,6 @@
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, OpenApiParameter
 from django.core.mail import send_mail
 from django.conf import settings
 
@@ -12,7 +12,17 @@ from dmv.api_response import APIResponse
 @extend_schema_view(
     get=extend_schema(
         summary="List client reviews",
-        description="Retrieve all active client reviews.",
+        description="Retrieve all active client reviews. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )
@@ -48,7 +58,17 @@ class ClientReviewListAPIView(generics.ListAPIView):
 @extend_schema_view(
     get=extend_schema(
         summary="List pricing plans",
-        description="Retrieve all active pricing plans with their features.",
+        description="Retrieve all active pricing plans with their features. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )
@@ -206,7 +226,17 @@ class ContactInfoRetrieveAPIView(generics.RetrieveAPIView):
 @extend_schema_view(
     get=extend_schema(
         summary="List partners",
-        description="Retrieve all active partners/sponsors.",
+        description="Retrieve all active partners/sponsors. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )
@@ -242,7 +272,17 @@ class PartnerListAPIView(generics.ListAPIView):
 @extend_schema_view(
     get=extend_schema(
         summary="Get main banner content",
-        description="Retrieve active main banner content.",
+        description="Retrieve active main banner content. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )
@@ -291,7 +331,17 @@ class MainBannerRetrieveAPIView(generics.RetrieveAPIView):
 @extend_schema_view(
     get=extend_schema(
         summary="Get How It Works section",
-        description="Retrieve active How It Works section with all steps.",
+        description="Retrieve active How It Works section with all steps. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )
@@ -340,7 +390,17 @@ class HowItWorksRetrieveAPIView(generics.RetrieveAPIView):
 @extend_schema_view(
     get=extend_schema(
         summary="Get Trust & Safety section",
-        description="Retrieve active Trust & Safety section with all features.",
+        description="Retrieve active Trust & Safety section with all features. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )
@@ -389,7 +449,17 @@ class TrustSafetyRetrieveAPIView(generics.RetrieveAPIView):
 @extend_schema_view(
     get=extend_schema(
         summary="Get Success Steps section",
-        description="Retrieve active Success Steps section with all steps.",
+        description="Retrieve active Success Steps section with all steps. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         tags=["Site Details"],
     )
 )

@@ -45,7 +45,17 @@ class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
     
     @extend_schema(
         summary="List lessons grouped by category",
-        description="Retrieve all lessons organized by their categories.",
+        description="Retrieve all lessons organized by their categories. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         responses={
             200: LessonCategoryListSerializer(many=True),
         },
@@ -72,7 +82,17 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
     @extend_schema(
         summary="Get lesson detail",
-        description="Retrieve full details of a specific lesson by its ID. Requires active subscription.",
+        description="Retrieve full details of a specific lesson by its ID. Requires active subscription. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         responses={
             200: LessonDetailSerializer,
             403: OpenApiResponse(description="Active subscription required"),
@@ -113,7 +133,17 @@ class TestListView(StandardizedResponseMixin, generics.ListAPIView):
     
     @extend_schema(
         summary="List tests",
-        description="Retrieve all tests.",
+        description="Retrieve all tests. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         responses={
             200: TestListSerializer(many=True),
         },
@@ -168,7 +198,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
     @extend_schema(
         summary="Get test detail",
-        description="Retrieve full test details with all questions and answer options. Requires active subscription unless is_demo=true.",
+        description="Retrieve full test details with all questions and answer options. Requires active subscription unless is_demo=true. Supports translations via ?lang= query parameter.",
         parameters=[
             OpenApiParameter(
                 name='is_demo',
@@ -176,6 +206,14 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                 location=OpenApiParameter.QUERY,
                 description='Set to true for demo test (returns 15 random questions)',
                 required=False,
+            ),
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
             ),
         ],
         responses={

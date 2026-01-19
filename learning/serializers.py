@@ -4,10 +4,12 @@ from .models import (
     Lesson, Test, Question, AnswerOption,
     LessonProgress, TestAttempt, TestAnswer, FavoriteLesson, LessonCategory
 )
+from dmv.translation import TranslatedSerializerMixin, get_translated_value
 
 
-class LessonListSerializer(serializers.ModelSerializer):
-    """Serializer for listing lessons (without full content)"""
+class LessonListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for listing lessons (without full content). Supports translations via ?lang= query parameter."""
+    translated_fields = ['title']
     state_names = serializers.SerializerMethodField()
     
     class Meta:
@@ -19,8 +21,9 @@ class LessonListSerializer(serializers.ModelSerializer):
         return [state.name for state in obj.states.all()]
 
 
-class LessonDetailSerializer(serializers.ModelSerializer):
-    """Serializer for lesson detail view (with full content)"""
+class LessonDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for lesson detail view (with full content). Supports translations via ?lang= query parameter."""
+    translated_fields = ['title', 'content']
     duration = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
     test_id = serializers.IntegerField(source='test.id', read_only=True, allow_null=True)
@@ -78,8 +81,9 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
         fields = ('id', 'text', 'image', 'question_type', 'explanation', 'order', 'answer_options')
 
 
-class TestListSerializer(serializers.ModelSerializer):
-    """Serializer for listing tests"""
+class TestListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for listing tests. Supports translations via ?lang= query parameter."""
+    translated_fields = ['title']
     lesson_title = serializers.SerializerMethodField()
     lesson_id = serializers.SerializerMethodField()
     question_count = serializers.SerializerMethodField()
@@ -172,8 +176,9 @@ class TestListSerializer(serializers.ModelSerializer):
         return [state.name for state in obj.states.all()]
 
 
-class TestDetailSerializer(serializers.ModelSerializer):
-    """Serializer for taking a test"""
+class TestDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for taking a test. Supports translations via ?lang= query parameter."""
+    translated_fields = ['title', 'description']
     questions = QuestionSerializer(many=True, read_only=True)
     lesson_title = serializers.SerializerMethodField()
     lesson_id = serializers.SerializerMethodField()
@@ -292,8 +297,9 @@ class FavoriteLessonSerializer(serializers.ModelSerializer):
         read_only_fields = ('created_at',)
 
 
-class TestStatisticsSerializer(serializers.ModelSerializer):
-    """Serializer for test statistics showing user's best performance"""
+class TestStatisticsSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for test statistics showing user's best performance. Supports translations via ?lang= query parameter."""
+    translated_fields = ['title']
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
     best_correct_answers = serializers.SerializerMethodField()
@@ -375,15 +381,21 @@ class TestStatisticsWithAggregatesSerializer(serializers.Serializer):
     incorrect_percentage = serializers.FloatField(read_only=True, help_text="Percentage of incorrect answers across all attempts")
 
 
-class LessonInCategorySerializer(serializers.ModelSerializer):
-    """Serializer for lessons within a category"""
-    name = serializers.CharField(source='title')
+class LessonInCategorySerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for lessons within a category. Supports translations via ?lang= query parameter."""
+    translated_fields = ['title']
+    name = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     category_id = serializers.IntegerField(source='category.id', read_only=True, allow_null=True)
     
     class Meta:
         model = Lesson
         fields = ('id', 'image', 'name', 'duration', 'order', 'category_id')
+    
+    def get_name(self, obj):
+        """Return translated title as name."""
+        lang = self.get_language()
+        return get_translated_value(obj, 'title', lang)
     
     def get_duration(self, obj):
         """Convert duration from minutes to seconds"""
@@ -394,14 +406,20 @@ class LessonInCategorySerializer(serializers.ModelSerializer):
         return 0
 
 
-class LessonCategoryListSerializer(serializers.ModelSerializer):
-    """Serializer for listing categories with their lessons"""
-    category = serializers.CharField(source='name')
+class LessonCategoryListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for listing categories with their lessons. Supports translations via ?lang= query parameter."""
+    translated_fields = ['name']
+    category = serializers.SerializerMethodField()
     lessons = serializers.SerializerMethodField()
     
     class Meta:
         model = LessonCategory
         fields = ('id', 'category', 'lessons')
+    
+    def get_category(self, obj):
+        """Return translated category name."""
+        lang = self.get_language()
+        return get_translated_value(obj, 'name', lang)
     
     def get_lessons(self, obj):
         """Get all lessons for this category, filtered by state if applicable"""
@@ -427,14 +445,20 @@ class LessonCategoryListSerializer(serializers.ModelSerializer):
         return LessonInCategorySerializer(queryset, many=True, context=self.context).data
 
 
-class FavoriteLessonCategorySerializer(serializers.ModelSerializer):
-    """Serializer for listing favorite lessons grouped by category"""
-    category = serializers.CharField(source='name')
+class FavoriteLessonCategorySerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for listing favorite lessons grouped by category. Supports translations via ?lang= query parameter."""
+    translated_fields = ['name']
+    category = serializers.SerializerMethodField()
     lessons = serializers.SerializerMethodField()
     
     class Meta:
         model = LessonCategory
         fields = ('id', 'category', 'lessons')
+    
+    def get_category(self, obj):
+        """Return translated category name."""
+        lang = self.get_language()
+        return get_translated_value(obj, 'name', lang)
     
     def get_lessons(self, obj):
         """Get favorite lessons for this category for the authenticated user"""
@@ -471,15 +495,18 @@ class FavoriteLessonCategorySerializer(serializers.ModelSerializer):
         return LessonInCategorySerializer(queryset, many=True, context=self.context).data
 
 
-class CategorySerializer(serializers.ModelSerializer):
-    """Serializer for listing categories (id and name only)"""
+class CategorySerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for listing categories (id and name only). Supports translations via ?lang= query parameter."""
+    translated_fields = ['name']
+    
     class Meta:
         model = LessonCategory
         fields = ('id', 'name')
 
 
-class CategoryDetailSerializer(serializers.ModelSerializer):
-    """Serializer for category detail with all videos/lessons"""
+class CategoryDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for category detail with all videos/lessons. Supports translations via ?lang= query parameter."""
+    translated_fields = ['name']
     videos = serializers.SerializerMethodField()
     
     class Meta:

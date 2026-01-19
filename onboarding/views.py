@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.db.models import Q
 
 from rest_framework import generics, permissions
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from dmv.api_mixins import StandardizedResponseMixin
 from .models import State, Vehicle, Profile
 from .serializers import StateSerializer, VehicleSerializer, ProfileSerializer
@@ -26,7 +26,17 @@ class StateListView(StandardizedResponseMixin, generics.ListAPIView):
 
     @extend_schema(
         summary="List states with content",
-        description="Retrieve a list of US states that have tests or lessons available.",
+        description="Retrieve a list of US states that have tests or lessons available. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         responses={
             200: StateSerializer(many=True),
         },
@@ -61,7 +71,17 @@ class VehicleListView(StandardizedResponseMixin, generics.ListAPIView):
 
     @extend_schema(
         summary="List vehicle types with content",
-        description="Retrieve a list of vehicle types that have tests available.",
+        description="Retrieve a list of vehicle types that have tests available. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
         responses={
             200: VehicleSerializer(many=True),
         },

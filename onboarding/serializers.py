@@ -1,19 +1,40 @@
 from rest_framework import serializers
 from .models import State, Vehicle, Profile
+from dmv.translation import TranslatedSerializerMixin
 
-class StateSerializer(serializers.ModelSerializer):
+class StateSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """
+    Serializer for State model.
+    Returns state with name. Supports translations via ?lang= query parameter.
+    """
+    translated_fields = ['name']
+    
     class Meta:
         model = State
         fields = ("id", "name")
 
-class VehicleSerializer(serializers.ModelSerializer):
-    label = serializers.CharField(source='name', read_only=True)
+class VehicleSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """
+    Serializer for Vehicle model.
+    Returns vehicle with label, image, and imageSize.
+    Supports translations via ?lang= query parameter.
+    """
+    translated_fields = ['name']
+    label = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     imageSize = serializers.SerializerMethodField()
     
     class Meta:
         model = Vehicle
         fields = ("id", "label", "image", "imageSize")
+    
+    def get_label(self, obj):
+        """
+        Return translated name as label.
+        """
+        from dmv.translation import get_translated_value
+        lang = self.get_language()
+        return get_translated_value(obj, 'name', lang)
     
     def get_image(self, obj):
         if obj.image:
