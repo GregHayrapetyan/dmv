@@ -23,6 +23,17 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
             'max_attempts': instance.max_attempts,
             'shuffle_questions': instance.shuffle_questions,
             'shuffle_answers': instance.shuffle_answers,
+            # Translation fields
+            'title_ru': instance.title_ru,
+            'description_ru': instance.description_ru,
+            'title_hy': instance.title_hy,
+            'description_hy': instance.description_hy,
+            'title_hi': instance.title_hi,
+            'description_hi': instance.description_hi,
+            'title_es': instance.title_es,
+            'description_es': instance.description_es,
+            'title_zh': instance.title_zh,
+            'description_zh': instance.description_zh,
         }
     )
     
@@ -34,6 +45,17 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
         test.max_attempts = instance.max_attempts
         test.shuffle_questions = instance.shuffle_questions
         test.shuffle_answers = instance.shuffle_answers
+        # Translation fields
+        test.title_ru = instance.title_ru
+        test.description_ru = instance.description_ru
+        test.title_hy = instance.title_hy
+        test.description_hy = instance.description_hy
+        test.title_hi = instance.title_hi
+        test.description_hi = instance.description_hi
+        test.title_es = instance.title_es
+        test.description_es = instance.description_es
+        test.title_zh = instance.title_zh
+        test.description_zh = instance.description_zh
         test.save()
     
     # Store the test ID in CMSTest for reference (we'll need to add this field)
@@ -60,6 +82,17 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
             'question_type': instance.question_type,
             'explanation': instance.explanation,
             'order': instance.order,
+            # Translation fields
+            'text_ru': instance.text_ru,
+            'explanation_ru': instance.explanation_ru,
+            'text_hy': instance.text_hy,
+            'explanation_hy': instance.explanation_hy,
+            'text_hi': instance.text_hi,
+            'explanation_hi': instance.explanation_hi,
+            'text_es': instance.text_es,
+            'explanation_es': instance.explanation_es,
+            'text_zh': instance.text_zh,
+            'explanation_zh': instance.explanation_zh,
         }
     )
     
@@ -68,6 +101,17 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
         question.question_type = instance.question_type
         question.explanation = instance.explanation
         question.order = instance.order
+        # Translation fields
+        question.text_ru = instance.text_ru
+        question.explanation_ru = instance.explanation_ru
+        question.text_hy = instance.text_hy
+        question.explanation_hy = instance.explanation_hy
+        question.text_hi = instance.text_hi
+        question.explanation_hi = instance.explanation_hi
+        question.text_es = instance.text_es
+        question.explanation_es = instance.explanation_es
+        question.text_zh = instance.text_zh
+        question.explanation_zh = instance.explanation_zh
         question.save()
 
 
@@ -91,6 +135,12 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
         defaults={
             'is_correct': instance.is_correct,
             'order': instance.order,
+            # Translation fields
+            'text_ru': instance.text_ru,
+            'text_hy': instance.text_hy,
+            'text_hi': instance.text_hi,
+            'text_es': instance.text_es,
+            'text_zh': instance.text_zh,
         }
     )
 

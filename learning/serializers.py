@@ -51,51 +51,65 @@ class LessonDetailSerializer(TranslatedSerializerMixin, serializers.ModelSeriali
         return False
 
 
-class AnswerOptionSerializer(serializers.ModelSerializer):
+class AnswerOptionSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for answer options. Supports translations via ?lang= query parameter."""
+    translated_fields = ['text']
+    
     class Meta:
         model = AnswerOption
         fields = ('id', 'text', 'is_correct', 'order')
 
 
-class AnswerOptionDetailSerializer(serializers.ModelSerializer):
-    """Used after submission to show correct answers"""
+class AnswerOptionDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Used after submission to show correct answers. Supports translations via ?lang= query parameter."""
+    translated_fields = ['text']
+    
     class Meta:
         model = AnswerOption
         fields = ('id', 'text', 'is_correct', 'order')
 
 
-class QuestionSerializer(serializers.ModelSerializer):
-    answer_options = AnswerOptionSerializer(many=True, read_only=True)
+class QuestionSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Serializer for questions. Supports translations via ?lang= query parameter."""
+    translated_fields = ['text', 'explanation']
+    answer_options = serializers.SerializerMethodField()
     
     class Meta:
         model = Question
         fields = ('id', 'text', 'image', 'question_type', 'explanation', 'order', 'answer_options')
+    
+    def get_answer_options(self, obj):
+        """Pass context to nested serializer for translation support."""
+        return AnswerOptionSerializer(obj.answer_options.all(), many=True, context=self.context).data
 
 
-class QuestionDetailSerializer(serializers.ModelSerializer):
-    """Used after submission to show correct answers"""
-    answer_options = AnswerOptionDetailSerializer(many=True, read_only=True)
+class QuestionDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """Used after submission to show correct answers. Supports translations via ?lang= query parameter."""
+    translated_fields = ['text', 'explanation']
+    answer_options = serializers.SerializerMethodField()
     
     class Meta:
         model = Question
         fields = ('id', 'text', 'image', 'question_type', 'explanation', 'order', 'answer_options')
+    
+    def get_answer_options(self, obj):
+        """Pass context to nested serializer for translation support."""
+        return AnswerOptionDetailSerializer(obj.answer_options.all(), many=True, context=self.context).data
 
 
 class TestListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for listing tests. Supports translations via ?lang= query parameter."""
     translated_fields = ['title']
-    lesson_title = serializers.SerializerMethodField()
     lesson_id = serializers.SerializerMethodField()
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
     best_correct_answers = serializers.SerializerMethodField()
     best_incorrect_answers = serializers.SerializerMethodField()
-    state_names = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Test
-        fields = ('id', 'title', 'image', 'lesson_id', 'lesson_title', 'time_limit_seconds', 'question_count',
-                  'passing_percentage', 'max_attempts', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers', 'state_names')
+        fields = ('id', 'title', 'image', 'lesson_id', 'question_count',
+                  'passing_percentage', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers')
     
     def get_lesson_title(self, obj):
         """Get the title of the lesson this test belongs to."""
@@ -170,10 +184,7 @@ class TestListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer)
         if best_attempt:
             return best_attempt.incorrect_answers
         return None
-    
-    def get_state_names(self, obj):
-        """Return list of state names this test is available for. Empty list means available for all states."""
-        return [state.name for state in obj.states.all()]
+
 
 
 class TestDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):

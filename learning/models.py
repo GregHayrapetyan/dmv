@@ -269,6 +269,27 @@ class Question(models.Model):
         related_name="questions",
     )
     text = models.TextField()
+    
+    # Multilingual fields - Russian
+    text_ru = models.TextField(blank=True, verbose_name="Text (Russian)")
+    explanation_ru = models.TextField(blank=True, verbose_name="Explanation (Russian)")
+    
+    # Multilingual fields - Armenian
+    text_hy = models.TextField(blank=True, verbose_name="Text (Armenian)")
+    explanation_hy = models.TextField(blank=True, verbose_name="Explanation (Armenian)")
+    
+    # Multilingual fields - Hindi
+    text_hi = models.TextField(blank=True, verbose_name="Text (Hindi)")
+    explanation_hi = models.TextField(blank=True, verbose_name="Explanation (Hindi)")
+    
+    # Multilingual fields - Spanish
+    text_es = models.TextField(blank=True, verbose_name="Text (Spanish)")
+    explanation_es = models.TextField(blank=True, verbose_name="Explanation (Spanish)")
+    
+    # Multilingual fields - Chinese
+    text_zh = models.TextField(blank=True, verbose_name="Text (Chinese)")
+    explanation_zh = models.TextField(blank=True, verbose_name="Explanation (Chinese)")
+    
     image = models.ImageField(
         upload_to="test_questions/",
         blank=True,
@@ -333,6 +354,22 @@ class AnswerOption(models.Model):
         related_name="answer_options",
     )
     text = models.TextField()
+    
+    # Multilingual fields - Russian
+    text_ru = models.TextField(blank=True, verbose_name="Text (Russian)")
+    
+    # Multilingual fields - Armenian
+    text_hy = models.TextField(blank=True, verbose_name="Text (Armenian)")
+    
+    # Multilingual fields - Hindi
+    text_hi = models.TextField(blank=True, verbose_name="Text (Hindi)")
+    
+    # Multilingual fields - Spanish
+    text_es = models.TextField(blank=True, verbose_name="Text (Spanish)")
+    
+    # Multilingual fields - Chinese
+    text_zh = models.TextField(blank=True, verbose_name="Text (Chinese)")
+    
     is_correct = models.BooleanField(default=False)
     order = models.PositiveIntegerField(
         default=1,
