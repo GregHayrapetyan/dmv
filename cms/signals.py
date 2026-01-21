@@ -2,6 +2,7 @@
 Signals to keep CMSTest in sync with learning.Test model.
 This ensures that tests created in Wagtail CMS are available in the API.
 """
+from django.db import models
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from cms.models import CMSTest, CMSQuestion, CMSAnswer
@@ -127,22 +128,35 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
     except (Test.DoesNotExist, Question.DoesNotExist):
         return
     
-    # Use update_or_create to handle both creation and updates
-    # Match by question and text (unique identifier for an answer)
-    answer, answer_created = AnswerOption.objects.update_or_create(
-        question=question,
-        text=instance.text,
-        defaults={
-            'is_correct': instance.is_correct,
-            'order': instance.order,
-            # Translation fields
-            'text_ru': instance.text_ru,
-            'text_hy': instance.text_hy,
-            'text_hi': instance.text_hi,
-            'text_es': instance.text_es,
-            'text_zh': instance.text_zh,
-        }
-    )
+    # First try to find existing answer by question and text
+    try:
+        answer = AnswerOption.objects.get(question=question, text=instance.text)
+        # Update existing answer (order can stay as-is to avoid constraint issues)
+        answer.is_correct = instance.is_correct
+        answer.text_ru = instance.text_ru
+        answer.text_hy = instance.text_hy
+        answer.text_hi = instance.text_hi
+        answer.text_es = instance.text_es
+        answer.text_zh = instance.text_zh
+        answer.save()
+    except AnswerOption.DoesNotExist:
+        # Create new answer - find next available order to avoid constraint violation
+        max_order = AnswerOption.objects.filter(question=question).aggregate(
+            max_order=models.Max('order')
+        )['max_order']
+        next_order = (max_order or -1) + 1
+        
+        AnswerOption.objects.create(
+            question=question,
+            text=instance.text,
+            is_correct=instance.is_correct,
+            order=next_order,
+            text_ru=instance.text_ru,
+            text_hy=instance.text_hy,
+            text_hi=instance.text_hi,
+            text_es=instance.text_es,
+            text_zh=instance.text_zh,
+        )
 
 
 @receiver(post_delete, sender=CMSTest)

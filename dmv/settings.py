@@ -340,6 +340,9 @@ LOGGING = {
     },
 }
 
+# Data upload settings (needed for forms with many translation fields)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
 # Wagtail settings
 WAGTAIL_SITE_NAME = 'MyTest DMV'
 WAGTAILADMIN_BASE_URL = config('WAGTAILADMIN_BASE_URL', default='http://localhost:8000')

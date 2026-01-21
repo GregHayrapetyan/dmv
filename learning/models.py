@@ -382,12 +382,6 @@ class AnswerOption(models.Model):
         verbose_name = "Answer option"
         verbose_name_plural = "Answer options"
         ordering = ["order", "id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=['question', 'order'],
-                name='unique_answer_order_per_question'
-            ),
-        ]
 
     def __str__(self):
         prefix = "✓" if self.is_correct else "✗"
