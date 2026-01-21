@@ -1167,3 +1167,135 @@ class SuccessStep(models.Model):
     
     def __str__(self):
         return f"{self.title[:30]}"
+
+
+class LearningOptions(ClusterableModel):
+    """
+    Learning Options section model.
+    Stores the "Reach your success in three steps" section content with title, description,
+    and individual learning option cards.
+    Only one instance should be active at a time (singleton pattern).
+    """
+    # Main title
+    title = models.CharField(
+        max_length=200,
+        default="Reach your success in three steps.",
+        help_text="Main title (e.g., 'Reach your success in three steps.')",
+    )
+    
+    # Description
+    description = models.TextField(
+        help_text="Description text below the title",
+    )
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    
+    # Display settings
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this Learning Options section is active",
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Learning Options Section"
+        verbose_name_plural = "Learning Options Sections"
+    
+    def __str__(self):
+        return f"{self.title[:50]}"
+    
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one LearningOptions is active at a time (singleton pattern).
+        """
+        if self.is_active:
+            LearningOptions.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+
+class LearningOption(models.Model):
+    """
+    Individual option card in the Learning Options section.
+    Each option has an image, title, and description.
+    """
+    learning_options = ParentalKey(
+        LearningOptions,
+        on_delete=models.CASCADE,
+        related_name="options",
+        help_text="The Learning Options section this option belongs to",
+    )
+    
+    image = models.ImageField(
+        upload_to="learning_options/images/",
+        help_text="Image for this option card",
+    )
+    
+    title = models.CharField(
+        max_length=200,
+        help_text="Option title (e.g., 'Start Test', 'Practice Test', 'Real Exam Simul.', 'By Topic')",
+    )
+    
+    description = models.TextField(
+        help_text="Option description (e.g., '650+ exam-like questions', 'Road Signs, Rules, Fines')",
+    )
+    
+    link = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Optional URL or route for this option card",
+    )
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
+    description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=200, blank=True, verbose_name="Title (Armenian)")
+    description_hy = models.TextField(blank=True, verbose_name="Description (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=200, blank=True, verbose_name="Title (Hindi)")
+    description_hi = models.TextField(blank=True, verbose_name="Description (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=200, blank=True, verbose_name="Title (Spanish)")
+    description_es = models.TextField(blank=True, verbose_name="Description (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=200, blank=True, verbose_name="Title (Chinese)")
+    description_zh = models.TextField(blank=True, verbose_name="Description (Chinese)")
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    class Meta:
+        ordering = ("order",)
+        verbose_name = "Learning Option"
+        verbose_name_plural = "Learning Options"
+    
+    def __str__(self):
+        return f"{self.title[:30]}"

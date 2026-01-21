@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps, LearningOptions
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer, LearningOptionsSerializer
 from dmv.api_response import APIResponse
 
 
@@ -498,6 +498,65 @@ class SuccessStepsRetrieveAPIView(generics.RetrieveAPIView):
         if not instance:
             return APIResponse.error(
                 message="Success Steps section not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.get_serializer(instance)
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get Learning Options section",
+        description="Retrieve active Learning Options section with all option cards. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
+        tags=["Site Details"],
+    )
+)
+class LearningOptionsRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    API endpoint to retrieve Learning Options section content.
+    GET /api/site-details/learning-options/
+    
+    Returns the active Learning Options section with all option cards.
+    No authentication required.
+    
+    Returns:
+        200: Active Learning Options section with options
+        404: No active Learning Options section found
+    """
+    serializer_class = LearningOptionsSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
+    
+    def get_object(self):
+        """
+        Return the active LearningOptions instance with prefetched options.
+        """
+        try:
+            return LearningOptions.objects.prefetch_related('options').get(is_active=True)
+        except LearningOptions.DoesNotExist:
+            # Return first available if no active one exists
+            return LearningOptions.objects.prefetch_related('options').first()
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to use standardized response format.
+        """
+        instance = self.get_object()
+        
+        if not instance:
+            return APIResponse.error(
+                message="Learning Options section not found",
                 status_code=status.HTTP_404_NOT_FOUND
             )
         

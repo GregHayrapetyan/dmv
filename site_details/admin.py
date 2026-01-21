@@ -3,7 +3,8 @@ from django.utils.html import format_html
 from .models import (
     ClientReview, Contact, ContactInfo, Partner, MainBanner, 
     HowItWorks, HowItWorksStep, PricingPlan, PlanFeature,
-    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep
+    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep,
+    LearningOptions, LearningOption
 )
 
 
@@ -886,4 +887,70 @@ class SuccessStepsAdmin(admin.ModelAdmin):
         return format_html('<strong>{}</strong> steps', count)
     
     steps_count.short_description = "Steps"
+
+
+class LearningOptionInline(admin.TabularInline):
+    """
+    Inline admin for Learning Options.
+    """
+    model = LearningOption
+    extra = 1
+    fields = ('image', 'title', 'description', 'link', 'order')
+    ordering = ('order',)
+
+
+@admin.register(LearningOptions)
+class LearningOptionsAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing Learning Options section.
+    """
+    list_display = (
+        "title",
+        "options_count",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "is_active",
+    )
+    
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "title",
+        "description",
+    )
+    
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Content", {
+            "fields": ("title", "description")
+        }),
+        ("Display Settings", {
+            "fields": ("is_active",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    inlines = [LearningOptionInline]
+    
+    def options_count(self, obj):
+        """
+        Display the number of options in this section.
+        """
+        count = obj.options.count()
+        return format_html('<strong>{}</strong> options', count)
+    
+    options_count.short_description = "Options"
 

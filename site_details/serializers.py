@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption
 from dmv.translation import TranslatedSerializerMixin
 
 
@@ -362,3 +362,50 @@ class SuccessStepsSerializer(TranslatedSerializerMixin, serializers.ModelSeriali
         Return steps with context for translation support.
         """
         return SuccessStepSerializer(obj.steps.all(), many=True, context=self.context).data
+
+
+class LearningOptionSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """
+    Serializer for LearningOption model.
+    Returns individual option details with image, title, description, and link.
+    Supports translations via ?lang= query parameter.
+    """
+    translated_fields = ['title', 'description']
+    
+    class Meta:
+        model = LearningOption
+        fields = [
+            "id",
+            "image",
+            "title",
+            "description",
+            "link",
+            "order",
+        ]
+        read_only_fields = ["id"]
+
+
+class LearningOptionsSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """
+    Serializer for LearningOptions model with nested options.
+    Returns complete Learning Options section with all option cards.
+    Supports translations via ?lang= query parameter.
+    """
+    translated_fields = ['title', 'description']
+    options = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LearningOptions
+        fields = [
+            "id",
+            "title",
+            "description",
+            "options",
+        ]
+        read_only_fields = ["id"]
+    
+    def get_options(self, obj):
+        """
+        Return options with context for translation support.
+        """
+        return LearningOptionSerializer(obj.options.all(), many=True, context=self.context).data

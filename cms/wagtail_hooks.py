@@ -26,7 +26,7 @@ from cms.models import CMSTest
 # Import site_details models
 from site_details.models import (
     PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep,
-    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep
+    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption
 )
 
 # Import accounts models
@@ -669,6 +669,61 @@ class SuccessStepsAdmin(ModelAdmin):
     steps_count.short_description = 'Steps'
 
 
+class LearningOptionsAdmin(ModelAdmin):
+    """Learning Options admin with inline option editing."""
+    model = LearningOptions
+    menu_label = 'Learning Options'
+    menu_icon = 'view'
+    list_display = ('title', 'options_count', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'description')
+    ordering = ('-created_at',)
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('title'),
+                    FieldPanel('description'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('title_ru'),
+                    FieldPanel('description_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('title_hy'),
+                    FieldPanel('description_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('title_hi'),
+                    FieldPanel('description_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('title_es'),
+                    FieldPanel('description_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('title_zh'),
+                    FieldPanel('description_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    InlinePanel('options', label="Options"),
+                ], heading='Options'),
+                ObjectList([
+                    FieldPanel('is_active'),
+                ], heading='Settings'),
+            ])
+        return self.edit_handler
+    
+    def options_count(self, obj):
+        """Display the number of options in this section."""
+        count = obj.options.count()
+        return format_html('<strong>{}</strong> options', count)
+    options_count.short_description = 'Options'
+
+
 # ============================================================================
 # ACCOUNTS - ModelAdmin Classes (for Settings menu)
 # ============================================================================
@@ -710,6 +765,7 @@ class SiteDetailsGroup(ModelAdminGroup):
         HowItWorksAdmin,
         SuccessStepsAdmin,
         TrustSafetyAdmin,
+        LearningOptionsAdmin,
         PricingPlanAdmin,
         ClientReviewAdmin,
         ContactInfoAdmin,
