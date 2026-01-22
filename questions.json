@@ -15694,6 +15694,22 @@
       "category": "signs",
       "needs_image": "yes",
       "explanation": "Normal traffic rules apply beyond this point."
+    },
+        {
+      "id": 1001,
+      "question": "Idiot question",
+      "video_link": null,
+      "image_link": null,
+      "answers": [
+        "Idiot answer",
+        "Idiot answer 2",
+        "Idiot answer 3",
+        "Idiot answer 4"
+      ],
+      "correct": 0,
+      "category": "idiot test",
+      "needs_image": "yes",
+      "explanation": "Idiot Explanation"
     }
   ]
 }

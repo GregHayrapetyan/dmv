@@ -31,6 +31,9 @@ urlpatterns = [
     
     # Wagtail admin (CMS backend - keep for content management)
     path('cms/', include(wagtailadmin_urls)),
+    
+    # CMS custom views (import, etc.)
+    path('cms-admin/', include('cms.urls')),
     # path('documents/', include(wagtaildocs_urls)),
     
     # API endpoints

@@ -5,10 +5,38 @@ This file integrates existing Django models into the Wagtail admin interface.
 from django.contrib import admin
 from django import forms
 from django.utils.html import format_html
+from django.urls import reverse
 from wagtail_modeladmin.options import (
     ModelAdmin, ModelAdminGroup, modeladmin_register
 )
 from wagtail_modeladmin.helpers import PermissionHelper, ButtonHelper
+
+
+class CMSTestButtonHelper(ButtonHelper):
+    """Custom button helper to add import button to CMSTest index."""
+    
+    def get_buttons_for_obj(self, obj, **kwargs):
+        """Return default buttons for object."""
+        return super().get_buttons_for_obj(obj, **kwargs)
+    
+    def import_button(self, classnames_add=None, classnames_exclude=None):
+        """Return a button to import questions."""
+        if classnames_add is None:
+            classnames_add = []
+        if classnames_exclude is None:
+            classnames_exclude = []
+        
+        classnames = self.add_button_classnames + classnames_add
+        cn = self.finalise_classname(classnames, classnames_exclude)
+        
+        return {
+            'url': reverse('cms:import_questions'),
+            'label': 'Import Questions',
+            'classname': cn,
+            'title': 'Import questions from JSON file',
+        }
+
+
 from wagtail import hooks
 from wagtail.documents.models import Document
 from wagtail.images.models import Image
@@ -133,6 +161,8 @@ class CMSTestAdmin(ModelAdmin):
     menu_icon = 'form'
     list_display = ('title', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
     search_fields = ('title', 'description')
+    button_helper_class = CMSTestButtonHelper
+    index_template_name = 'cms/cmstest_index.html'
     
     def get_edit_handler(self):
         from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList, MultiFieldPanel

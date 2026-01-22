@@ -1,0 +1,14 @@
+{% extends "modeladmin/index.html" %}
+{% load wagtailadmin_tags %}
+
+{% block header_extra %}
+    <a href="{% url 'cms:import_questions' %}" class="button bicolor button--icon">
+        <span class="icon-wrapper">
+            <svg class="icon icon-upload icon" aria-hidden="true">
+                <use href="#icon-upload"></use>
+            </svg>
+        </span>
+        Import Questions
+    </a>
+    {{ block.super }}
+{% endblock %}
