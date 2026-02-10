@@ -178,6 +178,15 @@ class GoogleLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Either id_token or access_token must be provided")
         return attrs
 
+class AppleLoginSerializer(serializers.Serializer):
+    id_token = serializers.CharField(required=True, help_text="Apple ID token (JWT)")
+    user_data = serializers.JSONField(required=False, allow_null=True, help_text="User data (only provided on first login)")
+    
+    def validate(self, attrs):
+        if not attrs.get('id_token'):
+            raise serializers.ValidationError("id_token is required")
+        return attrs
+
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating user profile (excludes avatar)."""
     state = serializers.IntegerField(required=False, allow_null=True, write_only=True)

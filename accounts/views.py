@@ -8,7 +8,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
-    ResetPasswordSerializer, GoogleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
+    ResetPasswordSerializer, GoogleLoginSerializer, AppleLoginSerializer, UserSerializer, UserUpdateSerializer, SetAvatarSerializer,
     ChangePasswordSerializer,
 )
 from .throttling import AuthRateThrottle
@@ -454,6 +454,226 @@ class GoogleLoginView(generics.GenericAPIView):
             )
         except Exception as e:
             logger.error(f"Unexpected error in Google login: {str(e)}")
+            return APIResponse.server_error(
+                message="An error occurred during authentication."
+            )
+
+class AppleLoginView(generics.GenericAPIView):
+    """
+    Authenticate with Apple Sign In.
+    
+    Accepts an Apple ID token, verifies it, and creates/authenticates the user.
+    Returns JWT tokens for the application.
+    """
+    serializer_class = AppleLoginSerializer
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    @extend_schema(
+        summary="Apple Sign In login",
+        description="Authenticate using Apple ID token. Creates new user if doesn't exist. Email is automatically verified.",
+        request=AppleLoginSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Authentication successful",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                            "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                            "user": {
+                                "id": 1,
+                                "email": "user@example.com",
+                                "first_name": "John",
+                                "last_name": "Doe",
+                                "is_email_verified": True
+                            }
+                        },
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Invalid token or email not verified by Apple"),
+            401: OpenApiResponse(description="Invalid or expired Apple token"),
+            503: OpenApiResponse(description="Apple OAuth not configured on server"),
+        },
+        tags=["Authentication"],
+    )
+    def post(self, request):
+        """Accepts an Apple id_token and returns app JWTs."""
+        import jwt
+        import requests
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.backends import default_backend
+        
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        
+        id_token = ser.validated_data.get("id_token")
+        user_data = ser.validated_data.get("user_data")
+        
+        # Check if Apple OAuth is configured
+        if not all([settings.APPLE_CLIENT_ID, settings.APPLE_TEAM_ID, settings.APPLE_KEY_ID]):
+            logger.error("Apple OAuth not properly configured")
+            return APIResponse.service_unavailable(
+                message="Apple authentication is not configured."
+            )
+        
+        try:
+            # Get Apple's public keys for verification
+            apple_keys_url = "https://appleid.apple.com/auth/keys"
+            response = requests.get(apple_keys_url, timeout=10)
+            
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch Apple public keys: {response.text}")
+                return APIResponse.error(
+                    message="Failed to verify Apple token.",
+                    error_code=ErrorCodes.INVALID_TOKEN,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            apple_public_keys = response.json()
+            
+            # Decode token header to get key id (kid)
+            header = jwt.get_unverified_header(id_token)
+            kid = header.get('kid')
+            
+            if not kid:
+                logger.error("Apple token missing kid in header")
+                return APIResponse.error(
+                    message="Invalid Apple token format.",
+                    error_code=ErrorCodes.INVALID_TOKEN,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Find the matching public key
+            public_key = None
+            for key in apple_public_keys.get('keys', []):
+                if key.get('kid') == kid:
+                    # Convert JWK to PEM format for verification
+                    from jwt.algorithms import RSAAlgorithm
+                    public_key = RSAAlgorithm.from_jwk(key)
+                    break
+            
+            if not public_key:
+                logger.error(f"Apple public key not found for kid: {kid}")
+                return APIResponse.error(
+                    message="Invalid Apple token.",
+                    error_code=ErrorCodes.INVALID_TOKEN,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Verify and decode the token
+            try:
+                decoded_token = jwt.decode(
+                    id_token,
+                    public_key,
+                    algorithms=['RS256'],
+                    audience=settings.APPLE_CLIENT_ID,
+                    options={'verify_exp': True}
+                )
+            except jwt.ExpiredSignatureError:
+                logger.error("Apple token has expired")
+                return APIResponse.error(
+                    message="Apple token has expired.",
+                    error_code=ErrorCodes.INVALID_TOKEN,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            except jwt.InvalidTokenError as e:
+                logger.error(f"Invalid Apple token: {str(e)}")
+                return APIResponse.error(
+                    message="Invalid Apple token.",
+                    error_code=ErrorCodes.INVALID_TOKEN,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Extract user information from token
+            email = decoded_token.get('email')
+            email_verified = decoded_token.get('email_verified', False)
+            
+            # Apple sends 'email_verified' as string "true" or boolean True
+            if isinstance(email_verified, str):
+                email_verified = email_verified.lower() == 'true'
+            
+            if not email:
+                return APIResponse.validation_error(
+                    message="Email not provided by Apple."
+                )
+            
+            # Check if email is verified by Apple
+            if not email_verified:
+                logger.warning(f"Unverified email attempted Apple login: {email}")
+                return APIResponse.error(
+                    message="Email not verified by Apple.",
+                    error_code=ErrorCodes.EMAIL_NOT_VERIFIED,
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Extract name from user_data (only provided on first sign-in)
+            first_name = ""
+            last_name = ""
+            
+            if user_data and isinstance(user_data, dict):
+                name = user_data.get('name', {})
+                if isinstance(name, dict):
+                    first_name = name.get('firstName', '')
+                    last_name = name.get('lastName', '')
+            
+            # Get or create user
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "is_email_verified": True  # Apple emails are pre-verified
+                }
+            )
+            
+            # Update existing user's email verification status if not already verified
+            if not created and not user.is_email_verified:
+                user.is_email_verified = True
+                user.save(update_fields=["is_email_verified"])
+                logger.info(f"Email verified via Apple Sign In for existing user: {email}")
+            
+            if created:
+                logger.info(f"New user created via Apple Sign In: {email}")
+            
+            # Generate JWT tokens
+            tokens = RefreshToken.for_user(user)
+            response = APIResponse.success(
+                data={
+                    "access": str(tokens.access_token),
+                    "user": {
+                        "id": user.id,
+                        "email": user.email,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "is_email_verified": user.is_email_verified
+                    }
+                },
+                message="Apple authentication successful"
+            )
+            
+            # Set refresh token as httpOnly cookie
+            response.set_cookie(
+                key='refresh_token',
+                value=str(tokens),
+                httponly=True,
+                secure=True,
+                samesite='None',
+                max_age=7*24*60*60,
+                path='/'
+            )
+            
+            return response
+            
+        except requests.RequestException as e:
+            logger.error(f"Failed to connect to Apple services: {str(e)}")
+            return APIResponse.server_error(
+                message="Failed to verify Apple token. Please try again later."
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in Apple login: {str(e)}")
             return APIResponse.server_error(
                 message="An error occurred during authentication."
             )

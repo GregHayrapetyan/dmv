@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     LoginView, RegisterView, ConfirmEmailView, ResetPasswordView, 
-    RequestPasswordResetView, GoogleLoginView, MeView, CookieTokenRefreshView, LogoutView,
+    RequestPasswordResetView, GoogleLoginView, AppleLoginView, MeView, CookieTokenRefreshView, LogoutView,
     SetAvatarView, DeleteAccountView, ChangePasswordView
 )
 from .subscription_views import (
@@ -19,6 +19,7 @@ urlpatterns = [
     path("password/forgot/", RequestPasswordResetView.as_view(), name="password-forgot"),
     path("password/reset/", ResetPasswordView.as_view(), name="password-reset"),
     path("google/", GoogleLoginView.as_view(), name="google-login"),
+    path("apple/", AppleLoginView.as_view(), name="apple-login"),
     path("me/", MeView.as_view(), name="me"),
     path("set_avatar/", SetAvatarView.as_view(), name="set-avatar"),
     path("delete_account/", DeleteAccountView.as_view(), name="delete-account"),

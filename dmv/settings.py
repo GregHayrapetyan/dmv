@@ -252,6 +252,12 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@dmv.local')
 # Google OAuth
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
 
+# Apple OAuth
+APPLE_CLIENT_ID = config('APPLE_CLIENT_ID', default='')
+APPLE_TEAM_ID = config('APPLE_TEAM_ID', default='')
+APPLE_KEY_ID = config('APPLE_KEY_ID', default='')
+APPLE_PRIVATE_KEY_PATH = config('APPLE_PRIVATE_KEY_PATH', default=str(BASE_DIR / 'AuthKey_7D2CG73MZW.p8'))
+
 # Stripe Settings
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
