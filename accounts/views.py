@@ -616,8 +616,8 @@ class AppleLoginView(generics.GenericAPIView):
             if user_data and isinstance(user_data, dict):
                 name = user_data.get('name', {})
                 if isinstance(name, dict):
-                    first_name = name.get('firstName', '')
-                    last_name = name.get('lastName', '')
+                    first_name = name.get('first_name', '')
+                    last_name = name.get('last_name', '')
             
             # Get or create user
             user, created = User.objects.get_or_create(
