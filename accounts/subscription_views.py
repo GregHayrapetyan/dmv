@@ -8,8 +8,10 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiResponse
-import stripe
 import logging
+
+import stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 from dmv.api_response import APIResponse, ErrorCodes
 from .models import Subscription
@@ -34,13 +36,15 @@ class CreateCheckoutSessionView(APIView):
                 "properties": {
                     "price_id": {"type": "string", "description": "Stripe price ID"},
                     "success_url": {"type": "string", "description": "URL to redirect after success"},
-                    "cancel_url": {"type": "string", "description": "URL to redirect if cancelled"}
+                    "cancel_url": {"type": "string", "description": "URL to redirect if cancelled"},
+                    "plan_tier": {"type": "string", "description": "Plan tier (starter/standard/premium) for one-time purchases", "enum": ["starter", "standard", "premium"]}
                 },
                 "required": ["price_id", "success_url", "cancel_url"],
                 "example": {
                     "price_id": "price_1234567890",
                     "success_url": "https://yourapp.com/success",
-                    "cancel_url": "https://yourapp.com/cancel"
+                    "cancel_url": "https://yourapp.com/cancel",
+                    "plan_tier": "standard"
                 }
             }
         },
@@ -55,10 +59,19 @@ class CreateCheckoutSessionView(APIView):
         price_id = request.data.get('price_id')
         success_url = request.data.get('success_url')
         cancel_url = request.data.get('cancel_url')
+        plan_tier = request.data.get('plan_tier')  # Optional: starter/standard/premium
         
         if not all([price_id, success_url, cancel_url]):
             return APIResponse.error(
                 message="price_id, success_url, and cancel_url are required",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate plan_tier if provided
+        if plan_tier and plan_tier not in ['starter', 'standard', 'premium']:
+            return APIResponse.error(
+                message="plan_tier must be one of: starter, standard, premium",
                 error_code=ErrorCodes.VALIDATION_ERROR,
                 status_code=status.HTTP_400_BAD_REQUEST
             )
@@ -68,7 +81,8 @@ class CreateCheckoutSessionView(APIView):
                 user=request.user,
                 price_id=price_id,
                 success_url=success_url,
-                cancel_url=cancel_url
+                cancel_url=cancel_url,
+                plan_tier=plan_tier
             )
             
             return APIResponse.success(

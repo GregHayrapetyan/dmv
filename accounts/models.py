@@ -68,7 +68,7 @@ class EmailOTP(models.Model):
 
 
 class Subscription(models.Model):
-    """User subscription model for managing Stripe subscriptions."""
+    """User subscription model for managing Stripe subscriptions and one-time access purchases."""
     
     STATUS_CHOICES = (
         ('active', 'Active'),
@@ -78,6 +78,12 @@ class Subscription(models.Model):
         ('incomplete', 'Incomplete'),
         ('incomplete_expired', 'Incomplete Expired'),
         ('unpaid', 'Unpaid'),
+    )
+    
+    PLAN_TIER_CHOICES = (
+        ('starter', 'Starter - 7 Days'),
+        ('standard', 'Standard - 30 Days'),
+        ('premium', 'Premium - 90 Days'),
     )
     
     user = models.OneToOneField(
@@ -97,7 +103,29 @@ class Subscription(models.Model):
         unique=True,
         null=True,
         blank=True,
-        help_text="Stripe subscription ID"
+        help_text="Stripe subscription ID (for recurring) or Payment Intent ID (for one-time)"
+    )
+    stripe_price_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Stripe Price ID that user purchased"
+    )
+    plan_tier = models.CharField(
+        max_length=20,
+        choices=PLAN_TIER_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Plan tier (starter/standard/premium)"
+    )
+    access_duration_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of days of access (7/30/90)"
+    )
+    is_one_time_purchase = models.BooleanField(
+        default=False,
+        help_text="True for one-time purchase, False for recurring subscription"
     )
     status = models.CharField(
         max_length=20,
@@ -128,4 +156,28 @@ class Subscription(models.Model):
     
     def has_access(self):
         """Check if user has access to premium content."""
-        return self.is_active() and self.current_period_end and self.current_period_end > timezone.now()
+        if not self.is_active():
+            return False
+        
+        if self.current_period_end:
+            return self.current_period_end > timezone.now()
+        
+        return False
+    
+    def get_plan_display_name(self):
+        """Get friendly display name for the plan."""
+        if self.plan_tier == 'starter':
+            return 'Starter - 7 Days Access'
+        elif self.plan_tier == 'standard':
+            return 'Standard - 30 Days Access'
+        elif self.plan_tier == 'premium':
+            return 'Premium - 90 Days Access'
+        return 'Unknown Plan'
+    
+    def days_remaining(self):
+        """Calculate days remaining in access period."""
+        if not self.current_period_end:
+            return 0
+        
+        remaining = self.current_period_end - timezone.now()
+        return max(0, remaining.days)

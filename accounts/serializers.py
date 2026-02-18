@@ -302,14 +302,27 @@ class UserSerializer(serializers.ModelSerializer):
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     """Serializer for subscription information."""
+    plan_display_name = serializers.SerializerMethodField()
+    days_remaining = serializers.SerializerMethodField()
     
     class Meta:
         model = Subscription
         fields = (
-            'id', 'status', 'current_period_start', 'current_period_end',
-            'cancel_at_period_end', 'created_at', 'updated_at'
+            'id', 'status', 'plan_tier', 'access_duration_days', 'is_one_time_purchase',
+            'current_period_start', 'current_period_end', 'cancel_at_period_end',
+            'plan_display_name', 'days_remaining', 'created_at', 'updated_at'
         )
         read_only_fields = fields
+    
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_plan_display_name(self, obj):
+        """Get friendly plan name."""
+        return obj.get_plan_display_name() if obj.plan_tier else None
+    
+    @extend_schema_field(serializers.IntegerField())
+    def get_days_remaining(self, obj):
+        """Get days remaining in access period."""
+        return obj.days_remaining()
 
 
 class SetAvatarSerializer(serializers.Serializer):

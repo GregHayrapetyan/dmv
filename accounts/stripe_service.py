@@ -53,21 +53,25 @@ class StripeService:
             return customer.id
     
     @staticmethod
-    def create_checkout_session(user, price_id, success_url, cancel_url):
+    def create_checkout_session(user, price_id, success_url, cancel_url, plan_tier=None):
         """
-        Create a Stripe Checkout session for subscription.
+        Create a Stripe Checkout session for one-time payment or subscription.
         
         Args:
             user: User instance
-            price_id: Stripe price ID for the subscription plan
+            price_id: Stripe price ID for the plan
             success_url: URL to redirect after successful payment
             cancel_url: URL to redirect if user cancels
+            plan_tier: Plan tier (starter/standard/premium) - required for one-time purchases
         
         Returns:
             Checkout session object
         """
         try:
             customer_id = StripeService.get_or_create_customer(user)
+            
+            # Determine if this is a one-time purchase based on plan_tier
+            mode = 'payment' if plan_tier else 'subscription'
             
             session = stripe.checkout.Session.create(
                 customer=customer_id,
@@ -76,13 +80,17 @@ class StripeService:
                     'price': price_id,
                     'quantity': 1,
                 }],
-                mode='subscription',
+                mode=mode,
                 success_url=success_url,
                 cancel_url=cancel_url,
-                metadata={'user_id': user.id}
+                metadata={
+                    'user_id': user.id,
+                    'plan_tier': plan_tier or '',
+                    'price_id': price_id
+                }
             )
             
-            logger.info(f"Created checkout session {session.id} for user {user.email}")
+            logger.info(f"Created {mode} checkout session {session.id} for user {user.email}")
             return session
         except stripe.error.StripeError as e:
             logger.error(f"Failed to create checkout session for {user.email}: {str(e)}")
@@ -163,6 +171,8 @@ class StripeService:
             StripeService._handle_payment_succeeded(event['data']['object'])
         elif event_type == 'invoice.payment_failed':
             StripeService._handle_payment_failed(event['data']['object'])
+        elif event_type == 'checkout.session.completed':
+            StripeService._handle_checkout_completed(event['data']['object'])
         else:
             logger.info(f"Unhandled webhook event type: {event_type}")
     
@@ -246,3 +256,66 @@ class StripeService:
                 logger.warning(f"Payment failed for subscription: {subscription_id}")
             except Subscription.DoesNotExist:
                 logger.error(f"Subscription not found: {subscription_id}")
+    
+    @staticmethod
+    def _handle_checkout_completed(session):
+        """Handle checkout.session.completed event for one-time purchases."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Only handle payment mode (one-time purchases)
+        if session.get('mode') != 'payment':
+            logger.info(f"Skipping checkout.session.completed for mode: {session.get('mode')}")
+            return
+        
+        try:
+            # Get metadata safely
+            metadata = session.get('metadata', {})
+            user_id = metadata.get('user_id') if metadata else None
+            plan_tier = metadata.get('plan_tier') if metadata else None
+            price_id = metadata.get('price_id') if metadata else None
+            
+            if not user_id or not plan_tier:
+                logger.warning(f"Checkout session {session.get('id')} missing required metadata (user_id or plan_tier). This is expected for test events.")
+                return
+            
+            from accounts.models import User
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                logger.error(f"User with id {user_id} not found for checkout session {session.get('id')}")
+                return
+            
+            # Map plan tier to access duration
+            duration_map = {
+                'starter': 7,
+                'standard': 30,
+                'premium': 90
+            }
+            access_days = duration_map.get(plan_tier, 0)
+            
+            if access_days == 0:
+                logger.error(f"Invalid plan tier: {plan_tier} for session {session.get('id')}")
+                return
+            
+            # Get or create subscription
+            subscription, created = Subscription.objects.get_or_create(
+                user=user,
+                defaults={'stripe_customer_id': session.get('customer')}
+            )
+            
+            # Update subscription with one-time purchase details
+            subscription.stripe_subscription_id = session.get('payment_intent')
+            subscription.stripe_price_id = price_id
+            subscription.plan_tier = plan_tier
+            subscription.access_duration_days = access_days
+            subscription.is_one_time_purchase = True
+            subscription.status = 'active'
+            subscription.current_period_start = timezone.now()
+            subscription.current_period_end = timezone.now() + timedelta(days=access_days)
+            subscription.save()
+            
+            logger.info(f"One-time purchase activated for user {user.email}: {plan_tier} ({access_days} days)")
+            
+        except Exception as e:
+            logger.error(f"Error handling checkout completed: {str(e)}", exc_info=True)
