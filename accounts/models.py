@@ -72,6 +72,7 @@ class Subscription(models.Model):
     
     STATUS_CHOICES = (
         ('active', 'Active'),
+        ('expired', 'Expired'),
         ('canceled', 'Canceled'),
         ('past_due', 'Past Due'),
         ('trialing', 'Trialing'),
@@ -160,7 +161,13 @@ class Subscription(models.Model):
             return False
         
         if self.current_period_end:
-            return self.current_period_end > timezone.now()
+            if self.current_period_end > timezone.now():
+                return True
+            else:
+                # Auto-expire on access check
+                self.status = 'expired'
+                self.save(update_fields=['status', 'updated_at'])
+                return False
         
         return False
     
