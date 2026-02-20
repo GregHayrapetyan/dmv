@@ -304,13 +304,15 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     """Serializer for subscription information."""
     plan_display_name = serializers.SerializerMethodField()
     days_remaining = serializers.SerializerMethodField()
+    next_payment_date = serializers.SerializerMethodField()
     
     class Meta:
         model = Subscription
         fields = (
-            'id', 'status', 'plan_tier', 'access_duration_days', 'is_one_time_purchase',
+            'id', 'status', 'plan_tier', 'access_duration_days',
             'current_period_start', 'current_period_end', 'cancel_at_period_end',
-            'plan_display_name', 'days_remaining', 'created_at', 'updated_at'
+            'plan_display_name', 'days_remaining', 'next_payment_date',
+            'created_at', 'updated_at'
         )
         read_only_fields = fields
     
@@ -321,8 +323,15 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     
     @extend_schema_field(serializers.IntegerField())
     def get_days_remaining(self, obj):
-        """Get days remaining in access period."""
+        """Get days remaining in current billing period."""
         return obj.days_remaining()
+    
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_next_payment_date(self, obj):
+        """Get next payment date (current_period_end for recurring)."""
+        if obj.cancel_at_period_end:
+            return None
+        return obj.current_period_end
 
 
 class SetAvatarSerializer(serializers.Serializer):

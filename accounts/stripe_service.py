@@ -55,23 +55,20 @@ class StripeService:
     @staticmethod
     def create_checkout_session(user, price_id, success_url, cancel_url, plan_tier=None):
         """
-        Create a Stripe Checkout session for one-time payment or subscription.
+        Create a Stripe Checkout session for a recurring subscription.
         
         Args:
             user: User instance
-            price_id: Stripe price ID for the plan
+            price_id: Stripe recurring price ID (7-day/30-day/90-day interval)
             success_url: URL to redirect after successful payment
             cancel_url: URL to redirect if user cancels
-            plan_tier: Plan tier (starter/standard/premium) - required for one-time purchases
+            plan_tier: Plan tier (starter/standard/premium)
         
         Returns:
             Checkout session object
         """
         try:
             customer_id = StripeService.get_or_create_customer(user)
-            
-            # Determine if this is a one-time purchase based on plan_tier
-            mode = 'payment' if plan_tier else 'subscription'
             
             session = stripe.checkout.Session.create(
                 customer=customer_id,
@@ -80,7 +77,7 @@ class StripeService:
                     'price': price_id,
                     'quantity': 1,
                 }],
-                mode=mode,
+                mode='subscription',
                 success_url=success_url,
                 cancel_url=cancel_url,
                 metadata={
@@ -90,7 +87,7 @@ class StripeService:
                 }
             )
             
-            logger.info(f"Created {mode} checkout session {session.id} for user {user.email}")
+            logger.info(f"Created subscription checkout session {session.id} for user {user.email}")
             return session
         except stripe.error.StripeError as e:
             logger.error(f"Failed to create checkout session for {user.email}: {str(e)}")
@@ -149,6 +146,185 @@ class StripeService:
             raise ValueError("User has no subscription")
         except stripe.error.StripeError as e:
             logger.error(f"Failed to cancel subscription for {user.email}: {str(e)}")
+            raise
+    
+    @staticmethod
+    def reactivate_subscription(user):
+        """Reactivate a subscription that was set to cancel at period end."""
+        try:
+            subscription = Subscription.objects.get(user=user)
+            
+            if not subscription.stripe_subscription_id:
+                raise ValueError("No subscription to reactivate")
+            
+            if not subscription.cancel_at_period_end:
+                raise ValueError("Subscription is not set to cancel")
+            
+            stripe_subscription = stripe.Subscription.modify(
+                subscription.stripe_subscription_id,
+                cancel_at_period_end=False
+            )
+            
+            subscription.cancel_at_period_end = False
+            subscription.save(update_fields=['cancel_at_period_end'])
+            
+            logger.info(f"Reactivated subscription for user {user.email}")
+            return stripe_subscription
+        except Subscription.DoesNotExist:
+            raise ValueError("User has no subscription")
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to reactivate subscription for {user.email}: {str(e)}")
+            raise
+    
+    @staticmethod
+    def change_plan(user, new_price_id, new_plan_tier):
+        """
+        Change user's subscription to a different plan (upgrade/downgrade).
+        Prorates automatically.
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+            
+            if not subscription.stripe_subscription_id:
+                raise ValueError("No active subscription to change")
+            
+            stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+            
+            stripe_subscription = stripe.Subscription.modify(
+                subscription.stripe_subscription_id,
+                items=[{
+                    'id': stripe_sub['items']['data'][0]['id'],
+                    'price': new_price_id,
+                }],
+                proration_behavior='create_prorations',
+                metadata={
+                    'plan_tier': new_plan_tier,
+                }
+            )
+            
+            subscription.stripe_price_id = new_price_id
+            subscription.plan_tier = new_plan_tier
+            subscription.cancel_at_period_end = False
+            subscription.save(update_fields=['stripe_price_id', 'plan_tier', 'cancel_at_period_end'])
+            
+            logger.info(f"Changed plan for user {user.email} to {new_plan_tier}")
+            return stripe_subscription
+        except Subscription.DoesNotExist:
+            raise ValueError("User has no subscription")
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to change plan for {user.email}: {str(e)}")
+            raise
+    
+    @staticmethod
+    def create_setup_session(user, return_url):
+        """
+        Create a Stripe Checkout session in setup mode to update payment method.
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+            if not subscription.stripe_customer_id:
+                raise ValueError("No Stripe customer found")
+            
+            session = stripe.checkout.Session.create(
+                customer=subscription.stripe_customer_id,
+                mode='setup',
+                payment_method_types=['card'],
+                success_url=return_url,
+                cancel_url=return_url,
+                metadata={
+                    'user_id': user.id,
+                }
+            )
+            
+            logger.info(f"Created setup session for user {user.email}")
+            return session
+        except Subscription.DoesNotExist:
+            raise ValueError("User has no subscription")
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to create setup session for {user.email}: {str(e)}")
+            raise
+    
+    @staticmethod
+    def get_payment_details(user):
+        """
+        Get the user's payment method details (last 4 digits, brand, etc.).
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+            if not subscription.stripe_customer_id:
+                return None
+            
+            payment_methods = stripe.PaymentMethod.list(
+                customer=subscription.stripe_customer_id,
+                type='card',
+                limit=1
+            )
+            
+            if payment_methods.data:
+                pm = payment_methods.data[0]
+                card = pm.card
+                return {
+                    'id': pm.id,
+                    'brand': card.brand,
+                    'last4': card.last4,
+                    'exp_month': card.exp_month,
+                    'exp_year': card.exp_year,
+                    'name': pm.billing_details.name,
+                }
+            return None
+        except Subscription.DoesNotExist:
+            return None
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get payment details for {user.email}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_billing_info(user):
+        """
+        Get the user's billing information from Stripe customer.
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+            if not subscription.stripe_customer_id:
+                return None
+            
+            customer = stripe.Customer.retrieve(subscription.stripe_customer_id)
+            return {
+                'name': customer.name,
+                'email': customer.email,
+            }
+        except Subscription.DoesNotExist:
+            return None
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get billing info for {user.email}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def update_billing_info(user, name=None, email=None):
+        """
+        Update the user's billing information on the Stripe customer.
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+            if not subscription.stripe_customer_id:
+                raise ValueError("No Stripe customer found")
+            
+            update_data = {}
+            if name is not None:
+                update_data['name'] = name
+            if email is not None:
+                update_data['email'] = email
+            
+            if update_data:
+                stripe.Customer.modify(
+                    subscription.stripe_customer_id,
+                    **update_data
+                )
+                logger.info(f"Updated billing info for user {user.email}")
+        except Subscription.DoesNotExist:
+            raise ValueError("User has no subscription")
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to update billing info for {user.email}: {str(e)}")
             raise
     
     @staticmethod
@@ -259,24 +435,25 @@ class StripeService:
     
     @staticmethod
     def _handle_checkout_completed(session):
-        """Handle checkout.session.completed event for one-time purchases."""
-        from django.utils import timezone
-        from datetime import timedelta
+        """Handle checkout.session.completed event for subscriptions."""
+        mode = session.get('mode')
         
-        # Only handle payment mode (one-time purchases)
-        if session.get('mode') != 'payment':
-            logger.info(f"Skipping checkout.session.completed for mode: {session.get('mode')}")
+        if mode == 'setup':
+            StripeService._handle_setup_completed(session)
+            return
+        
+        if mode != 'subscription':
+            logger.info(f"Skipping checkout.session.completed for mode: {mode}")
             return
         
         try:
-            # Get metadata safely
             metadata = session.get('metadata', {})
             user_id = metadata.get('user_id') if metadata else None
             plan_tier = metadata.get('plan_tier') if metadata else None
             price_id = metadata.get('price_id') if metadata else None
             
-            if not user_id or not plan_tier:
-                logger.warning(f"Checkout session {session.get('id')} missing required metadata (user_id or plan_tier). This is expected for test events.")
+            if not user_id:
+                logger.warning(f"Checkout session {session.get('id')} missing user_id metadata.")
                 return
             
             from accounts.models import User
@@ -286,36 +463,58 @@ class StripeService:
                 logger.error(f"User with id {user_id} not found for checkout session {session.get('id')}")
                 return
             
-            # Map plan tier to access duration
-            duration_map = {
-                'starter': 7,
-                'standard': 30,
-                'premium': 90
-            }
-            access_days = duration_map.get(plan_tier, 0)
-            
-            if access_days == 0:
-                logger.error(f"Invalid plan tier: {plan_tier} for session {session.get('id')}")
-                return
-            
-            # Get or create subscription
             subscription, created = Subscription.objects.get_or_create(
                 user=user,
                 defaults={'stripe_customer_id': session.get('customer')}
             )
             
-            # Update subscription with one-time purchase details
-            subscription.stripe_subscription_id = session.get('payment_intent')
+            subscription.stripe_subscription_id = session.get('subscription')
             subscription.stripe_price_id = price_id
             subscription.plan_tier = plan_tier
-            subscription.access_duration_days = access_days
-            subscription.is_one_time_purchase = True
+            subscription.is_one_time_purchase = False
             subscription.status = 'active'
-            subscription.current_period_start = timezone.now()
-            subscription.current_period_end = timezone.now() + timedelta(days=access_days)
             subscription.save()
             
-            logger.info(f"One-time purchase activated for user {user.email}: {plan_tier} ({access_days} days)")
+            logger.info(f"Subscription activated for user {user.email}: {plan_tier}")
             
         except Exception as e:
             logger.error(f"Error handling checkout completed: {str(e)}", exc_info=True)
+    
+    @staticmethod
+    def _handle_setup_completed(session):
+        """Handle checkout.session.completed in setup mode (payment method update)."""
+        try:
+            setup_intent_id = session.get('setup_intent')
+            if not setup_intent_id:
+                logger.warning("Setup session completed without setup_intent")
+                return
+            
+            setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
+            payment_method_id = setup_intent.payment_method
+            customer_id = session.get('customer')
+            
+            if not customer_id or not payment_method_id:
+                logger.warning("Setup session missing customer or payment_method")
+                return
+            
+            # Set as default payment method on customer
+            stripe.Customer.modify(
+                customer_id,
+                invoice_settings={'default_payment_method': payment_method_id}
+            )
+            
+            # Also update the subscription's default payment method if exists
+            try:
+                subscription = Subscription.objects.get(stripe_customer_id=customer_id)
+                if subscription.stripe_subscription_id:
+                    stripe.Subscription.modify(
+                        subscription.stripe_subscription_id,
+                        default_payment_method=payment_method_id
+                    )
+            except Subscription.DoesNotExist:
+                pass
+            
+            logger.info(f"Payment method updated for customer {customer_id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling setup completed: {str(e)}", exc_info=True)

@@ -17,7 +17,7 @@ def create_pricing_plans(apps, schema_editor):
         title="Starter",
         description="Perfect for focused, short-term preparation before your DMV test.",
         price_old=None,
-        price_period="/one-time",
+        price_period="/7 days",
         price_new=9.99,
         discount_amount=0,
         button_text="Get Started",
@@ -25,7 +25,7 @@ def create_pricing_plans(apps, schema_editor):
         is_featured=False,
         order=0,
         is_active=True,
-        stripe_price_id_one_time="",  # Add your Stripe Price ID here
+        stripe_price_id_monthly="",  # Add your Stripe recurring Price ID here (7-day interval)
     )
     
     # Starter features
@@ -64,7 +64,7 @@ def create_pricing_plans(apps, schema_editor):
         title="Standard",
         description="30 days of comprehensive study time to master your DMV test.",
         price_old=None,
-        price_period="/one-time",
+        price_period="/30 days",
         price_new=19.99,
         discount_amount=0,
         button_text="Get Started",
@@ -72,7 +72,7 @@ def create_pricing_plans(apps, schema_editor):
         is_featured=True,
         order=1,
         is_active=True,
-        stripe_price_id_one_time="",  # Add your Stripe Price ID here
+        stripe_price_id_monthly="",  # Add your Stripe recurring Price ID here (30-day interval)
     )
     
     # Standard features
@@ -125,7 +125,7 @@ def create_pricing_plans(apps, schema_editor):
         title="Premium",
         description="90 days of unlimited access for thorough preparation and confidence.",
         price_old=None,
-        price_period="/one-time",
+        price_period="/90 days",
         price_new=29.99,
         discount_amount=0,
         button_text="Get Started",
@@ -133,7 +133,7 @@ def create_pricing_plans(apps, schema_editor):
         is_featured=False,
         order=2,
         is_active=True,
-        stripe_price_id_one_time="",  # Add your Stripe Price ID here
+        stripe_price_id_monthly="",  # Add your Stripe recurring Price ID here (90-day interval)
     )
     
     # Premium features

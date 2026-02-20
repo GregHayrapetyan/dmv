@@ -23,21 +23,21 @@ logger = logging.getLogger(__name__)
 
 class CreateCheckoutSessionView(APIView):
     """
-    Create a Stripe Checkout session for subscription.
+    Create a Stripe Checkout session for recurring subscription.
     """
     permission_classes = [permissions.IsAuthenticated]
     
     @extend_schema(
         summary="Create subscription checkout session",
-        description="Create a Stripe Checkout session to subscribe to premium content.",
+        description="Create a Stripe Checkout session for a recurring subscription (7-day/30-day/90-day billing cycle).",
         request={
             "application/json": {
                 "type": "object",
                 "properties": {
-                    "price_id": {"type": "string", "description": "Stripe price ID"},
+                    "price_id": {"type": "string", "description": "Stripe recurring price ID"},
                     "success_url": {"type": "string", "description": "URL to redirect after success"},
                     "cancel_url": {"type": "string", "description": "URL to redirect if cancelled"},
-                    "plan_tier": {"type": "string", "description": "Plan tier (starter/standard/premium) for one-time purchases", "enum": ["starter", "standard", "premium"]}
+                    "plan_tier": {"type": "string", "description": "Plan tier", "enum": ["starter", "standard", "premium"]}
                 },
                 "required": ["price_id", "success_url", "cancel_url"],
                 "example": {
@@ -234,6 +234,289 @@ class CancelSubscriptionView(APIView):
             logger.error(f"Error cancelling subscription: {str(e)}")
             return APIResponse.error(
                 message="Failed to cancel subscription",
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SubscriptionDetailView(APIView):
+    """
+    Get full subscription detail including plan, billing info, and payment details.
+    This powers the subscription management page.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get full subscription details",
+        description="Get plan info, billing info, and payment details for the subscription management page.",
+        responses={
+            200: OpenApiResponse(description="Subscription details retrieved"),
+            404: OpenApiResponse(description="No subscription found"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Subscriptions"],
+    )
+    def get(self, request):
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            serializer = SubscriptionSerializer(subscription)
+            
+            billing_info = StripeService.get_billing_info(request.user)
+            payment_details = StripeService.get_payment_details(request.user)
+            
+            return APIResponse.success(
+                data={
+                    'plan': {
+                        **serializer.data,
+                        'has_access': subscription.has_access(),
+                    },
+                    'billing_info': billing_info,
+                    'payment_details': payment_details,
+                },
+                message="Subscription details retrieved successfully"
+            )
+        except Subscription.DoesNotExist:
+            return APIResponse.error(
+                message="No subscription found",
+                error_code=ErrorCodes.NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+
+class ReactivateSubscriptionView(APIView):
+    """
+    Reactivate a subscription that was set to cancel at period end.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Reactivate subscription",
+        description="Reactivate a subscription that was set to cancel at the end of the billing period.",
+        responses={
+            200: OpenApiResponse(description="Subscription reactivated"),
+            400: OpenApiResponse(description="Cannot reactivate"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Subscriptions"],
+    )
+    def post(self, request):
+        try:
+            StripeService.reactivate_subscription(request.user)
+            
+            return APIResponse.success(
+                message="Subscription reactivated successfully"
+            )
+        except ValueError as e:
+            return APIResponse.error(
+                message=str(e),
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error reactivating subscription: {str(e)}")
+            return APIResponse.error(
+                message="Failed to reactivate subscription",
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ChangePlanView(APIView):
+    """
+    Change subscription plan (upgrade or downgrade).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Change subscription plan",
+        description="Upgrade or downgrade the subscription to a different plan. Prorates automatically.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "price_id": {"type": "string", "description": "New Stripe recurring price ID"},
+                    "plan_tier": {"type": "string", "description": "New plan tier", "enum": ["starter", "standard", "premium"]}
+                },
+                "required": ["price_id", "plan_tier"],
+                "example": {
+                    "price_id": "price_1234567890",
+                    "plan_tier": "premium"
+                }
+            }
+        },
+        responses={
+            200: OpenApiResponse(description="Plan changed successfully"),
+            400: OpenApiResponse(description="Invalid request or no subscription"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Subscriptions"],
+    )
+    def post(self, request):
+        new_price_id = request.data.get('price_id')
+        new_plan_tier = request.data.get('plan_tier')
+        
+        if not new_price_id or not new_plan_tier:
+            return APIResponse.error(
+                message="price_id and plan_tier are required",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if new_plan_tier not in ['starter', 'standard', 'premium']:
+            return APIResponse.error(
+                message="plan_tier must be one of: starter, standard, premium",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            StripeService.change_plan(request.user, new_price_id, new_plan_tier)
+            
+            return APIResponse.success(
+                message=f"Plan changed to {new_plan_tier} successfully"
+            )
+        except ValueError as e:
+            return APIResponse.error(
+                message=str(e),
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error changing plan: {str(e)}")
+            return APIResponse.error(
+                message="Failed to change plan",
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UpdatePaymentMethodView(APIView):
+    """
+    Create a Stripe setup session to update the payment method (card).
+    Returns a URL to redirect the user to Stripe's hosted page.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Update payment method",
+        description="Create a Stripe setup session to update the card on file. Returns a URL to redirect the user.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "return_url": {"type": "string", "description": "URL to return to after updating payment method"}
+                },
+                "required": ["return_url"],
+                "example": {
+                    "return_url": "https://yourapp.com/account"
+                }
+            }
+        },
+        responses={
+            200: OpenApiResponse(description="Setup session created"),
+            400: OpenApiResponse(description="Invalid request"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Subscriptions"],
+    )
+    def post(self, request):
+        return_url = request.data.get('return_url')
+        
+        if not return_url:
+            return APIResponse.error(
+                message="return_url is required",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            session = StripeService.create_setup_session(
+                user=request.user,
+                return_url=return_url
+            )
+            
+            return APIResponse.success(
+                data={
+                    'session_id': session.id,
+                    'url': session.url,
+                },
+                message="Setup session created successfully"
+            )
+        except ValueError as e:
+            return APIResponse.error(
+                message=str(e),
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error creating setup session: {str(e)}")
+            return APIResponse.error(
+                message="Failed to create setup session",
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UpdateBillingInfoView(APIView):
+    """
+    Update billing information (name, email) on the Stripe customer.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Update billing information",
+        description="Update the billing name and/or email on the Stripe customer record.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Billing name"},
+                    "email": {"type": "string", "format": "email", "description": "Billing email"}
+                },
+                "example": {
+                    "name": "John Smith",
+                    "email": "jsmith@gmail.com"
+                }
+            }
+        },
+        responses={
+            200: OpenApiResponse(description="Billing info updated"),
+            400: OpenApiResponse(description="Invalid request"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+        tags=["Subscriptions"],
+    )
+    def post(self, request):
+        name = request.data.get('name')
+        email = request.data.get('email')
+        
+        if not name and not email:
+            return APIResponse.error(
+                message="At least one of name or email is required",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            StripeService.update_billing_info(
+                user=request.user,
+                name=name,
+                email=email
+            )
+            
+            return APIResponse.success(
+                message="Billing information updated successfully"
+            )
+        except ValueError as e:
+            return APIResponse.error(
+                message=str(e),
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error updating billing info: {str(e)}")
+            return APIResponse.error(
+                message="Failed to update billing information",
                 error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

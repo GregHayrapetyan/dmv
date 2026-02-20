@@ -68,7 +68,7 @@ class EmailOTP(models.Model):
 
 
 class Subscription(models.Model):
-    """User subscription model for managing Stripe subscriptions and one-time access purchases."""
+    """User subscription model for managing Stripe recurring subscriptions."""
     
     STATUS_CHOICES = (
         ('active', 'Active'),
@@ -104,13 +104,13 @@ class Subscription(models.Model):
         unique=True,
         null=True,
         blank=True,
-        help_text="Stripe subscription ID (for recurring) or Payment Intent ID (for one-time)"
+        help_text="Stripe subscription ID"
     )
     stripe_price_id = models.CharField(
         max_length=255,
         null=True,
         blank=True,
-        help_text="Stripe Price ID that user purchased"
+        help_text="Stripe recurring Price ID"
     )
     plan_tier = models.CharField(
         max_length=20,
@@ -122,11 +122,11 @@ class Subscription(models.Model):
     access_duration_days = models.PositiveIntegerField(
         null=True,
         blank=True,
-        help_text="Number of days of access (7/30/90)"
+        help_text="Billing interval in days (7/30/90)"
     )
     is_one_time_purchase = models.BooleanField(
         default=False,
-        help_text="True for one-time purchase, False for recurring subscription"
+        help_text="Deprecated - always False for recurring subscriptions"
     )
     status = models.CharField(
         max_length=20,
@@ -169,20 +169,23 @@ class Subscription(models.Model):
                 self.save(update_fields=['status', 'updated_at'])
                 return False
         
-        return False
+        # Active subscription without period_end yet (set via webhook)
+        return True
     
     def get_plan_display_name(self):
         """Get friendly display name for the plan."""
-        if self.plan_tier == 'starter':
-            return 'Starter - 7 Days Access'
-        elif self.plan_tier == 'standard':
-            return 'Standard - 30 Days Access'
-        elif self.plan_tier == 'premium':
-            return 'Premium - 90 Days Access'
+        tier_info = {
+            'starter': ('Starter', '$9.99', '7 days'),
+            'standard': ('Standard', '$19.99', '30 days'),
+            'premium': ('Premium', '$29.99', '90 days'),
+        }
+        info = tier_info.get(self.plan_tier)
+        if info:
+            return f'{info[0]} {info[1]} / {info[2]}'
         return 'Unknown Plan'
     
     def days_remaining(self):
-        """Calculate days remaining in access period."""
+        """Calculate days remaining in current billing period."""
         if not self.current_period_end:
             return 0
         

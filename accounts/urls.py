@@ -6,7 +6,9 @@ from .views import (
 )
 from .subscription_views import (
     CreateCheckoutSessionView, CreateBillingPortalSessionView,
-    SubscriptionStatusView, CancelSubscriptionView, StripeWebhookView
+    SubscriptionStatusView, CancelSubscriptionView, StripeWebhookView,
+    SubscriptionDetailView, ReactivateSubscriptionView, ChangePlanView,
+    UpdatePaymentMethodView, UpdateBillingInfoView
 )
 
 
@@ -29,6 +31,11 @@ urlpatterns = [
     path("subscription/checkout/", CreateCheckoutSessionView.as_view(), name="subscription-checkout"),
     path("subscription/portal/", CreateBillingPortalSessionView.as_view(), name="subscription-portal"),
     path("subscription/status/", SubscriptionStatusView.as_view(), name="subscription-status"),
+    path("subscription/detail/", SubscriptionDetailView.as_view(), name="subscription-detail"),
     path("subscription/cancel/", CancelSubscriptionView.as_view(), name="subscription-cancel"),
+    path("subscription/reactivate/", ReactivateSubscriptionView.as_view(), name="subscription-reactivate"),
+    path("subscription/change-plan/", ChangePlanView.as_view(), name="subscription-change-plan"),
+    path("subscription/update-payment/", UpdatePaymentMethodView.as_view(), name="subscription-update-payment"),
+    path("subscription/update-billing/", UpdateBillingInfoView.as_view(), name="subscription-update-billing"),
     path("subscription/webhook/", StripeWebhookView.as_view(), name="subscription-webhook"),
 ]
