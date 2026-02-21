@@ -16,8 +16,19 @@ from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
 import logging
+import requests as http_requests
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_auth_requests
+from google.auth.exceptions import GoogleAuthError
 
 logger = logging.getLogger(__name__)
+
+# Reusable session for Google OAuth certificate verification.
+# This caches Google's public signing keys and reuses TCP/TLS connections,
+# avoiding a full network round-trip on every login.
+_google_auth_session = http_requests.Session()
+_google_auth_session.timeout = 10  # seconds – prevents indefinite hangs
+_google_transport_request = google_auth_requests.Request(session=_google_auth_session)
 
 User = get_user_model()
 
@@ -312,11 +323,6 @@ class GoogleLoginView(generics.GenericAPIView):
     )
     def post(self, request):
         """Accepts a Google id_token or access_token and returns app JWTs."""
-        import requests as http_requests
-        from google.oauth2 import id_token
-        from google.auth.transport import requests as grequests
-        from google.auth.exceptions import GoogleAuthError
-
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
         
@@ -332,10 +338,10 @@ class GoogleLoginView(generics.GenericAPIView):
         try:
             # Method 1: If ID token is provided (from GoogleLogin component)
             if id_token_str:
-                # Verify the ID token with Google
-                info = id_token.verify_oauth2_token(
+                # Verify the ID token with Google (uses cached session / certs)
+                info = google_id_token.verify_oauth2_token(
                     id_token_str, 
-                    grequests.Request(), 
+                    _google_transport_request, 
                     settings.GOOGLE_OAUTH_CLIENT_ID
                 )
                 
@@ -451,6 +457,11 @@ class GoogleLoginView(generics.GenericAPIView):
                 message="Invalid Google token.",
                 error_code=ErrorCodes.INVALID_TOKEN,
                 status_code=status.HTTP_401_UNAUTHORIZED
+            )
+        except (http_requests.ConnectionError, http_requests.Timeout) as e:
+            logger.error(f"Network error verifying Google token: {str(e)}")
+            return APIResponse.server_error(
+                message="Could not reach Google servers. Please try again."
             )
         except Exception as e:
             logger.error(f"Unexpected error in Google login: {str(e)}")
