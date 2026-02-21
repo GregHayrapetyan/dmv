@@ -401,7 +401,8 @@ class GoogleLoginView(generics.GenericAPIView):
                 defaults={
                     "first_name": first_name,
                     "last_name": last_name,
-                    "is_email_verified": True  # Google emails are pre-verified
+                    "is_email_verified": True,  # Google emails are pre-verified
+                    "auth_provider": "google",
                 }
             )
             
@@ -636,7 +637,8 @@ class AppleLoginView(generics.GenericAPIView):
                 defaults={
                     "first_name": first_name,
                     "last_name": last_name,
-                    "is_email_verified": True  # Apple emails are pre-verified
+                    "is_email_verified": True,  # Apple emails are pre-verified
+                    "auth_provider": "apple",
                 }
             )
             
