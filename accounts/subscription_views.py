@@ -49,9 +49,47 @@ class CreateCheckoutSessionView(APIView):
             }
         },
         responses={
-            200: OpenApiResponse(description="Checkout session created"),
-            400: OpenApiResponse(description="Invalid request"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Checkout session created successfully",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "session_id": {"type": "string", "description": "Stripe Checkout session ID", "example": "cs_test_a1b2c3d4"},
+                                "url": {"type": "string", "format": "uri", "description": "Stripe-hosted checkout page URL to redirect the user to", "example": "https://checkout.stripe.com/c/pay/cs_test_a1b2c3d4"},
+                                "publishable_key": {"type": "string", "description": "Stripe publishable key for client-side use", "example": "pk_test_xxx"}
+                            }
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="Validation error — missing or invalid fields",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "price_id, success_url, and cancel_url are required"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            500: OpenApiResponse(
+                description="Failed to create checkout session due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to create checkout session"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -124,9 +162,56 @@ class CreateBillingPortalSessionView(APIView):
             }
         },
         responses={
-            200: OpenApiResponse(description="Portal session created"),
-            400: OpenApiResponse(description="Invalid request or no subscription"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Billing portal session created successfully",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "format": "uri", "description": "Stripe-hosted billing portal URL to redirect the user to", "example": "https://billing.stripe.com/p/session/test_abc123"}
+                            }
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="Validation error — return_url is missing",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "return_url is required"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            404: OpenApiResponse(
+                description="No Stripe customer found for this user",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "No Stripe customer found"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            500: OpenApiResponse(
+                description="Failed to create billing portal session due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to create billing portal session"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -175,9 +260,47 @@ class SubscriptionStatusView(APIView):
         summary="Get subscription status",
         description="Retrieve the current subscription status for the authenticated user.",
         responses={
-            200: SubscriptionSerializer,
-            404: OpenApiResponse(description="No subscription found"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Subscription status retrieved successfully",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {
+                            "type": "object",
+                            "description": "Subscription fields plus computed access flag",
+                            "properties": {
+                                "id": {"type": "integer", "description": "Subscription record ID", "example": 1},
+                                "status": {"type": "string", "description": "Subscription status", "enum": ["active", "canceled", "past_due", "incomplete", "trialing"], "example": "active"},
+                                "plan_tier": {"type": "string", "description": "Plan tier", "enum": ["starter", "standard", "premium"], "example": "standard"},
+                                "access_duration_days": {"type": "integer", "description": "Billing cycle length in days", "example": 30},
+                                "current_period_start": {"type": "string", "format": "date-time", "description": "Start of current billing period"},
+                                "current_period_end": {"type": "string", "format": "date-time", "description": "End of current billing period"},
+                                "cancel_at_period_end": {"type": "boolean", "description": "Whether subscription is set to cancel at period end", "example": False},
+                                "plan_display_name": {"type": "string", "nullable": True, "description": "Human-friendly plan name", "example": "Standard Plan"},
+                                "days_remaining": {"type": "integer", "description": "Days remaining in current billing period", "example": 15},
+                                "next_payment_date": {"type": "string", "format": "date-time", "nullable": True, "description": "Next payment date (null if cancelling)"},
+                                "created_at": {"type": "string", "format": "date-time"},
+                                "updated_at": {"type": "string", "format": "date-time"},
+                                "has_access": {"type": "boolean", "description": "Whether the user currently has active access", "example": True}
+                            }
+                        }
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            404: OpenApiResponse(
+                description="No subscription found for this user",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "No subscription found"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -211,9 +334,40 @@ class CancelSubscriptionView(APIView):
         summary="Cancel subscription",
         description="Cancel the subscription at the end of the current billing period. Access continues until period end.",
         responses={
-            200: OpenApiResponse(description="Subscription cancelled"),
-            400: OpenApiResponse(description="No active subscription"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Subscription scheduled for cancellation at period end",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="No active subscription to cancel",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "No active subscription to cancel"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            500: OpenApiResponse(
+                description="Failed to cancel subscription due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to cancel subscription"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -250,9 +404,74 @@ class SubscriptionDetailView(APIView):
         summary="Get full subscription details",
         description="Get plan info, billing info, and payment details for the subscription management page.",
         responses={
-            200: OpenApiResponse(description="Subscription details retrieved"),
-            404: OpenApiResponse(description="No subscription found"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Full subscription details including plan, billing info, and payment details",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "plan": {
+                                    "type": "object",
+                                    "description": "Subscription plan details",
+                                    "properties": {
+                                        "id": {"type": "integer", "example": 1},
+                                        "status": {"type": "string", "enum": ["active", "canceled", "past_due", "incomplete", "trialing"], "example": "active"},
+                                        "plan_tier": {"type": "string", "enum": ["starter", "standard", "premium"], "example": "standard"},
+                                        "access_duration_days": {"type": "integer", "example": 30},
+                                        "current_period_start": {"type": "string", "format": "date-time"},
+                                        "current_period_end": {"type": "string", "format": "date-time"},
+                                        "cancel_at_period_end": {"type": "boolean", "example": False},
+                                        "plan_display_name": {"type": "string", "nullable": True, "example": "Standard Plan"},
+                                        "days_remaining": {"type": "integer", "example": 15},
+                                        "next_payment_date": {"type": "string", "format": "date-time", "nullable": True},
+                                        "created_at": {"type": "string", "format": "date-time"},
+                                        "updated_at": {"type": "string", "format": "date-time"},
+                                        "has_access": {"type": "boolean", "example": True}
+                                    }
+                                },
+                                "billing_info": {
+                                    "type": "object",
+                                    "nullable": True,
+                                    "description": "Billing contact info from Stripe customer record (null if unavailable)",
+                                    "properties": {
+                                        "name": {"type": "string", "nullable": True, "description": "Billing name", "example": "John Smith"},
+                                        "email": {"type": "string", "format": "email", "nullable": True, "description": "Billing email", "example": "john@example.com"}
+                                    }
+                                },
+                                "payment_details": {
+                                    "type": "object",
+                                    "nullable": True,
+                                    "description": "Payment method on file (null if no card saved)",
+                                    "properties": {
+                                        "id": {"type": "string", "description": "Stripe PaymentMethod ID", "example": "pm_1abc2def3ghi"},
+                                        "brand": {"type": "string", "description": "Card brand", "example": "visa"},
+                                        "last4": {"type": "string", "description": "Last 4 digits of card number", "example": "4242"},
+                                        "exp_month": {"type": "integer", "description": "Card expiration month", "example": 12},
+                                        "exp_year": {"type": "integer", "description": "Card expiration year", "example": 2027},
+                                        "name": {"type": "string", "nullable": True, "description": "Cardholder name", "example": "John Smith"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            404: OpenApiResponse(
+                description="No subscription found for this user",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "No subscription found"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -293,9 +512,40 @@ class ReactivateSubscriptionView(APIView):
         summary="Reactivate subscription",
         description="Reactivate a subscription that was set to cancel at the end of the billing period.",
         responses={
-            200: OpenApiResponse(description="Subscription reactivated"),
-            400: OpenApiResponse(description="Cannot reactivate"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Subscription reactivated — cancellation reversed",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="Subscription cannot be reactivated (not pending cancellation or already cancelled)",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Subscription is not pending cancellation"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            500: OpenApiResponse(
+                description="Failed to reactivate subscription due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to reactivate subscription"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -345,9 +595,40 @@ class ChangePlanView(APIView):
             }
         },
         responses={
-            200: OpenApiResponse(description="Plan changed successfully"),
-            400: OpenApiResponse(description="Invalid request or no subscription"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Plan changed successfully with proration applied",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="Validation error — missing fields, invalid plan_tier, or no active subscription",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "plan_tier must be one of: starter, standard, premium"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            500: OpenApiResponse(
+                description="Failed to change plan due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to change plan"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -413,9 +694,46 @@ class UpdatePaymentMethodView(APIView):
             }
         },
         responses={
-            200: OpenApiResponse(description="Setup session created"),
-            400: OpenApiResponse(description="Invalid request"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Stripe setup session created for updating payment method",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "session_id": {"type": "string", "description": "Stripe SetupIntent session ID", "example": "seti_1abc2def3ghi"},
+                                "url": {"type": "string", "format": "uri", "description": "Stripe-hosted page URL to update card", "example": "https://checkout.stripe.com/c/setup/cs_test_xyz"}
+                            }
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="Validation error — return_url is missing or no Stripe customer found",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "return_url is required"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            500: OpenApiResponse(
+                description="Failed to create setup session due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to create setup session"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
@@ -480,9 +798,40 @@ class UpdateBillingInfoView(APIView):
             }
         },
         responses={
-            200: OpenApiResponse(description="Billing info updated"),
-            400: OpenApiResponse(description="Invalid request"),
-            401: OpenApiResponse(description="Authentication required"),
+            200: OpenApiResponse(
+                description="Billing information updated on Stripe customer record",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": True},
+                        "error": {"type": "string", "nullable": True, "example": None},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                description="Validation error — no fields provided or no Stripe customer found",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "At least one of name or email is required"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid"),
+            500: OpenApiResponse(
+                description="Failed to update billing information due to a Stripe or server error",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Failed to update billing information"},
+                        "data": {"type": "object", "nullable": True, "example": None}
+                    }
+                }
+            ),
         },
         tags=["Subscriptions"],
     )
