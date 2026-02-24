@@ -363,22 +363,32 @@ class SetAvatarSerializer(serializers.Serializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     """Serializer for changing user password."""
-    old_password = serializers.CharField(required=True, write_only=True)
+    old_password = serializers.CharField(required=False, write_only=True)
     new_password = serializers.CharField(required=True, write_only=True, min_length=8)
     confirm_password = serializers.CharField(required=True, write_only=True)
+    
+    def _is_social_auth_user(self):
+        """Check if the user registered via Google or Apple."""
+        user = self.context['request'].user
+        return user.auth_provider in ('google', 'apple')
     
     def validate(self, attrs):
         """Validate that new passwords match and old password is correct."""
         if attrs['new_password'] != attrs['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "New passwords do not match"})
         
-        if attrs['old_password'] == attrs['new_password']:
-            raise serializers.ValidationError({"new_password": "New password must be different from old password"})
+        if not self._is_social_auth_user():
+            if 'old_password' not in attrs or not attrs['old_password']:
+                raise serializers.ValidationError({"old_password": "Old password is required"})
+            if attrs['old_password'] == attrs['new_password']:
+                raise serializers.ValidationError({"new_password": "New password must be different from old password"})
         
         return attrs
     
     def validate_old_password(self, value):
         """Validate that the old password is correct."""
+        if self._is_social_auth_user():
+            return value
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError("Old password is incorrect")

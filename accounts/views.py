@@ -1049,11 +1049,13 @@ class ChangePasswordView(generics.GenericAPIView):
         description="""Change the authenticated user's password.
         
         Requires:
-        - old_password: Current password for verification
+        - old_password: Current password for verification (not required for Google/Apple auth users)
         - new_password: New password (minimum 8 characters)
         - confirm_password: Must match new_password
         
         The new password must be different from the old password.
+        For users who registered via Google or Apple, old_password is not required.
+        Setting a password will switch the user's auth_provider to 'email'.
         """,
         request=ChangePasswordSerializer,
         responses={
@@ -1084,11 +1086,19 @@ class ChangePasswordView(generics.GenericAPIView):
         user = request.user
         new_password = serializer.validated_data['new_password']
         
+        # If social auth user is setting a password, update auth_provider to 'email'
+        was_social = user.auth_provider in ('google', 'apple')
+        
         # Set the new password
         user.set_password(new_password)
+        if was_social:
+            user.auth_provider = 'email'
         user.save()
         
-        logger.info(f"Password changed for user: {user.email}")
+        if was_social:
+            logger.info(f"Social auth user ({user.email}) set a password and switched to email auth")
+        else:
+            logger.info(f"Password changed for user: {user.email}")
         
         return APIResponse.success(
             data=None,
