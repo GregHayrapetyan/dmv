@@ -363,7 +363,7 @@ class SetAvatarSerializer(serializers.Serializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     """Serializer for changing user password."""
-    old_password = serializers.CharField(required=False, write_only=True)
+    old_password = serializers.CharField(required=False, write_only=True, allow_null=True, allow_blank=True)
     new_password = serializers.CharField(required=True, write_only=True, min_length=8)
     confirm_password = serializers.CharField(required=True, write_only=True)
     
