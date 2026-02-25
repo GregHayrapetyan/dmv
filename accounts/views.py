@@ -17,18 +17,19 @@ from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
 import logging
 import requests as http_requests
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_auth_requests
-from google.auth.exceptions import GoogleAuthError
+import jwt as pyjwt
+from jwt import PyJWKClient, PyJWKClientError
 
 logger = logging.getLogger(__name__)
 
-# Reusable session for Google OAuth certificate verification.
-# This caches Google's public signing keys and reuses TCP/TLS connections,
-# avoiding a full network round-trip on every login.
-_google_auth_session = http_requests.Session()
-_google_auth_session.timeout = 10  # seconds – prevents indefinite hangs
-_google_transport_request = google_auth_requests.Request(session=_google_auth_session)
+# PyJWKClient fetches Google's JWKS keys once, then caches them in-memory
+# for `lifespan` seconds.  Subsequent verify calls are pure local crypto
+# with ZERO network round-trips, which is why this is fast.
+_google_jwks_client = PyJWKClient(
+    "https://www.googleapis.com/oauth2/v3/certs",
+    cache_jwk_set=True,
+    lifespan=3600,  # re-fetch keys at most once per hour
+)
 
 User = get_user_model()
 
@@ -338,11 +339,14 @@ class GoogleLoginView(generics.GenericAPIView):
         try:
             # Method 1: If ID token is provided (from GoogleLogin component)
             if id_token_str:
-                # Verify the ID token with Google (uses cached session / certs)
-                info = google_id_token.verify_oauth2_token(
-                    id_token_str, 
-                    _google_transport_request, 
-                    settings.GOOGLE_OAUTH_CLIENT_ID
+                # Verify the ID token locally using cached JWKS keys (no network call)
+                signing_key = _google_jwks_client.get_signing_key_from_jwt(id_token_str)
+                info = pyjwt.decode(
+                    id_token_str,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    audience=settings.GOOGLE_OAUTH_CLIENT_ID,
+                    issuer=["accounts.google.com", "https://accounts.google.com"],
                 )
                 
                 # Extract user information from ID token
@@ -444,20 +448,18 @@ class GoogleLoginView(generics.GenericAPIView):
             
             return response
             
-        except ValueError as e:
-            # Token is expired or invalid format
-            logger.error(f"Invalid token format: {str(e)}")
+        except (ValueError, pyjwt.InvalidTokenError) as e:
+            # Token is expired, invalid format, bad signature, wrong audience, etc.
+            logger.error(f"Invalid token: {str(e)}")
             return APIResponse.error(
                 message="Invalid or expired Google token.",
                 error_code=ErrorCodes.INVALID_TOKEN,
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
-        except GoogleAuthError as e:
-            logger.error(f"Google authentication error: {str(e)}")
-            return APIResponse.error(
-                message="Invalid Google token.",
-                error_code=ErrorCodes.INVALID_TOKEN,
-                status_code=status.HTTP_401_UNAUTHORIZED
+        except PyJWKClientError as e:
+            logger.error(f"Failed to fetch Google signing keys: {str(e)}")
+            return APIResponse.server_error(
+                message="Could not verify Google token. Please try again."
             )
         except (http_requests.ConnectionError, http_requests.Timeout) as e:
             logger.error(f"Network error verifying Google token: {str(e)}")
