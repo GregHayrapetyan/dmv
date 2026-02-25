@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, EmailOTP, Subscription
+from .models import User, EmailOTP, Subscription, PaymentMethod
 
 
 @admin.register(User)
@@ -54,6 +54,26 @@ class SubscriptionAdmin(admin.ModelAdmin):
         }),
         ("Subscription Period", {
             "fields": ("current_period_start", "current_period_end", "cancel_at_period_end")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at")
+        }),
+    )
+
+
+@admin.register(PaymentMethod)
+class PaymentMethodAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "card_brand", "card_last4", "card_exp_month", "card_exp_year", "is_default", "created_at")
+    list_filter = ("card_brand", "is_default")
+    search_fields = ("user__email", "card_last4", "stripe_payment_method_id")
+    readonly_fields = ("stripe_payment_method_id", "card_brand", "card_last4", "card_exp_month", "card_exp_year", "billing_name", "created_at", "updated_at")
+    
+    fieldsets = (
+        ("User", {
+            "fields": ("user",)
+        }),
+        ("Card Details", {
+            "fields": ("stripe_payment_method_id", "card_brand", "card_last4", "card_exp_month", "card_exp_year", "billing_name", "is_default")
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at")

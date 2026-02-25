@@ -7,7 +7,7 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_field
 import secrets
 import logging
-from .models import EmailOTP, Subscription
+from .models import EmailOTP, Subscription, PaymentMethod
 from .email_utils import send_verification_email, send_password_reset_email
 logger = logging.getLogger(__name__)
 
@@ -332,6 +332,19 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         if obj.cancel_at_period_end:
             return None
         return obj.current_period_end
+
+
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    """Serializer for payment method information."""
+    
+    class Meta:
+        model = PaymentMethod
+        fields = (
+            'id', 'stripe_payment_method_id', 'card_brand', 'card_last4',
+            'card_exp_month', 'card_exp_year', 'billing_name', 'is_default',
+            'created_at', 'updated_at'
+        )
+        read_only_fields = fields
 
 
 class SetAvatarSerializer(serializers.Serializer):

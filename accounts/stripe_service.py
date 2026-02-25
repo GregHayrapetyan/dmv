@@ -4,7 +4,7 @@ Stripe service for managing subscriptions.
 import stripe
 from django.conf import settings
 from django.utils import timezone
-from .models import Subscription
+from .models import Subscription, PaymentMethod
 import logging
 
 logger = logging.getLogger(__name__)
@@ -247,8 +247,25 @@ class StripeService:
     @staticmethod
     def get_payment_details(user):
         """
-        Get the user's payment method details (last 4 digits, brand, etc.).
+        Get the user's payment method details from local DB.
+        Falls back to Stripe API if not found locally, and syncs the result.
         """
+        # Try local DB first
+        local_pm = PaymentMethod.objects.filter(user=user, is_default=True).first()
+        if not local_pm:
+            local_pm = PaymentMethod.objects.filter(user=user).first()
+        
+        if local_pm:
+            return {
+                'id': local_pm.stripe_payment_method_id,
+                'brand': local_pm.card_brand,
+                'last4': local_pm.card_last4,
+                'exp_month': local_pm.card_exp_month,
+                'exp_year': local_pm.card_exp_year,
+                'name': local_pm.billing_name,
+            }
+        
+        # Fallback: fetch from Stripe and sync locally
         try:
             subscription = Subscription.objects.get(user=user)
             if not subscription.stripe_customer_id:
@@ -263,6 +280,7 @@ class StripeService:
             if payment_methods.data:
                 pm = payment_methods.data[0]
                 card = pm.card
+                StripeService._save_payment_method_locally(user, pm)
                 return {
                     'id': pm.id,
                     'brand': card.brand,
@@ -277,6 +295,76 @@ class StripeService:
         except stripe.error.StripeError as e:
             logger.error(f"Failed to get payment details for {user.email}: {str(e)}")
             return None
+    
+    @staticmethod
+    def _save_payment_method_locally(user, stripe_pm, is_default=True):
+        """
+        Save or update a Stripe PaymentMethod in the local database.
+        
+        Args:
+            user: User instance
+            stripe_pm: Stripe PaymentMethod object
+            is_default: Whether this is the default payment method
+        """
+        try:
+            card = stripe_pm.card
+            if not card:
+                logger.warning(f"PaymentMethod {stripe_pm.id} has no card data")
+                return None
+            
+            # If setting as default, unset other defaults for this user
+            if is_default:
+                PaymentMethod.objects.filter(user=user, is_default=True).update(is_default=False)
+            
+            pm, created = PaymentMethod.objects.update_or_create(
+                stripe_payment_method_id=stripe_pm.id,
+                defaults={
+                    'user': user,
+                    'card_brand': card.brand,
+                    'card_last4': card.last4,
+                    'card_exp_month': card.exp_month,
+                    'card_exp_year': card.exp_year,
+                    'billing_name': stripe_pm.billing_details.name if stripe_pm.billing_details else None,
+                    'is_default': is_default,
+                }
+            )
+            action = 'Created' if created else 'Updated'
+            logger.info(f"{action} local payment method {stripe_pm.id} for user {user.email}")
+            return pm
+        except Exception as e:
+            logger.error(f"Failed to save payment method locally for {user.email}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def sync_payment_methods_from_stripe(user):
+        """
+        Sync all payment methods from Stripe to local DB for a given user.
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+            if not subscription.stripe_customer_id:
+                return
+            
+            # Get default payment method ID from customer
+            customer = stripe.Customer.retrieve(subscription.stripe_customer_id)
+            default_pm_id = None
+            if customer.invoice_settings and customer.invoice_settings.default_payment_method:
+                default_pm_id = customer.invoice_settings.default_payment_method
+            
+            payment_methods = stripe.PaymentMethod.list(
+                customer=subscription.stripe_customer_id,
+                type='card'
+            )
+            
+            for pm in payment_methods.data:
+                is_default = (pm.id == default_pm_id)
+                StripeService._save_payment_method_locally(user, pm, is_default=is_default)
+            
+            logger.info(f"Synced {len(payment_methods.data)} payment methods for user {user.email}")
+        except Subscription.DoesNotExist:
+            logger.warning(f"No subscription found for user {user.email} during payment method sync")
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to sync payment methods for {user.email}: {str(e)}")
     
     @staticmethod
     def get_billing_info(user):
@@ -475,6 +563,20 @@ class StripeService:
             subscription.status = 'active'
             subscription.save()
             
+            # Save payment method details locally
+            try:
+                payment_methods = stripe.PaymentMethod.list(
+                    customer=session.get('customer'),
+                    type='card',
+                    limit=1
+                )
+                if payment_methods.data:
+                    StripeService._save_payment_method_locally(
+                        user, payment_methods.data[0], is_default=True
+                    )
+            except Exception as pm_err:
+                logger.warning(f"Could not save payment method locally after checkout: {str(pm_err)}")
+            
             logger.info(f"Subscription activated for user {user.email}: {plan_tier}")
             
         except Exception as e:
@@ -511,6 +613,12 @@ class StripeService:
                         subscription.stripe_subscription_id,
                         default_payment_method=payment_method_id
                     )
+                
+                # Save payment method details locally
+                stripe_pm = stripe.PaymentMethod.retrieve(payment_method_id)
+                StripeService._save_payment_method_locally(
+                    subscription.user, stripe_pm, is_default=True
+                )
             except Subscription.DoesNotExist:
                 pass
             

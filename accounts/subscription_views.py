@@ -14,8 +14,8 @@ import stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 from dmv.api_response import APIResponse, ErrorCodes
-from .models import Subscription
-from .serializers import SubscriptionSerializer
+from .models import Subscription, PaymentMethod
+from .serializers import SubscriptionSerializer, PaymentMethodSerializer
 from .stripe_service import StripeService
 
 logger = logging.getLogger(__name__)
@@ -481,7 +481,12 @@ class SubscriptionDetailView(APIView):
             serializer = SubscriptionSerializer(subscription)
             
             billing_info = StripeService.get_billing_info(request.user)
-            payment_details = StripeService.get_payment_details(request.user)
+            
+            # Get payment details from local DB
+            default_pm = PaymentMethod.objects.filter(user=request.user, is_default=True).first()
+            if not default_pm:
+                default_pm = PaymentMethod.objects.filter(user=request.user).first()
+            payment_details = PaymentMethodSerializer(default_pm).data if default_pm else None
             
             return APIResponse.success(
                 data={

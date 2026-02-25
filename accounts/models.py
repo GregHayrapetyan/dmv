@@ -77,6 +77,67 @@ class EmailOTP(models.Model):
         return f"{self.user.email} - {self.purpose} - {self.code}"
 
 
+class PaymentMethod(models.Model):
+    """Stores payment method details locally (synced from Stripe)."""
+    
+    user = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        related_name='payment_methods'
+    )
+    stripe_payment_method_id = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Stripe PaymentMethod ID (e.g. pm_xxx)"
+    )
+    card_brand = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Card brand (visa, mastercard, amex, etc.)"
+    )
+    card_last4 = models.CharField(
+        max_length=4,
+        null=True,
+        blank=True,
+        help_text="Last 4 digits of card number"
+    )
+    card_exp_month = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Card expiration month (1-12)"
+    )
+    card_exp_year = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Card expiration year"
+    )
+    billing_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Cardholder / billing name"
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Whether this is the default payment method"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Payment Method"
+        verbose_name_plural = "Payment Methods"
+        ordering = ['-is_default', '-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_default']),
+            models.Index(fields=['stripe_payment_method_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.card_brand} ****{self.card_last4}"
+
+
 class Subscription(models.Model):
     """User subscription model for managing Stripe recurring subscriptions."""
     
