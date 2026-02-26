@@ -494,6 +494,21 @@ class SubscriptionDetailView(APIView):
     def get(self, request):
         try:
             subscription = Subscription.objects.get(user=request.user)
+            
+            # Sync period dates from Stripe if missing locally
+            if not subscription.current_period_end and subscription.stripe_subscription_id:
+                try:
+                    stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+                    subscription.current_period_start = timezone.datetime.fromtimestamp(
+                        stripe_sub['current_period_start'], tz=timezone.utc
+                    )
+                    subscription.current_period_end = timezone.datetime.fromtimestamp(
+                        stripe_sub['current_period_end'], tz=timezone.utc
+                    )
+                    subscription.save(update_fields=['current_period_start', 'current_period_end', 'updated_at'])
+                except Exception:
+                    pass
+            
             serializer = SubscriptionSerializer(subscription)
             
             billing_info = StripeService.get_billing_info(request.user)
