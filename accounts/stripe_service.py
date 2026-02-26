@@ -32,6 +32,65 @@ class StripeService:
             raise
     
     @staticmethod
+    def sync_subscription_from_stripe(user):
+        """
+        Sync the local Subscription record with the actual state in Stripe.
+        Call this when the local status is stale (e.g. still 'incomplete' after checkout).
+        
+        Returns:
+            Updated Subscription instance, or None if sync is not possible.
+        """
+        try:
+            subscription = Subscription.objects.get(user=user)
+        except Subscription.DoesNotExist:
+            return None
+        
+        if not subscription.stripe_customer_id:
+            return None
+        
+        try:
+            # List active subscriptions for this customer from Stripe
+            stripe_subs = stripe.Subscription.list(
+                customer=subscription.stripe_customer_id,
+                status='all',
+                limit=1,
+            )
+            
+            if not stripe_subs.data:
+                logger.info(f"No Stripe subscriptions found for customer {subscription.stripe_customer_id}")
+                return subscription
+            
+            stripe_sub = stripe_subs.data[0]
+            
+            subscription.stripe_subscription_id = stripe_sub['id']
+            subscription.status = stripe_sub['status']
+            subscription.cancel_at_period_end = stripe_sub.get('cancel_at_period_end', False)
+            subscription.current_period_start = timezone.datetime.fromtimestamp(
+                stripe_sub['current_period_start'], tz=timezone.utc
+            )
+            subscription.current_period_end = timezone.datetime.fromtimestamp(
+                stripe_sub['current_period_end'], tz=timezone.utc
+            )
+            
+            # Sync price and plan tier from subscription items
+            items = stripe_sub.get('items', {}).get('data', [])
+            if items:
+                price = items[0].get('price', {})
+                subscription.stripe_price_id = price.get('id')
+                # Sync plan_tier from price metadata if available
+                price_metadata = price.get('metadata', {})
+                if price_metadata.get('plan_tier'):
+                    subscription.plan_tier = price_metadata['plan_tier']
+            
+            subscription.save()
+            logger.info(f"Synced subscription from Stripe for user {user.email}: status={subscription.status}")
+            return subscription
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to sync subscription from Stripe for {user.email}: {str(e)}")
+            return subscription
+    
+    @staticmethod
     def get_or_create_customer(user):
         """Get existing Stripe customer or create a new one."""
         try:

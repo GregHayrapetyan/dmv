@@ -5,7 +5,6 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.conf import settings
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -309,19 +308,11 @@ class SubscriptionStatusView(APIView):
         try:
             subscription = Subscription.objects.get(user=request.user)
             
-            # Sync period dates from Stripe if missing locally
-            if not subscription.current_period_end and subscription.stripe_subscription_id:
-                try:
-                    stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-                    subscription.current_period_start = timezone.datetime.fromtimestamp(
-                        stripe_sub['current_period_start'], tz=timezone.utc
-                    )
-                    subscription.current_period_end = timezone.datetime.fromtimestamp(
-                        stripe_sub['current_period_end'], tz=timezone.utc
-                    )
-                    subscription.save(update_fields=['current_period_start', 'current_period_end', 'updated_at'])
-                except Exception:
-                    pass
+            # Sync from Stripe if status is stale or period dates missing
+            if subscription.status == 'incomplete' or not subscription.current_period_end:
+                synced = StripeService.sync_subscription_from_stripe(request.user)
+                if synced:
+                    subscription = synced
             
             serializer = SubscriptionSerializer(subscription)
             
@@ -495,19 +486,11 @@ class SubscriptionDetailView(APIView):
         try:
             subscription = Subscription.objects.get(user=request.user)
             
-            # Sync period dates from Stripe if missing locally
-            if not subscription.current_period_end and subscription.stripe_subscription_id:
-                try:
-                    stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-                    subscription.current_period_start = timezone.datetime.fromtimestamp(
-                        stripe_sub['current_period_start'], tz=timezone.utc
-                    )
-                    subscription.current_period_end = timezone.datetime.fromtimestamp(
-                        stripe_sub['current_period_end'], tz=timezone.utc
-                    )
-                    subscription.save(update_fields=['current_period_start', 'current_period_end', 'updated_at'])
-                except Exception:
-                    pass
+            # Sync from Stripe if status is stale or period dates missing
+            if subscription.status == 'incomplete' or not subscription.current_period_end:
+                synced = StripeService.sync_subscription_from_stripe(request.user)
+                if synced:
+                    subscription = synced
             
             serializer = SubscriptionSerializer(subscription)
             
