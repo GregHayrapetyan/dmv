@@ -13,10 +13,12 @@ import logging
 import stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+from django.db import models
 from dmv.api_response import APIResponse, ErrorCodes
 from .models import Subscription, PaymentMethod
 from .serializers import SubscriptionSerializer, PaymentMethodSerializer
 from .stripe_service import StripeService
+from site_details.models import PricingPlan
 
 logger = logging.getLogger(__name__)
 
@@ -502,12 +504,24 @@ class SubscriptionDetailView(APIView):
                 default_pm = PaymentMethod.objects.filter(user=request.user).first()
             payment_details = PaymentMethodSerializer(default_pm).data if default_pm else None
             
+            # Look up the active pricing plan matching the subscription's stripe price
+            pricing_plan = PricingPlan.objects.filter(
+                is_active=True,
+            ).filter(
+                models.Q(stripe_price_id_monthly=subscription.stripe_price_id) |
+                models.Q(stripe_price_id_one_time=subscription.stripe_price_id)
+            ).first()
+
+            plan_data = {
+                **serializer.data,
+                'has_access': subscription.has_access(),
+                'stripe_price_id_monthly': pricing_plan.stripe_price_id_monthly if pricing_plan else None,
+                'stripe_price_id_one_time': pricing_plan.stripe_price_id_one_time if pricing_plan else None,
+            }
+
             return APIResponse.success(
                 data={
-                    'plan': {
-                        **serializer.data,
-                        'has_access': subscription.has_access(),
-                    },
+                    'plan': plan_data,
                     'billing_info': billing_info,
                     'payment_details': payment_details,
                 },

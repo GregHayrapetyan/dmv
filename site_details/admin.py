@@ -190,8 +190,8 @@ class ClientReviewAdmin(admin.ModelAdmin):
                 img = Image.open(obj.avatar.path)
                 width, height = img.size
                 
-                # Check if dimensions meet minimum requirements
-                if width >= 112 and height >= 112:
+                # Check if dimensions are exactly 300x300
+                if width == 300 and height == 300:
                     color = "green"
                     status = "✓"
                 else:

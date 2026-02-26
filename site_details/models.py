@@ -250,7 +250,7 @@ class ClientReview(models.Model):
     """
     avatar = models.ImageField(
         upload_to="reviews/avatars/",
-        help_text="Client avatar/profile image (minimum dimensions: 112x112 pixels)",
+        help_text="Client avatar/profile image (exact dimensions: 300x300 pixels).",
     )
     
     image = models.ImageField(
@@ -325,7 +325,7 @@ class ClientReview(models.Model):
     
     def clean(self):
         """
-        Validate avatar dimensions (minimum 112x112 pixels) and image dimensions (minimum 800x600 pixels).
+        Validate avatar dimensions (exact 300x300 pixels) and image dimensions (minimum 800x600 pixels).
         """
         super().clean()
         
@@ -337,8 +337,8 @@ class ClientReview(models.Model):
                 img = Image.open(self.avatar)
                 width, height = img.size
                 
-                if width < 112 or height < 112:
-                    errors['avatar'] = f'Avatar dimensions must be at least 112x112 pixels. Current dimensions: {width}x{height} pixels.'
+                if width != 300 or height != 300:
+                    errors['avatar'] = f'Avatar dimensions must be exactly 300x300 pixels. Current dimensions: {width}x{height} pixels.'
             except Exception as e:
                 if not isinstance(e, ValidationError):
                     errors['avatar'] = 'Unable to validate avatar. Please ensure it is a valid image file.'
