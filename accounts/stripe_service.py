@@ -561,6 +561,25 @@ class StripeService:
             subscription.plan_tier = plan_tier
             subscription.is_one_time_purchase = False
             subscription.status = 'active'
+            
+            # Fetch Stripe subscription to populate billing period dates
+            if subscription.stripe_subscription_id:
+                try:
+                    stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+                    subscription.current_period_start = timezone.datetime.fromtimestamp(
+                        stripe_sub['current_period_start'], tz=timezone.utc
+                    )
+                    subscription.current_period_end = timezone.datetime.fromtimestamp(
+                        stripe_sub['current_period_end'], tz=timezone.utc
+                    )
+                except stripe.error.StripeError as sub_err:
+                    logger.warning(f"Could not fetch subscription details after checkout: {str(sub_err)}")
+            
+            # Set access_duration_days from plan_tier if not already set
+            if not subscription.access_duration_days and plan_tier:
+                duration_map = {'starter': 7, 'standard': 30, 'premium': 90}
+                subscription.access_duration_days = duration_map.get(plan_tier)
+            
             subscription.save()
             
             # Save payment method details locally
