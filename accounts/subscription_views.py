@@ -896,6 +896,8 @@ class StripeWebhookView(APIView):
     Handle Stripe webhook events.
     """
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = []
     
     @extend_schema(exclude=True)  # Exclude from API docs
     def post(self, request):

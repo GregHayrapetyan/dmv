@@ -1,6 +1,7 @@
 """
 Stripe service for managing subscriptions.
 """
+import datetime
 import stripe
 from django.conf import settings
 from django.utils import timezone
@@ -65,22 +66,49 @@ class StripeService:
             subscription.stripe_subscription_id = stripe_sub['id']
             subscription.status = stripe_sub['status']
             subscription.cancel_at_period_end = stripe_sub.get('cancel_at_period_end', False)
-            subscription.current_period_start = timezone.datetime.fromtimestamp(
-                stripe_sub['current_period_start'], tz=timezone.utc
-            )
-            subscription.current_period_end = timezone.datetime.fromtimestamp(
-                stripe_sub['current_period_end'], tz=timezone.utc
-            )
             
-            # Sync price and plan tier from subscription items
+            period_start = stripe_sub.get('current_period_start')
+            period_end = stripe_sub.get('current_period_end')
+            
+            # In newer Stripe API versions, period dates are on subscription items
+            if not period_start or not period_end:
+                items_for_period = stripe_sub.get('items', {})
+                items_data_for_period = items_for_period.get('data', []) if hasattr(items_for_period, 'get') else getattr(items_for_period, 'data', [])
+                if items_data_for_period:
+                    period_start = period_start or items_data_for_period[0].get('current_period_start')
+                    period_end = period_end or items_data_for_period[0].get('current_period_end')
+            
+            if period_start:
+                subscription.current_period_start = datetime.datetime.fromtimestamp(
+                    period_start, tz=datetime.timezone.utc
+                )
+            if period_end:
+                subscription.current_period_end = datetime.datetime.fromtimestamp(
+                    period_end, tz=datetime.timezone.utc
+                )
+            
+            # Sync price, plan tier, and access_duration_days from subscription items
             items = stripe_sub.get('items', {}).get('data', [])
             if items:
                 price = items[0].get('price', {})
                 subscription.stripe_price_id = price.get('id')
-                # Sync plan_tier from price metadata if available
+                
+                # Try plan_tier from price metadata first
                 price_metadata = price.get('metadata', {})
                 if price_metadata.get('plan_tier'):
                     subscription.plan_tier = price_metadata['plan_tier']
+                
+                # Infer plan_tier from price amount if not set
+                if not subscription.plan_tier:
+                    amount = price.get('unit_amount')  # in cents
+                    tier_by_amount = {999: 'starter', 1999: 'standard', 2999: 'premium'}
+                    if amount in tier_by_amount:
+                        subscription.plan_tier = tier_by_amount[amount]
+                
+                # Set access_duration_days from plan_tier
+                if subscription.plan_tier and not subscription.access_duration_days:
+                    duration_map = {'starter': 7, 'standard': 30, 'premium': 90}
+                    subscription.access_duration_days = duration_map.get(subscription.plan_tier)
             
             subscription.save()
             logger.info(f"Synced subscription from Stripe for user {user.email}: status={subscription.status}")
@@ -508,14 +536,29 @@ class StripeService:
             )
             subscription.stripe_subscription_id = stripe_subscription['id']
             subscription.status = stripe_subscription['status']
-            subscription.current_period_start = timezone.datetime.fromtimestamp(
-                stripe_subscription['current_period_start'], tz=timezone.utc
-            )
-            subscription.current_period_end = timezone.datetime.fromtimestamp(
-                stripe_subscription['current_period_end'], tz=timezone.utc
-            )
+            
+            period_start = stripe_subscription.get('current_period_start')
+            period_end = stripe_subscription.get('current_period_end')
+            
+            # In newer Stripe API versions, period dates are on subscription items
+            if not period_start or not period_end:
+                items = stripe_subscription.get('items', {})
+                items_data = items.get('data', []) if hasattr(items, 'get') else getattr(items, 'data', [])
+                if items_data:
+                    period_start = period_start or items_data[0].get('current_period_start')
+                    period_end = period_end or items_data[0].get('current_period_end')
+            
+            logger.info(f"Webhook sub.created: start={period_start}, end={period_end}")
+            if period_start:
+                subscription.current_period_start = datetime.datetime.fromtimestamp(
+                    period_start, tz=datetime.timezone.utc
+                )
+            if period_end:
+                subscription.current_period_end = datetime.datetime.fromtimestamp(
+                    period_end, tz=datetime.timezone.utc
+                )
             subscription.save()
-            logger.info(f"Subscription created: {subscription.stripe_subscription_id}")
+            logger.info(f"Subscription created: {subscription.stripe_subscription_id}, period_start={subscription.current_period_start}, period_end={subscription.current_period_end}")
         except Subscription.DoesNotExist:
             logger.error(f"Subscription not found for customer {stripe_subscription['customer']}")
     
@@ -527,12 +570,26 @@ class StripeService:
                 stripe_subscription_id=stripe_subscription['id']
             )
             subscription.status = stripe_subscription['status']
-            subscription.current_period_start = timezone.datetime.fromtimestamp(
-                stripe_subscription['current_period_start'], tz=timezone.utc
-            )
-            subscription.current_period_end = timezone.datetime.fromtimestamp(
-                stripe_subscription['current_period_end'], tz=timezone.utc
-            )
+            
+            period_start = stripe_subscription.get('current_period_start')
+            period_end = stripe_subscription.get('current_period_end')
+            
+            # In newer Stripe API versions, period dates are on subscription items
+            if not period_start or not period_end:
+                items = stripe_subscription.get('items', {})
+                items_data = items.get('data', []) if hasattr(items, 'get') else getattr(items, 'data', [])
+                if items_data:
+                    period_start = period_start or items_data[0].get('current_period_start')
+                    period_end = period_end or items_data[0].get('current_period_end')
+            
+            if period_start:
+                subscription.current_period_start = datetime.datetime.fromtimestamp(
+                    period_start, tz=datetime.timezone.utc
+                )
+            if period_end:
+                subscription.current_period_end = datetime.datetime.fromtimestamp(
+                    period_end, tz=datetime.timezone.utc
+                )
             subscription.cancel_at_period_end = stripe_subscription.get('cancel_at_period_end', False)
             subscription.save()
             logger.info(f"Subscription updated: {subscription.stripe_subscription_id}")
@@ -615,6 +672,9 @@ class StripeService:
                 defaults={'stripe_customer_id': session.get('customer')}
             )
             
+            # Refresh from DB to pick up any fields set by concurrent webhooks
+            subscription.refresh_from_db()
+            
             subscription.stripe_subscription_id = session.get('subscription')
             subscription.stripe_price_id = price_id
             subscription.plan_tier = plan_tier
@@ -625,17 +685,33 @@ class StripeService:
             if subscription.stripe_subscription_id:
                 try:
                     stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-                    subscription.current_period_start = timezone.datetime.fromtimestamp(
-                        stripe_sub['current_period_start'], tz=timezone.utc
-                    )
-                    subscription.current_period_end = timezone.datetime.fromtimestamp(
-                        stripe_sub['current_period_end'], tz=timezone.utc
-                    )
-                except stripe.error.StripeError as sub_err:
-                    logger.warning(f"Could not fetch subscription details after checkout: {str(sub_err)}")
+                    
+                    period_start = stripe_sub.get('current_period_start')
+                    period_end = stripe_sub.get('current_period_end')
+                    
+                    # In newer Stripe API versions, period dates are on subscription items
+                    if not period_start or not period_end:
+                        items = stripe_sub.get('items', {})
+                        items_data = items.get('data', []) if hasattr(items, 'get') else getattr(items, 'data', [])
+                        if items_data:
+                            period_start = period_start or items_data[0].get('current_period_start')
+                            period_end = period_end or items_data[0].get('current_period_end')
+                    
+                    logger.info(f"Stripe sub retrieve: start={period_start}, end={period_end}, status={stripe_sub.get('status')}")
+                    
+                    if period_start:
+                        subscription.current_period_start = datetime.datetime.fromtimestamp(
+                            period_start, tz=datetime.timezone.utc
+                        )
+                    if period_end:
+                        subscription.current_period_end = datetime.datetime.fromtimestamp(
+                            period_end, tz=datetime.timezone.utc
+                        )
+                except Exception as sub_err:
+                    logger.error(f"Could not fetch subscription details after checkout: {sub_err}", exc_info=True)
             
-            # Set access_duration_days from plan_tier if not already set
-            if not subscription.access_duration_days and plan_tier:
+            # Set access_duration_days from plan_tier
+            if plan_tier:
                 duration_map = {'starter': 7, 'standard': 30, 'premium': 90}
                 subscription.access_duration_days = duration_map.get(plan_tier)
             

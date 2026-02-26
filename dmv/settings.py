@@ -343,6 +343,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'dmv': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
 

@@ -2,6 +2,7 @@
 Custom exception handler for DRF to use standardized API responses.
 """
 
+import logging
 from rest_framework.views import exception_handler as drf_exception_handler
 from rest_framework import status
 from rest_framework.exceptions import (
@@ -10,6 +11,8 @@ from rest_framework.exceptions import (
 )
 from django.core.exceptions import ObjectDoesNotExist
 from dmv.api_response import APIResponse, ErrorCodes
+
+logger = logging.getLogger(__name__)
 
 
 def custom_exception_handler(exc, context):
@@ -32,6 +35,7 @@ def custom_exception_handler(exc, context):
             )
         
         # Handle any other unexpected exceptions
+        logger.error(f"Unhandled exception in {context.get('view', '')}: {exc}", exc_info=True)
         return APIResponse.server_error(
             message="An unexpected error occurred"
         )
