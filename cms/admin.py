@@ -54,6 +54,7 @@ class CMSTestAdmin(admin.ModelAdmin):
         }),
         ("Test Settings", {
             "fields": (
+                "order",
                 "passing_percentage",
                 "time_limit_seconds",
                 "max_attempts",

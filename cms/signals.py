@@ -24,6 +24,7 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
             'max_attempts': instance.max_attempts,
             'shuffle_questions': instance.shuffle_questions,
             'shuffle_answers': instance.shuffle_answers,
+            'order': instance.order,
             # Translation fields
             'title_ru': instance.title_ru,
             'description_ru': instance.description_ru,
@@ -46,6 +47,7 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
         test.max_attempts = instance.max_attempts
         test.shuffle_questions = instance.shuffle_questions
         test.shuffle_answers = instance.shuffle_answers
+        test.order = instance.order
         # Translation fields
         test.title_ru = instance.title_ru
         test.description_ru = instance.description_ru

@@ -110,6 +110,7 @@ class LessonAdmin(ModelAdmin):
     list_filter = ('is_published', 'category', 'states')
     search_fields = ('title', 'content')
     ordering = ('order', 'id')
+    index_template_name = 'cms/lesson_index.html'
     
     def get_edit_handler(self):
         from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList, MultiFieldPanel
@@ -159,8 +160,9 @@ class CMSTestAdmin(ModelAdmin):
     model = CMSTest
     menu_label = 'Tests'
     menu_icon = 'form'
-    list_display = ('title', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_display = ('title', 'order', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
     search_fields = ('title', 'description')
+    ordering = ('order', 'id')
     button_helper_class = CMSTestButtonHelper
     index_template_name = 'cms/cmstest_index.html'
     
@@ -195,6 +197,7 @@ class CMSTestAdmin(ModelAdmin):
                 ], heading='Chinese'),
                 ObjectList([
                     FieldPanel('image'),
+                    FieldPanel('order'),
                     FieldPanel('passing_percentage'),
                     FieldPanel('max_attempts'),
                     FieldPanel('time_limit_seconds'),

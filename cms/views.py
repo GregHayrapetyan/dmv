@@ -3,9 +3,12 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
+from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_protect
 
 from cms.models import CMSTest, CMSQuestion, CMSAnswer
+from learning.models import Lesson, Test
 
 
 @staff_member_required
@@ -150,3 +153,45 @@ def _process_state_data(data, stats):
                         order=idx + 1,
                     )
                     stats['answers_created'] += 1
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+@csrf_protect
+def reorder_tests_view(request):
+    """AJAX view to reorder CMSTest items via drag-and-drop."""
+    try:
+        data = json.loads(request.body)
+        ordered_ids = data.get('ordered_ids', [])
+        
+        if not ordered_ids:
+            return JsonResponse({'status': 'error', 'message': 'No items provided'}, status=400)
+        
+        with transaction.atomic():
+            for index, item_id in enumerate(ordered_ids):
+                CMSTest.objects.filter(pk=item_id).update(order=index)
+        
+        return JsonResponse({'status': 'ok', 'message': f'Reordered {len(ordered_ids)} tests'})
+    except (json.JSONDecodeError, Exception) as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+@csrf_protect
+def reorder_lessons_view(request):
+    """AJAX view to reorder Lesson items via drag-and-drop."""
+    try:
+        data = json.loads(request.body)
+        ordered_ids = data.get('ordered_ids', [])
+        
+        if not ordered_ids:
+            return JsonResponse({'status': 'error', 'message': 'No items provided'}, status=400)
+        
+        with transaction.atomic():
+            for index, item_id in enumerate(ordered_ids):
+                Lesson.objects.filter(pk=item_id).update(order=index)
+        
+        return JsonResponse({'status': 'ok', 'message': f'Reordered {len(ordered_ids)} lessons'})
+    except (json.JSONDecodeError, Exception) as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

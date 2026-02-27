@@ -236,12 +236,17 @@ class Test(models.Model):
         related_name='tests',
         help_text="Vehicle types for this test. Leave empty for all vehicle types."
     )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order"
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
     class Meta:
         verbose_name = "Test"
         verbose_name_plural = "Tests"
+        ordering = ['order', 'id']
         constraints = [
             models.CheckConstraint(
                 check=models.Q(passing_percentage__gte=0, passing_percentage__lte=100),

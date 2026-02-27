@@ -238,6 +238,10 @@ class CMSTest(ClusterableModel):
         default=False,
         help_text="Randomize answer order for each attempt"
     )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (drag to reorder)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -247,6 +251,7 @@ class CMSTest(ClusterableModel):
     class Meta:
         verbose_name = "Test"
         verbose_name_plural = "Tests"
+        ordering = ['order', 'id']
 
 
 class CMSQuestion(ClusterableModel):

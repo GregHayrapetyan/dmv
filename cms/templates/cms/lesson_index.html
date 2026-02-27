@@ -1,18 +1,6 @@
 {% extends "modeladmin/index.html" %}
 {% load wagtailadmin_tags %}
 
-{% block header_extra %}
-    <a href="{% url 'cms:import_questions' %}" class="button bicolor button--icon">
-        <span class="icon-wrapper">
-            <svg class="icon icon-upload icon" aria-hidden="true">
-                <use href="#icon-upload"></use>
-            </svg>
-        </span>
-        Import Questions
-    </a>
-    {{ block.super }}
-{% endblock %}
-
 {% block extra_js %}
     {{ block.super }}
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -24,7 +12,7 @@
         // Add drag handle and data-id to each row
         const rows = tbody.querySelectorAll('tr');
         rows.forEach(function(row) {
-            // Extract ID from the edit link href (e.g., /admin/cms/cmstest/edit/123/)
+            // Extract ID from the edit link href (e.g., /admin/learning/lesson/edit/123/)
             const editLink = row.querySelector('a[href*="/edit/"]');
             if (editLink) {
                 const match = editLink.href.match(/\/edit\/(\d+)\//);
@@ -57,7 +45,7 @@
                 });
 
                 // Send to server
-                fetch('{% url "cms:reorder_tests" %}', {
+                fetch('{% url "cms:reorder_lessons" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -70,7 +58,7 @@
                     if (data.status === 'ok') {
                         // Update order numbers in the table
                         tbody.querySelectorAll('tr[data-id]').forEach(function(row, index) {
-                            const orderCell = row.querySelector('td.field-order .value, td:nth-child(3)');
+                            const orderCell = row.querySelector('td.field-order .value, td:nth-child(4)');
                             if (orderCell) {
                                 orderCell.textContent = index;
                             }
