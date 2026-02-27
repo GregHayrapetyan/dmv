@@ -331,6 +331,7 @@ class SuccessStepSerializer(TranslatedSerializerMixin, serializers.ModelSerializ
             "icon",
             "title",
             "description",
+            "link",
             "order",
         ]
         read_only_fields = ["id"]

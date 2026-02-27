@@ -1135,6 +1135,13 @@ class SuccessStep(models.Model):
         help_text="Step description (e.g., 'Enter your name, email and password.')",
     )
     
+    link = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Link/path for this step (e.g., '/signup', 'https://example.com')",
+    )
+    
     # Multilingual fields - Russian
     title_ru = models.CharField(max_length=200, blank=True, verbose_name="Title (Russian)")
     description_ru = models.TextField(blank=True, verbose_name="Description (Russian)")

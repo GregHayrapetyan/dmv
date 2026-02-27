@@ -823,7 +823,7 @@ class SuccessStepInline(admin.TabularInline):
     """
     model = SuccessStep
     extra = 1
-    fields = ('icon', 'title', 'description', 'order')
+    fields = ('icon', 'title', 'description', 'link', 'order')
     ordering = ('order',)
 
 
