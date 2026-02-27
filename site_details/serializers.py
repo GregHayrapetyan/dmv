@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork
 from dmv.translation import TranslatedSerializerMixin
 
 
@@ -410,3 +410,22 @@ class LearningOptionsSerializer(TranslatedSerializerMixin, serializers.ModelSeri
         Return options with context for translation support.
         """
         return LearningOptionSerializer(obj.options.all(), many=True, context=self.context).data
+
+
+class SocialNetworkSerializer(serializers.ModelSerializer):
+    """
+    Serializer for SocialNetwork model.
+    Returns social network details including name, icon, URL, and hide status.
+    """
+    
+    class Meta:
+        model = SocialNetwork
+        fields = [
+            "id",
+            "name",
+            "icon",
+            "url",
+            "hide",
+            "order",
+        ]
+        read_only_fields = ["id"]

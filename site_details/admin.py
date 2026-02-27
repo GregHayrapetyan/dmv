@@ -4,7 +4,7 @@ from .models import (
     ClientReview, Contact, ContactInfo, Partner, MainBanner, 
     HowItWorks, HowItWorksStep, PricingPlan, PlanFeature,
     TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep,
-    LearningOptions, LearningOption
+    LearningOptions, LearningOption, SocialNetwork
 )
 
 
@@ -953,4 +953,69 @@ class LearningOptionsAdmin(admin.ModelAdmin):
         return format_html('<strong>{}</strong> options', count)
     
     options_count.short_description = "Options"
+
+
+@admin.register(SocialNetwork)
+class SocialNetworkAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing social network links.
+    """
+    list_display = (
+        "name",
+        "icon_preview",
+        "url",
+        "hide",
+        "order",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "hide",
+        "order",
+        "is_active",
+    )
+    
+    list_filter = (
+        "hide",
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "name",
+        "url",
+    )
+    
+    readonly_fields = (
+        "icon_preview",
+        "created_at",
+        "updated_at",
+    )
+    
+    fieldsets = (
+        ("Social Network Information", {
+            "fields": ("name", "icon", "icon_preview", "url")
+        }),
+        ("Display Settings", {
+            "fields": ("hide", "order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def icon_preview(self, obj):
+        """
+        Display a thumbnail preview of the social network icon.
+        """
+        if obj.icon:
+            return format_html(
+                '<img src="{}" style="max-width: 32px; max-height: 32px; object-fit: contain;" />',
+                obj.icon.url
+            )
+        return "No icon"
+    
+    icon_preview.short_description = "Icon Preview"
 

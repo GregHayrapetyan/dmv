@@ -1306,3 +1306,54 @@ class LearningOption(models.Model):
     
     def __str__(self):
         return f"{self.title[:30]}"
+
+
+class SocialNetwork(models.Model):
+    """
+    Social network link model.
+    Stores social media platform details like name, icon, and URL.
+    The 'hide' field controls whether the link is visible on the frontend.
+    """
+    name = models.CharField(
+        max_length=100,
+        help_text="Social network name (e.g., 'Facebook', 'Instagram', 'Twitter')",
+    )
+    
+    icon = models.FileField(
+        upload_to="social_networks/icons/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['svg', 'png', 'jpg', 'jpeg', 'webp'])],
+        help_text="Social network icon (SVG, PNG, JPG, or WebP)",
+    )
+    
+    url = models.URLField(
+        max_length=500,
+        help_text="Social network profile URL (e.g., 'https://facebook.com/yourpage')",
+    )
+    
+    hide = models.BooleanField(
+        default=False,
+        help_text="Hide this social network link from the frontend",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this social network is available on the site",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ("order", "-created_at")
+        verbose_name = "Social Network"
+        verbose_name_plural = "Social Networks"
+    
+    def __str__(self):
+        return self.name

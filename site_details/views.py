@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps, LearningOptions
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer, LearningOptionsSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps, LearningOptions, SocialNetwork
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer, LearningOptionsSerializer, SocialNetworkSerializer
 from dmv.api_response import APIResponse
 
 
@@ -561,4 +561,42 @@ class LearningOptionsRetrieveAPIView(generics.RetrieveAPIView):
             )
         
         serializer = self.get_serializer(instance)
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="List social networks",
+        description="Retrieve all active and visible social network links.",
+        tags=["Site Details"],
+    )
+)
+class SocialNetworkListAPIView(generics.ListAPIView):
+    """
+    API endpoint to retrieve all active social network links.
+    GET /api/site-details/social-networks/
+    
+    Returns only social networks where is_active=True and hide=False.
+    
+    Returns:
+        200: List of visible social network links
+    """
+    serializer_class = SocialNetworkSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
+    pagination_class = None
+    
+    def get_queryset(self):
+        """
+        Return only active and non-hidden social networks, ordered by display order.
+        """
+        return SocialNetwork.objects.filter(is_active=True, hide=False)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        Override list to use standardized response format.
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
         return APIResponse.success(data=serializer.data)

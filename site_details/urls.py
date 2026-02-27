@@ -10,6 +10,7 @@ from .views import (
     TrustSafetyRetrieveAPIView,
     SuccessStepsRetrieveAPIView,
     LearningOptionsRetrieveAPIView,
+    SocialNetworkListAPIView,
 )
 
 urlpatterns = [
@@ -23,4 +24,5 @@ urlpatterns = [
     path("trust-safety/", TrustSafetyRetrieveAPIView.as_view(), name="trust-safety"),
     path("success-steps/", SuccessStepsRetrieveAPIView.as_view(), name="success-steps"),
     path("learning-options/", LearningOptionsRetrieveAPIView.as_view(), name="learning-options"),
+    path("social-networks/", SocialNetworkListAPIView.as_view(), name="social-networks-list"),
 ]

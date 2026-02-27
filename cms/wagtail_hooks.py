@@ -54,7 +54,7 @@ from cms.models import CMSTest
 # Import site_details models
 from site_details.models import (
     PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep,
-    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption
+    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork
 )
 
 # Import accounts models
@@ -757,6 +757,16 @@ class LearningOptionsAdmin(ModelAdmin):
     options_count.short_description = 'Options'
 
 
+class SocialNetworkCMSAdmin(ModelAdmin):
+    model = SocialNetwork
+    menu_label = 'Social Networks'
+    menu_icon = 'link-external'
+    list_display = ('name', 'url', 'hide', 'is_active', 'order', 'created_at')
+    list_filter = ('hide', 'is_active')
+    search_fields = ('name', 'url')
+    ordering = ('order', '-created_at')
+
+
 # ============================================================================
 # ACCOUNTS - ModelAdmin Classes (for Settings menu)
 # ============================================================================
@@ -804,6 +814,7 @@ class SiteDetailsGroup(ModelAdminGroup):
         ContactInfoAdmin,
         ContactAdmin,
         PartnerAdmin,
+        SocialNetworkCMSAdmin,
     )
 
 
