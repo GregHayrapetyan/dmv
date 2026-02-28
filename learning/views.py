@@ -1063,3 +1063,292 @@ class DemoTestGenerateView(APIView):
             data=response_data,
             message="Demo test ID generated successfully. Use this ID with GET /tests/{id}/?is_demo=true"
         )
+
+
+# ============================================================================
+# MIXED TEST VIEWS (random questions from all tests)
+# ============================================================================
+
+MIXED_TEST_QUESTION_COUNT = 20
+MIXED_TEST_PASSING_PERCENTAGE = 80
+
+
+class MixedTestView(APIView):
+    """
+    Generate a mixed screening test with random questions from all available tests.
+    
+    Returns 20 random questions pulled from all tests matching the user's
+    state and vehicle profile. Requires authentication and active subscription.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Get mixed screening test",
+        description="Generate a mixed test with 20 random questions from all available tests. "
+                    "Questions are filtered by user's state and vehicle profile. Requires active subscription.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                description="Mixed test generated successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "questions_count": 20,
+                            "time_limit_seconds": None,
+                            "passing_percentage": 80,
+                            "questions": []
+                        },
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Not enough questions available"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active subscription required"),
+        },
+        tags=["Tests"],
+    )
+    def get(self, request):
+        # Check subscription
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            if not subscription.has_access():
+                return APIResponse.error(
+                    message="Active subscription required to access mixed test",
+                    error_code=ErrorCodes.FORBIDDEN,
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
+        except Subscription.DoesNotExist:
+            return APIResponse.error(
+                message="Active subscription required to access mixed test",
+                error_code=ErrorCodes.FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        # Get tests filtered by user's state/vehicle
+        from django.db.models import Count, Q
+        queryset = Test.objects.all()
+
+        try:
+            profile = request.user.profile
+
+            if profile.state:
+                queryset = queryset.annotate(state_count=Count('states'))
+                queryset = queryset.filter(
+                    Q(states=profile.state) | Q(state_count=0)
+                ).distinct()
+
+            if profile.vehicle:
+                queryset = queryset.annotate(vehicle_count=Count('vehicles'))
+                queryset = queryset.filter(
+                    Q(vehicles=profile.vehicle) | Q(vehicle_count=0)
+                ).distinct()
+        except Exception:
+            pass
+
+        # Pick random questions from all matching tests
+        all_questions = Question.objects.filter(
+            test__in=queryset
+        ).prefetch_related('answer_options').order_by('?')
+
+        total_available = all_questions.count()
+        if total_available < MIXED_TEST_QUESTION_COUNT:
+            return APIResponse.error(
+                message=f"Not enough questions available ({total_available} found, need {MIXED_TEST_QUESTION_COUNT})",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        selected_questions = list(all_questions[:MIXED_TEST_QUESTION_COUNT])
+        random.shuffle(selected_questions)
+
+        serializer = QuestionSerializer(selected_questions, many=True)
+
+        response_data = {
+            'questions_count': len(selected_questions),
+            'time_limit_seconds': None,
+            'passing_percentage': MIXED_TEST_PASSING_PERCENTAGE,
+            'questions': serializer.data,
+        }
+
+        logger.info(f"Mixed test generated for user {request.user.email} with {len(selected_questions)} questions")
+
+        return APIResponse.success(
+            data=response_data,
+            message="Mixed test generated successfully"
+        )
+
+
+class MixedTestSubmitView(APIView):
+    """
+    Submit answers for a mixed screening test.
+    
+    Accepts a dictionary of answers (question_id: answer_option_id),
+    calculates the score across questions from multiple tests,
+    and returns detailed results including correct answers.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Submit mixed test answers",
+        description="Submit answers for a mixed screening test. Returns score, percentage, pass/fail status, and correct answers.",
+        request=TestSubmissionSerializer,
+        examples=[
+            OpenApiExample(
+                "Submit Mixed Test Answers",
+                value={
+                    "answers": {
+                        "1": 2,
+                        "2": 5,
+                        "3": 8
+                    },
+                    "time_taken_seconds": 600
+                },
+                request_only=True,
+            )
+        ],
+        responses={
+            200: OpenApiResponse(
+                description="Mixed test submitted successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "attempt_id": 1,
+                            "correct_answers": 16,
+                            "incorrect_answers": 4,
+                            "questions_count": 20,
+                            "percentage": 80.0,
+                            "passed": True,
+                            "questions": [],
+                            "user_answers": {"1": 2, "2": 5}
+                        },
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="Validation error"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active subscription required"),
+        },
+        tags=["Tests"],
+    )
+    def post(self, request):
+        # Check subscription
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            if not subscription.has_access():
+                return APIResponse.error(
+                    message="Active subscription required to submit mixed test",
+                    error_code=ErrorCodes.FORBIDDEN,
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
+        except Subscription.DoesNotExist:
+            return APIResponse.error(
+                message="Active subscription required to submit mixed test",
+                error_code=ErrorCodes.FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = TestSubmissionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return APIResponse.validation_error(
+                message="Invalid test submission",
+                details=serializer.errors
+            )
+
+        answers = serializer.validated_data['answers']
+        time_taken = request.data.get('time_taken_seconds', None)
+
+        # Resolve questions by IDs from the answers
+        question_ids = [int(qid) for qid in answers.keys()]
+        questions = Question.objects.filter(
+            id__in=question_ids
+        ).prefetch_related('answer_options')
+
+        # Calculate results
+        correct_answers = 0
+        incorrect_answers = 0
+        answer_records = []
+
+        for question in questions:
+            user_answer_id = answers.get(str(question.id))
+
+            selected_option = None
+            is_correct = False
+
+            if user_answer_id:
+                try:
+                    selected_option = question.answer_options.get(id=user_answer_id)
+                    is_correct = selected_option.is_correct
+                    if is_correct:
+                        correct_answers += 1
+                    else:
+                        incorrect_answers += 1
+                except AnswerOption.DoesNotExist:
+                    logger.warning(f"Invalid answer option {user_answer_id} for question {question.id}")
+                    incorrect_answers += 1
+            else:
+                incorrect_answers += 1
+
+            answer_records.append({
+                'question': question,
+                'selected_option': selected_option,
+                'is_correct': is_correct
+            })
+
+        questions_count = len(question_ids)
+        percentage = Decimal(correct_answers / questions_count * 100) if questions_count > 0 else Decimal(0)
+        passed = percentage >= MIXED_TEST_PASSING_PERCENTAGE
+
+        # Create test attempt record (test=None, is_mixed=True)
+        test_attempt = TestAttempt.objects.create(
+            user=request.user,
+            test=None,
+            is_mixed=True,
+            correct_answers=correct_answers,
+            incorrect_answers=incorrect_answers,
+            questions_count=questions_count,
+            percentage=percentage,
+            passed=passed,
+            time_taken_seconds=time_taken,
+            completed_at=timezone.now()
+        )
+
+        # Create answer records
+        for answer_data in answer_records:
+            TestAnswer.objects.create(
+                attempt=test_attempt,
+                question=answer_data['question'],
+                selected_option=answer_data['selected_option'],
+                is_correct=answer_data['is_correct']
+            )
+
+        # Prepare detailed results
+        question_serializer = QuestionDetailSerializer(questions, many=True)
+
+        result_data = {
+            'attempt_id': test_attempt.id,
+            'correct_answers': correct_answers,
+            'incorrect_answers': incorrect_answers,
+            'questions_count': questions_count,
+            'percentage': float(percentage),
+            'passed': passed,
+            'questions': question_serializer.data,
+            'user_answers': answers
+        }
+
+        logger.info(f"Mixed test submitted by {request.user.email}. Correct: {correct_answers}/{questions_count} ({percentage:.2f}%)")
+
+        return APIResponse.success(
+            data=result_data,
+            message="Mixed test submitted successfully"
+        )
