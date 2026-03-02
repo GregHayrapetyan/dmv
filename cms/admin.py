@@ -25,6 +25,7 @@ class CMSTestAdmin(admin.ModelAdmin):
     """Admin interface for managing tests."""
     list_display = (
         "title",
+        "is_demo",
         "questions_count",
         "passing_percentage",
         "time_limit_display",
@@ -33,6 +34,7 @@ class CMSTestAdmin(admin.ModelAdmin):
     )
     
     list_filter = (
+        "is_demo",
         "shuffle_questions",
         "shuffle_answers",
         "created_at",
@@ -55,6 +57,7 @@ class CMSTestAdmin(admin.ModelAdmin):
         ("Test Settings", {
             "fields": (
                 "order",
+                "is_demo",
                 "passing_percentage",
                 "time_limit_seconds",
                 "max_attempts",

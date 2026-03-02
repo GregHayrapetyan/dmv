@@ -160,7 +160,8 @@ class CMSTestAdmin(ModelAdmin):
     model = CMSTest
     menu_label = 'Tests'
     menu_icon = 'form'
-    list_display = ('title', 'order', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_display = ('title', 'is_demo', 'order', 'question_count', 'passing_percentage', 'time_limit_seconds', 'created_at')
+    list_filter = ('is_demo',)
     search_fields = ('title', 'description')
     ordering = ('order', 'id')
     button_helper_class = CMSTestButtonHelper
@@ -198,6 +199,7 @@ class CMSTestAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('image'),
                     FieldPanel('order'),
+                    FieldPanel('is_demo'),
                     FieldPanel('passing_percentage'),
                     FieldPanel('max_attempts'),
                     FieldPanel('time_limit_seconds'),

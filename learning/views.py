@@ -1010,6 +1010,63 @@ class CategoryDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
 
 # ============================================================================
+# DEMO TEST VIEW (for non-registered users)
+# ============================================================================
+
+class DemoTestView(StandardizedResponseMixin, generics.RetrieveAPIView):
+    """
+    Get the demo test with all its questions.
+    
+    Returns the first test marked as is_demo=True, including all questions 
+    and answer options. No authentication required. Correct answers are not revealed.
+    """
+    serializer_class = TestDetailSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        summary="Get demo test",
+        description="Retrieve the demo test with all questions and answer options. No authentication required. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
+        responses={
+            200: TestDetailSerializer,
+            404: OpenApiResponse(description="Demo test not found"),
+        },
+        tags=["Tests"],
+    )
+    def get(self, request, *args, **kwargs):
+        # Find the first demo test
+        demo_test = Test.objects.filter(is_demo=True).prefetch_related(
+            'questions__answer_options'
+        ).first()
+        
+        if not demo_test:
+            return APIResponse.error(
+                message="Demo test not found. Please contact support.",
+                error_code=ErrorCodes.NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Use the serializer to format the response
+        serializer = self.get_serializer(demo_test)
+        
+        logger.info(f"Demo test {demo_test.id} accessed")
+        
+        return APIResponse.success(
+            data=serializer.data,
+            message="Demo test retrieved successfully"
+        )
+
+
+# ============================================================================
 # MIXED TEST VIEWS (for non-registered users)
 # ============================================================================
 

@@ -6,7 +6,7 @@ from .views import (
     UserTestAttemptsListView, TestAttemptDetailView,
     AddFavoriteLessonView, RemoveFavoriteLessonView, FavoriteLessonsListView,
     TestStatisticsView, CategoryListView, CategoryDetailView,
-    MixedTestGenerateView
+    DemoTestView, MixedTestGenerateView
 )
 
 
@@ -22,6 +22,7 @@ urlpatterns = [
     
     # Test endpoints
     path('tests/', TestListView.as_view(), name='tests'),
+    path('tests/demo/', DemoTestView.as_view(), name='demo-test'),
     path('tests/statistics/', TestStatisticsView.as_view(), name='test-statistics'),
     path('tests/<str:pk>/', TestDetailView.as_view(), name='test-detail'),
     path('tests/<int:pk>/submit/', TestSubmitView.as_view(), name='test-submit'),

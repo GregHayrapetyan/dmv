@@ -242,6 +242,10 @@ class CMSTest(ClusterableModel):
         default=0,
         help_text="Display order (drag to reorder)"
     )
+    is_demo = models.BooleanField(
+        default=False,
+        help_text="Whether this test is a demo test (accessible without subscription)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
