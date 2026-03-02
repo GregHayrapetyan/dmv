@@ -549,15 +549,9 @@ class CategoryDetailSerializer(TranslatedSerializerMixin, serializers.ModelSeria
 
 
 # ============================================================================
-# DEMO TEST SERIALIZERS (for non-registered users)
+# MIXED TEST SERIALIZERS (for non-registered users)
 # ============================================================================
 
-class DemoTestRequestSerializer(serializers.Serializer):
-    """Serializer for demo test generation request"""
-    state_id = serializers.IntegerField(required=True, help_text="State ID for filtering questions")
-    vehicle_id = serializers.IntegerField(required=True, help_text="Vehicle type ID for filtering questions")
-
-
-class DemoTestResponseSerializer(serializers.Serializer):
-    """Serializer for demo test response with test_id"""
-    test_id = serializers.CharField(help_text="Temporary test ID to use with GET /tests/{id}/?is_demo=true")
+class MixedTestResponseSerializer(serializers.Serializer):
+    """Serializer for mixed test response with test_id"""
+    test_id = serializers.CharField(help_text="Temporary test ID to use with GET /tests/{id}/?is_mixed=true")

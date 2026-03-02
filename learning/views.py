@@ -23,7 +23,7 @@ from .serializers import (
     TestAttemptListWithStatsSerializer, FavoriteLessonSerializer, TestStatisticsSerializer,
     TestStatisticsWithAggregatesSerializer, LessonCategoryListSerializer, LessonInCategorySerializer,
     CategorySerializer, CategoryDetailSerializer,
-    DemoTestRequestSerializer, DemoTestResponseSerializer, QuestionSerializer
+    MixedTestResponseSerializer, QuestionSerializer
 )
 from accounts.models import Subscription
 import logging
@@ -198,13 +198,13 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
     @extend_schema(
         summary="Get test detail",
-        description="Retrieve full test details with all questions and answer options. Requires active subscription unless is_demo=true. Supports translations via ?lang= query parameter.",
+        description="Retrieve full test details with all questions and answer options. Requires active subscription unless is_mixed=true. Supports translations via ?lang= query parameter.",
         parameters=[
             OpenApiParameter(
-                name='is_demo',
+                name='is_mixed',
                 type=bool,
                 location=OpenApiParameter.QUERY,
-                description='Set to true for demo test (returns 15 random questions)',
+                description='Set to true for mixed test (returns 20 random questions)',
                 required=False,
             ),
             OpenApiParameter(
@@ -220,63 +220,27 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             200: TestDetailSerializer,
             401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Active subscription required"),
-            404: OpenApiResponse(description="Test not found or demo session expired"),
+            404: OpenApiResponse(description="Test not found or mixed test session expired"),
         },
         tags=["Tests"],
     )
     def get(self, request, *args, **kwargs):
-        is_demo = request.query_params.get('is_demo', '').lower() == 'true'
+        is_mixed = request.query_params.get('is_mixed', '').lower() == 'true'
         test_id = kwargs.get('pk')
         
-        if is_demo:
-            # Handle demo test request
-            # Verify this is a valid demo session
-            demo_session = cache.get(f'demo_test_{test_id}')
-            if not demo_session:
+        if is_mixed:
+            # Handle mixed test request
+            # Verify this is a valid mixed test session
+            mixed_session = cache.get(f'mixed_test_{test_id}')
+            if not mixed_session:
                 return APIResponse.error(
-                    message="Demo test session not found or expired. Please generate a new demo test.",
+                    message="Mixed test session not found or expired. Please generate a new mixed test.",
                     error_code=ErrorCodes.NOT_FOUND,
                     status_code=status.HTTP_404_NOT_FOUND
                 )
             
-            # Get state and vehicle from session
-            state_id = demo_session.get('state_id')
-            vehicle_id = demo_session.get('vehicle_id')
-            
-            # Find tests matching the criteria
-            from django.db.models import Count, Q
-            from onboarding.models import State, Vehicle
-            
-            try:
-                state = State.objects.get(id=state_id)
-                vehicle = Vehicle.objects.get(id=vehicle_id)
-            except (State.DoesNotExist, Vehicle.DoesNotExist):
-                return APIResponse.error(
-                    message="Invalid state or vehicle in session",
-                    error_code=ErrorCodes.VALIDATION_ERROR,
-                    status_code=status.HTTP_400_BAD_REQUEST
-                )
-            
-            tests = Test.objects.annotate(
-                state_count=Count('states'),
-                vehicle_count=Count('vehicles')
-            ).filter(
-                Q(states=state) | Q(state_count=0)
-            ).filter(
-                Q(vehicles=vehicle) | Q(vehicle_count=0)
-            ).distinct()
-            
-            if not tests.exists():
-                return APIResponse.error(
-                    message="No tests available for the selected state and vehicle",
-                    error_code=ErrorCodes.NOT_FOUND,
-                    status_code=status.HTTP_404_NOT_FOUND
-                )
-            
-            # Get 15 random questions from matching tests
-            all_questions = Question.objects.filter(
-                test__in=tests
-            ).prefetch_related('answer_options').order_by('?')
+            # Get 20 random questions from all available tests
+            all_questions = Question.objects.all().prefetch_related('answer_options').order_by('?')
             
             if all_questions.count() < 20:
                 return APIResponse.error(
@@ -290,10 +254,10 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             random.shuffle(selected_questions)
             
             # Store question IDs in cache for potential future use
-            demo_session['question_ids'] = [q.id for q in selected_questions]
-            cache.set(f'demo_test_{test_id}', demo_session, timeout=3600)
+            mixed_session['question_ids'] = [q.id for q in selected_questions]
+            cache.set(f'mixed_test_{test_id}', mixed_session, timeout=3600)
             
-            # Prepare response with demo questions
+            # Prepare response with mixed test questions
             question_serializer = QuestionSerializer(selected_questions, many=True)
             
             response_data = {
@@ -302,11 +266,11 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                 'questions': question_serializer.data
             }
             
-            logger.info(f"Demo test {test_id} accessed with {len(selected_questions)} questions")
+            logger.info(f"Mixed test {test_id} accessed with {len(selected_questions)} questions")
             
             return APIResponse.success(
                 data=response_data,
-                message="Demo test retrieved successfully"
+                message="Mixed test retrieved successfully"
             )
         
         # Regular test - validate that pk is an integer
@@ -315,7 +279,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             kwargs['pk'] = test_id_int
         except (ValueError, TypeError):
             return APIResponse.error(
-                message="Invalid test ID format. For demo tests, use ?is_demo=true parameter.",
+                message="Invalid test ID format. For mixed tests, use ?is_mixed=true parameter.",
                 error_code=ErrorCodes.VALIDATION_ERROR,
                 status_code=status.HTTP_400_BAD_REQUEST
             )
@@ -996,70 +960,45 @@ class CategoryDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
 
 
 # ============================================================================
-# DEMO TEST VIEWS (for non-registered users)
+# MIXED TEST VIEWS (for non-registered users)
 # ============================================================================
 
-class DemoTestGenerateView(APIView):
+class MixedTestGenerateView(APIView):
     """
-    Generate a demo test for non-registered users.
+    Generate a mixed test for non-registered users.
     
-    Creates a temporary test_id that can be used with tests/<id>/?is_demo=true
-    to retrieve 15 random questions. Session expires in 1 hour.
+    Creates a temporary test_id that can be used with tests/<id>/?is_mixed=true
+    to retrieve 20 random questions. Session expires in 1 hour.
     """
     permission_classes = [permissions.AllowAny]
     
     @extend_schema(
-        summary="Generate demo test",
-        description="Generate a temporary demo test ID. Use this ID with GET /tests/{id}/?is_demo=true to retrieve questions.",
-        request=DemoTestRequestSerializer,
+        summary="Generate mixed test",
+        description="Generate a temporary mixed test ID. Use this ID with GET /tests/{id}/?is_mixed=true to retrieve questions.",
         responses={
-            200: DemoTestResponseSerializer,
+            200: MixedTestResponseSerializer,
         },
-        tags=["Demo Tests"],
+        tags=["Mixed Tests"],
     )
-    def post(self, request):
-        serializer = DemoTestRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return APIResponse.validation_error(
-                message="Invalid request data",
-                details=serializer.errors
-            )
-        
-        state_id = serializer.validated_data['state_id']
-        vehicle_id = serializer.validated_data['vehicle_id']
-        
-        # Validate state and vehicle exist
-        from onboarding.models import State, Vehicle
-        try:
-            state = State.objects.get(id=state_id)
-            vehicle = Vehicle.objects.get(id=vehicle_id)
-        except (State.DoesNotExist, Vehicle.DoesNotExist):
-            return APIResponse.error(
-                message="Invalid state or vehicle selection",
-                error_code=ErrorCodes.VALIDATION_ERROR,
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-        
+    def get(self, request):
         # Generate unique temporary test ID
-        session_data = f"demo-{state_id}-{vehicle_id}-{timezone.now().timestamp()}-{random.randint(1000, 9999)}"
+        session_data = f"mixed-{timezone.now().timestamp()}-{random.randint(1000, 9999)}"
         test_id = hashlib.md5(session_data.encode()).hexdigest()
         
-        # Store demo session in cache (expires in 1 hour)
-        demo_session = {
+        # Store mixed test session in cache (expires in 1 hour)
+        mixed_session = {
             'created_at': timezone.now().isoformat(),
-            'is_demo': True,
-            'state_id': state_id,
-            'vehicle_id': vehicle_id
+            'is_mixed': True,
         }
-        cache.set(f'demo_test_{test_id}', demo_session, timeout=3600)
+        cache.set(f'mixed_test_{test_id}', mixed_session, timeout=3600)
         
         response_data = {
             'test_id': test_id
         }
         
-        logger.info(f"Demo test generated with ID: {test_id}, State: {state_id}, Vehicle: {vehicle_id}")
+        logger.info(f"Mixed test generated with ID: {test_id}")
         
         return APIResponse.success(
             data=response_data,
-            message="Demo test ID generated successfully. Use this ID with GET /tests/{id}/?is_demo=true"
+            message="Mixed test ID generated successfully. Use this ID with GET /tests/{id}/?is_mixed=true"
         )
