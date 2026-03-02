@@ -197,16 +197,18 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         allow_null=True,
         write_only=True
     )
+    vehicle = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "phone", "state", "age", "gender")
+        fields = ("first_name", "last_name", "phone", "state", "age", "gender", "vehicle")
     
     def update(self, instance, validated_data):
         # Extract profile-related fields
         state_id = validated_data.pop('state', None)
         age = validated_data.pop('age', None)
         gender = validated_data.pop('gender', None)
+        vehicle_id = validated_data.pop('vehicle', None)
         
         # Update user fields
         for attr, value in validated_data.items():
@@ -214,7 +216,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         
         # Update or create profile
-        from onboarding.models import Profile, State
+        from onboarding.models import Profile, State, Vehicle
         profile, _ = Profile.objects.get_or_create(user=instance)
         
         if state_id is not None:
@@ -232,6 +234,15 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         if gender is not None:
             profile.gender = gender
         
+        if vehicle_id is not None:
+            if vehicle_id:
+                try:
+                    profile.vehicle = Vehicle.objects.get(id=vehicle_id)
+                except Vehicle.DoesNotExist:
+                    pass
+            else:
+                profile.vehicle = None
+        
         profile.save()
         return instance
 
@@ -242,10 +253,11 @@ class UserSerializer(serializers.ModelSerializer):
     state = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     gender = serializers.SerializerMethodField()
+    vehicle = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state", "age", "gender", "auth_provider")
+        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state", "age", "gender", "vehicle", "auth_provider")
         read_only_fields = ("id", "email", "is_email_verified", "date_joined", "auth_provider")
     
     @extend_schema_field(serializers.BooleanField())
@@ -295,6 +307,32 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             if obj.profile:
                 return obj.profile.gender
+            return None
+        except Exception:
+            return None
+    
+    @extend_schema_field(serializers.DictField(allow_null=True, required=False))
+    def get_vehicle(self, obj):
+        """Return user's vehicle from profile if exists."""
+        try:
+            if obj.profile and obj.profile.vehicle:
+                request = self.context.get('request')
+                vehicle_data = {
+                    "id": obj.profile.vehicle.id,
+                    "name": obj.profile.vehicle.name
+                }
+                if obj.profile.vehicle.image:
+                    if request:
+                        vehicle_data["image"] = request.build_absolute_uri(obj.profile.vehicle.image.url)
+                    else:
+                        vehicle_data["image"] = obj.profile.vehicle.image.url
+                    if obj.profile.vehicle.image_width:
+                        vehicle_data["image_width"] = obj.profile.vehicle.image_width
+                    if obj.profile.vehicle.image_height:
+                        vehicle_data["image_height"] = obj.profile.vehicle.image_height
+                else:
+                    vehicle_data["image"] = None
+                return vehicle_data
             return None
         except Exception:
             return None

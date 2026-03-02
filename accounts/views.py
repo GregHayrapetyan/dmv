@@ -698,7 +698,7 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
     Get or update current user profile.
     
     Returns the authenticated user's profile information.
-    Allows updating first_name, last_name, phone, state, age, and gender.
+    Allows updating first_name, last_name, phone, state, age, gender, and vehicle.
     """
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -723,7 +723,7 @@ class MeView(StandardizedResponseMixin, generics.RetrieveUpdateAPIView):
 
     @extend_schema(
         summary="Update current user",
-        description="Update the authenticated user's profile. Can update first_name, last_name, phone, state, age, and gender. Supports partial updates.",
+        description="Update the authenticated user's profile. Can update first_name, last_name, phone, state, age, gender, and vehicle. Supports partial updates.",
         request=UserUpdateSerializer,
         responses={
             200: UserSerializer,
