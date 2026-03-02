@@ -437,13 +437,7 @@ class TestAttempt(models.Model):
     test = models.ForeignKey(
         Test,
         on_delete=models.CASCADE,
-        related_name='attempts',
-        null=True,
-        blank=True,
-    )
-    is_mixed = models.BooleanField(
-        default=False,
-        help_text="Whether this is a mixed test attempt (questions from multiple tests)"
+        related_name='attempts'
     )
     correct_answers = models.PositiveIntegerField()
     incorrect_answers = models.PositiveIntegerField()
@@ -469,8 +463,7 @@ class TestAttempt(models.Model):
         ]
 
     def __str__(self):
-        test_name = "Mixed Test" if self.is_mixed else (self.test.title if self.test else "Unknown")
-        return f"{self.user.email} - {test_name} - {self.percentage}% ({self.started_at.strftime('%Y-%m-%d')})"
+        return f"{self.user.email} - {self.test.title} - {self.percentage}% ({self.started_at.strftime('%Y-%m-%d')})"
 
 
 class TestAnswer(models.Model):

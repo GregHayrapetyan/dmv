@@ -265,37 +265,27 @@ class TestAnswerSerializer(serializers.ModelSerializer):
 
 class TestAttemptSerializer(serializers.ModelSerializer):
     """Serializer for test attempts"""
-    test_title = serializers.SerializerMethodField()
+    test_title = serializers.CharField(source='test.title', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     answers = TestAnswerSerializer(many=True, read_only=True)
     
     class Meta:
         model = TestAttempt
-        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'is_mixed', 'correct_answers', 'incorrect_answers', 'questions_count',
+        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'correct_answers', 'incorrect_answers', 'questions_count',
                   'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at', 'answers')
         read_only_fields = ('user', 'correct_answers', 'incorrect_answers', 'questions_count', 'percentage', 'passed', 'started_at', 'completed_at')
-
-    def get_test_title(self, obj):
-        if obj.is_mixed:
-            return "Mixed Test"
-        return obj.test.title if obj.test else None
 
 
 class TestAttemptListSerializer(serializers.ModelSerializer):
     """Serializer for listing test attempts (without detailed answers)"""
-    test_title = serializers.SerializerMethodField()
+    test_title = serializers.CharField(source='test.title', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     
     class Meta:
         model = TestAttempt
-        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'is_mixed', 'correct_answers', 'incorrect_answers', 'questions_count',
+        fields = ('id', 'user', 'user_email', 'test', 'test_title', 'correct_answers', 'incorrect_answers', 'questions_count',
                   'percentage', 'passed', 'time_taken_seconds', 'started_at', 'completed_at')
         read_only_fields = ('user', 'correct_answers', 'incorrect_answers', 'questions_count', 'percentage', 'passed', 'started_at', 'completed_at')
-
-    def get_test_title(self, obj):
-        if obj.is_mixed:
-            return "Mixed Test"
-        return obj.test.title if obj.test else None
 
 
 class TestAttemptListWithStatsSerializer(serializers.Serializer):
