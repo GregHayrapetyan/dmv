@@ -239,8 +239,58 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                     status_code=status.HTTP_404_NOT_FOUND
                 )
             
-            # Get 20 random questions from all available tests
-            all_questions = Question.objects.all().prefetch_related('answer_options').order_by('?')
+            # Require authentication to access mixed test
+            if not request.user.is_authenticated:
+                return APIResponse.error(
+                    message="Authentication required",
+                    error_code=ErrorCodes.UNAUTHORIZED,
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Get state and vehicle from user profile
+            from django.db.models import Count, Q
+            from onboarding.models import Profile
+            
+            try:
+                profile = request.user.profile
+            except Profile.DoesNotExist:
+                return APIResponse.error(
+                    message="User profile not found. Please complete onboarding first.",
+                    error_code=ErrorCodes.NOT_FOUND,
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+            
+            state = profile.state
+            vehicle = profile.vehicle
+            
+            if not state or not vehicle:
+                return APIResponse.error(
+                    message="Please select a state and vehicle in your profile first.",
+                    error_code=ErrorCodes.VALIDATION_ERROR,
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Find tests matching the user's state and vehicle
+            tests = Test.objects.annotate(
+                state_count=Count('states'),
+                vehicle_count=Count('vehicles')
+            ).filter(
+                Q(states=state) | Q(state_count=0)
+            ).filter(
+                Q(vehicles=vehicle) | Q(vehicle_count=0)
+            ).distinct()
+            
+            if not tests.exists():
+                return APIResponse.error(
+                    message="No tests available for your selected state and vehicle",
+                    error_code=ErrorCodes.NOT_FOUND,
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get 20 random questions from matching tests
+            all_questions = Question.objects.filter(
+                test__in=tests
+            ).prefetch_related('answer_options').order_by('?')
             
             if all_questions.count() < 20:
                 return APIResponse.error(
