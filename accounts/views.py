@@ -16,6 +16,7 @@ from django.conf import settings
 from dmv.api_response import APIResponse, ErrorCodes
 from dmv.api_mixins import StandardizedResponseMixin
 import logging
+import time
 import requests as http_requests
 import jwt as pyjwt
 from jwt import PyJWKClient, PyJWKClientError
@@ -324,11 +325,13 @@ class GoogleLoginView(generics.GenericAPIView):
     )
     def post(self, request):
         """Accepts a Google id_token or access_token and returns app JWTs."""
+        t0 = time.time()
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
         
         id_token_str = ser.validated_data.get("id_token")
         access_token = ser.validated_data.get("access_token")
+        logger.info(f"[GOOGLE TIMING] Serializer validation: {time.time() - t0:.3f}s")
         
         if not settings.GOOGLE_OAUTH_CLIENT_ID:
             logger.error("Google OAuth Client ID not configured")
@@ -339,6 +342,7 @@ class GoogleLoginView(generics.GenericAPIView):
         try:
             # Method 1: If ID token is provided (from GoogleLogin component)
             if id_token_str:
+                t1 = time.time()
                 # Verify the ID token locally using cached JWKS keys (no network call)
                 signing_key = _google_jwks_client.get_signing_key_from_jwt(id_token_str)
                 info = pyjwt.decode(
@@ -348,6 +352,7 @@ class GoogleLoginView(generics.GenericAPIView):
                     audience=settings.GOOGLE_OAUTH_CLIENT_ID,
                     issuer=["accounts.google.com", "https://accounts.google.com"],
                 )
+                logger.info(f"[GOOGLE TIMING] ID token verification: {time.time() - t1:.3f}s")
                 
                 # Extract user information from ID token
                 email = info.get("email")
@@ -357,11 +362,13 @@ class GoogleLoginView(generics.GenericAPIView):
             
             # Method 2: If access token is provided (from useGoogleLogin hook)
             elif access_token:
+                t1 = time.time()
                 # Use access token to fetch user info from Google's userinfo endpoint
                 userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
                 headers = {"Authorization": f"Bearer {access_token}"}
                 
                 response = http_requests.get(userinfo_url, headers=headers, timeout=10)
+                logger.info(f"[GOOGLE TIMING] Google userinfo API call: {time.time() - t1:.3f}s")
                 
                 if response.status_code != 200:
                     logger.error(f"Google userinfo fetch failed: {response.text}")
@@ -399,6 +406,7 @@ class GoogleLoginView(generics.GenericAPIView):
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
             
+            t2 = time.time()
             # Get or create user
             user, created = User.objects.get_or_create(
                 email=email,
@@ -409,6 +417,7 @@ class GoogleLoginView(generics.GenericAPIView):
                     "auth_provider": "google",
                 }
             )
+            logger.info(f"[GOOGLE TIMING] DB get_or_create: {time.time() - t2:.3f}s")
             
             # Update existing user's email verification status if not already verified
             if not created and not user.is_email_verified:
@@ -419,8 +428,11 @@ class GoogleLoginView(generics.GenericAPIView):
             if created:
                 logger.info(f"New user created via Google OAuth: {email}")
             
+            t3 = time.time()
             # Generate JWT tokens
             tokens = RefreshToken.for_user(user)
+            logger.info(f"[GOOGLE TIMING] JWT token generation: {time.time() - t3:.3f}s")
+            
             response = APIResponse.success(
                 data={
                     "access": str(tokens.access_token),
@@ -446,6 +458,7 @@ class GoogleLoginView(generics.GenericAPIView):
                 path='/'
             )
             
+            logger.info(f"[GOOGLE TIMING] Total endpoint time: {time.time() - t0:.3f}s")
             return response
             
         except (ValueError, pyjwt.InvalidTokenError) as e:
