@@ -109,7 +109,7 @@ class TestListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer)
     class Meta:
         model = Test
         fields = ('id', 'title', 'image', 'lesson_id', 'question_count',
-                  'passing_percentage', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers')
+                  'passing_percentage', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers', 'order')
     
     def get_lesson_title(self, obj):
         """Get the title of the lesson this test belongs to."""
@@ -198,7 +198,7 @@ class TestDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerialize
     class Meta:
         model = Test
         fields = ('id', 'title', 'image', 'description', 'lesson_id', 'lesson_title', 'time_limit_seconds', 
-                  'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names')
+                  'questions', 'passing_percentage', 'shuffle_questions', 'shuffle_answers', 'state_names', 'order')
     
     def get_lesson_title(self, obj):
         """Get the title of the lesson this test belongs to."""
@@ -318,7 +318,7 @@ class TestStatisticsSerializer(TranslatedSerializerMixin, serializers.ModelSeria
     
     class Meta:
         model = Test
-        fields = ('id', 'title', 'image', 'question_count', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers')
+        fields = ('id', 'title', 'image', 'question_count', 'best_percentage', 'best_correct_answers', 'best_incorrect_answers', 'order')
     
     def get_question_count(self, obj):
         """Return the total number of questions in this test"""
