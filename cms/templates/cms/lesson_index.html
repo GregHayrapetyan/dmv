@@ -75,5 +75,53 @@
         .sortable-chosen { background: #e8f0fe !important; }
         .drag-handle:hover { color: #333 !important; }
         .listing tbody tr { transition: background-color 0.15s ease; }
+
+        /* Responsive table for Lessons listing */
+        .listing table {
+            table-layout: auto;
+        }
+        .listing .field-title {
+            min-width: 180px;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        /* Tablet breakpoint: hide duration and order */
+        @media (max-width: 1100px) {
+            .listing .field-duration_minutes,
+            .listing th.field-duration_minutes,
+            .listing .field-order,
+            .listing th.field-order {
+                display: none;
+            }
+        }
+
+        /* Small screens: also hide created_at */
+        @media (max-width: 800px) {
+            .listing .field-created_at,
+            .listing th.field-created_at {
+                display: none;
+            }
+            .listing .field-title {
+                min-width: 140px;
+            }
+        }
+
+        /* Extra small: also hide category, keep only title and is_published */
+        @media (max-width: 600px) {
+            .listing .field-category,
+            .listing th.field-category {
+                display: none;
+            }
+            .listing .field-title {
+                min-width: 120px;
+            }
+        }
+
+        /* Scrollable wrapper fallback */
+        .content .result-list {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 {% endblock %}
