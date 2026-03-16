@@ -170,6 +170,10 @@ def reorder_tests_view(request):
         with transaction.atomic():
             for index, item_id in enumerate(ordered_ids):
                 CMSTest.objects.filter(pk=item_id).update(order=index)
+                # Sync order to learning.Test (QuerySet.update bypasses post_save signals)
+                cms_test = CMSTest.objects.filter(pk=item_id).values_list('title', flat=True).first()
+                if cms_test:
+                    Test.objects.filter(title=cms_test).update(order=index)
         
         return JsonResponse({'status': 'ok', 'message': f'Reordered {len(ordered_ids)} tests'})
     except (json.JSONDecodeError, Exception) as e:
