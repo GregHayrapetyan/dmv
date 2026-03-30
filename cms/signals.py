@@ -2,11 +2,29 @@
 Signals to keep CMSTest in sync with learning.Test model.
 This ensures that tests created in Wagtail CMS are available in the API.
 """
+import os
+
+from django.core.files.base import File
 from django.db import models
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from cms.models import CMSTest, CMSQuestion, CMSAnswer
 from learning.models import Test, Question, AnswerOption
+
+
+def _sync_wagtail_image_to_imagefield(cms_image, question):
+    """Copy a Wagtail Image file into the Question.image ImageField."""
+    if cms_image:
+        try:
+            wagtail_file = cms_image.file
+            filename = os.path.basename(wagtail_file.name)
+            question.image.save(filename, File(wagtail_file), save=True)
+        except Exception:
+            pass
+    else:
+        if question.image:
+            question.image = None
+            question.save()
 
 
 @receiver(post_save, sender=CMSTest)
@@ -118,6 +136,9 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
         question.text_zh = instance.text_zh
         question.explanation_zh = instance.explanation_zh
         question.save()
+    
+    # Sync image from Wagtail Image to Django ImageField
+    _sync_wagtail_image_to_imagefield(instance.image, question)
 
 
 @receiver(post_save, sender=CMSAnswer)
