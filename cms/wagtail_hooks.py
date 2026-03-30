@@ -945,6 +945,125 @@ def add_custom_panels(request, panels):
     pass
 
 
+@hooks.register('insert_global_admin_css')
+def global_responsive_listing_css():
+    """Inject responsive CSS for all ModelAdmin listing tables."""
+    return format_html("""
+    <style>
+        /* ===== Global responsive fixes for ModelAdmin listing tables ===== */
+
+        /* Scrollable table wrapper */
+        .content .result-list {{
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }}
+
+        .listing table {{
+            table-layout: auto;
+        }}
+
+        /* Primary identifier columns get minimum width */
+        .listing .field-title,
+        .listing .field-name,
+        .listing .field-user,
+        .listing .field-email_primary,
+        .listing .field-description_preview {{
+            min-width: 180px;
+            white-space: normal;
+            word-break: break-word;
+        }}
+
+        /* ---------- Tablet (≤1100px): hide order, time limits, previews ---------- */
+        @media (max-width: 1100px) {{
+            .listing .field-order,
+            .listing th.field-order,
+            .listing .field-time_limit_seconds,
+            .listing th.field-time_limit_seconds,
+            .listing .field-avatar_preview,
+            .listing th.field-avatar_preview,
+            .listing .field-image_preview,
+            .listing th.field-image_preview,
+            .listing .field-completed_at,
+            .listing th.field-completed_at,
+            .listing .field-current_period_end,
+            .listing th.field-current_period_end,
+            .listing .field-cancel_at_period_end,
+            .listing th.field-cancel_at_period_end {{
+                display: none;
+            }}
+        }}
+
+        /* ---------- Small screens (≤800px): also hide timestamps and counts ---------- */
+        @media (max-width: 800px) {{
+            .listing .field-created_at,
+            .listing th.field-created_at,
+            .listing .field-updated_at,
+            .listing th.field-updated_at,
+            .listing .field-started_at,
+            .listing th.field-started_at,
+            .listing .field-passing_percentage,
+            .listing th.field-passing_percentage,
+            .listing .field-section_header,
+            .listing th.field-section_header,
+            .listing .field-stripe_customer_id,
+            .listing th.field-stripe_customer_id,
+            .listing .field-duration_minutes,
+            .listing th.field-duration_minutes,
+            .listing .field-url,
+            .listing th.field-url {{
+                display: none;
+            }}
+            .listing .field-title,
+            .listing .field-name,
+            .listing .field-user,
+            .listing .field-email_primary,
+            .listing .field-description_preview {{
+                min-width: 140px;
+            }}
+        }}
+
+        /* ---------- Extra small (≤600px): keep only primary identifiers + key status ---------- */
+        @media (max-width: 600px) {{
+            .listing .field-question_count,
+            .listing th.field-question_count,
+            .listing .field-feature_count,
+            .listing th.field-feature_count,
+            .listing .field-steps_count,
+            .listing th.field-steps_count,
+            .listing .field-features_count,
+            .listing th.field-features_count,
+            .listing .field-options_count,
+            .listing th.field-options_count,
+            .listing .field-category,
+            .listing th.field-category,
+            .listing .field-job_title,
+            .listing th.field-job_title,
+            .listing .field-rating,
+            .listing th.field-rating,
+            .listing .field-percentage,
+            .listing th.field-percentage,
+            .listing .field-button_text,
+            .listing th.field-button_text,
+            .listing .field-price_new,
+            .listing th.field-price_new,
+            .listing .field-phone_primary,
+            .listing th.field-phone_primary,
+            .listing .field-hide,
+            .listing th.field-hide {{
+                display: none;
+            }}
+            .listing .field-title,
+            .listing .field-name,
+            .listing .field-user,
+            .listing .field-email_primary,
+            .listing .field-description_preview {{
+                min-width: 120px;
+            }}
+        }}
+    </style>
+    """)
+
+
 # ============================================================================
 # UNREGISTER WAGTAIL MODELS FROM DJANGO ADMIN
 # ============================================================================
