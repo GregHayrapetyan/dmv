@@ -1060,6 +1060,75 @@ def global_responsive_listing_css():
                 min-width: 120px;
             }}
         }}
+
+        /* ===== Wagtail built-in Users listing ===== */
+        .listing td.name,
+        .listing th.name {{
+            min-width: 180px;
+            white-space: normal;
+            word-break: break-word;
+        }}
+
+        @media (max-width: 1100px) {{
+            .listing td.last-login,
+            .listing th.last-login {{
+                display: none;
+            }}
+        }}
+
+        @media (max-width: 800px) {{
+            .listing td.level,
+            .listing th.level {{
+                display: none;
+            }}
+            .listing td.name,
+            .listing th.name {{
+                min-width: 140px;
+            }}
+        }}
+
+        @media (max-width: 600px) {{
+            .listing td.username,
+            .listing th.username {{
+                display: none;
+            }}
+            .listing td.name,
+            .listing th.name {{
+                min-width: 120px;
+            }}
+        }}
+
+        /* ===== Wagtail Pages explorer listing ===== */
+        .listing td.title,
+        .listing th.title {{
+            min-width: 180px;
+            white-space: normal;
+            word-break: break-word;
+        }}
+
+        @media (max-width: 800px) {{
+            .listing td.type,
+            .listing th.type,
+            .listing td.updated,
+            .listing th.updated {{
+                display: none;
+            }}
+            .listing td.title,
+            .listing th.title {{
+                min-width: 140px;
+            }}
+        }}
+
+        @media (max-width: 600px) {{
+            .listing td.parent,
+            .listing th.parent {{
+                display: none;
+            }}
+            .listing td.title,
+            .listing th.title {{
+                min-width: 120px;
+            }}
+        }}
     </style>
     """)
 
