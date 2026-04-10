@@ -3,12 +3,13 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
 
 from cms.models import CMSTest, CMSQuestion, CMSAnswer
 from learning.models import Lesson, Test
+from wagtail.images.models import Image as WagtailImage
 
 
 @staff_member_required
@@ -126,13 +127,22 @@ def _process_state_data(data, stats):
                 # Get explanation from JSON
                 explanation = q_data.get('explanation', '')
                 
+                # Look up image if provided
+                question_image = None
+                image_filename = q_data.get('image')
+                if image_filename:
+                    question_image = WagtailImage.objects.filter(file=image_filename).first()
+                    if not question_image:
+                        question_image = WagtailImage.objects.filter(title=image_filename).first()
+
                 # Create question
                 question = CMSQuestion.objects.create(
                     test=test,
                     text=question_text,
                     question_type='multiple_choice',
                     explanation=explanation,
-                    order=max_order + 1
+                    order=max_order + 1,
+                    image=question_image,
                 )
                 stats['questions_created'] += 1
                 
@@ -153,6 +163,59 @@ def _process_state_data(data, stats):
                         order=idx + 1,
                     )
                     stats['answers_created'] += 1
+
+
+@staff_member_required
+@require_http_methods(["GET"])
+def export_questions_view(request):
+    """Export all CMS questions as a JSON file in the same format used for import."""
+    tests = CMSTest.objects.prefetch_related('questions__answers').order_by('order', 'id')
+
+    questions_list = []
+    question_id = 1
+    for test in tests:
+        # Convert title back to snake_case category (reverse of import's .replace('_', ' ').title())
+        category = test.title.lower().replace(' ', '_')
+        for question in test.questions.all().order_by('order'):
+            answers = list(question.answers.all().order_by('order'))
+            correct_index = None
+            answer_texts = []
+            for idx, ans in enumerate(answers):
+                answer_texts.append(ans.text)
+                if ans.is_correct:
+                    correct_index = idx
+
+            image_link = None
+            if question.image:
+                image_link = question.image.file.url
+
+            q_data = {
+                'id': question_id,
+                'question': question.text,
+                'video_link': None,
+                'image_link': image_link,
+                'answers': answer_texts,
+                'correct': correct_index,
+                'category': category,
+                'needs_image': 'yes' if question.image else 'no',
+                'explanation': question.explanation,
+            }
+            questions_list.append(q_data)
+            question_id += 1
+
+    export_data = [
+        {
+            'state': 'California',
+            'questions': questions_list,
+        }
+    ]
+
+    response = HttpResponse(
+        json.dumps(export_data, indent=2, ensure_ascii=False),
+        content_type='application/json',
+    )
+    response['Content-Disposition'] = 'attachment; filename="questions_export.json"'
+    return response
 
 
 @staff_member_required
