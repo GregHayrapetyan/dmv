@@ -15,9 +15,20 @@ class CMSQuestionInline(admin.StackedInline):
     """Inline admin for questions."""
     model = CMSQuestion
     extra = 1
-    fields = ('text', 'image', 'question_type', 'explanation', 'order')
+    fields = ('text', 'image', 'image_preview', 'question_type', 'explanation', 'order')
+    readonly_fields = ('image_preview',)
     ordering = ('order',)
     show_change_link = True
+
+    def image_preview(self, obj):
+        """Display a thumbnail of the question image."""
+        if obj.pk and obj.image:
+            return format_html(
+                '<img src="{}" style="max-height: 120px; max-width: 200px; border-radius: 4px;" />',
+                obj.image.file.url
+            )
+        return "-"
+    image_preview.short_description = "Image Preview"
 
 
 @admin.register(CMSTest)
@@ -104,6 +115,7 @@ class CMSQuestionAdmin(admin.ModelAdmin):
     """Admin interface for managing questions."""
     list_display = (
         "text_preview",
+        "image_thumbnail",
         "test",
         "question_type",
         "answers_count",
@@ -130,6 +142,16 @@ class CMSQuestionAdmin(admin.ModelAdmin):
     
     inlines = [CMSAnswerInline]
     
+    def image_thumbnail(self, obj):
+        """Display a small thumbnail of the question image."""
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-height: 40px; max-width: 60px; border-radius: 3px;" />',
+                obj.image.file.url
+            )
+        return "-"
+    image_thumbnail.short_description = "Image"
+
     def text_preview(self, obj):
         """Display truncated question text."""
         if len(obj.text) > 80:
