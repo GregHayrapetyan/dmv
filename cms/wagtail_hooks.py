@@ -49,7 +49,7 @@ from learning.models import (
 )
 
 # Import CMS models for test management
-from cms.models import CMSTest
+from cms.models import CMSTest, CMSQuestion
 
 # Import site_details models
 from site_details.models import (
@@ -217,6 +217,34 @@ class CMSTestAdmin(ModelAdmin):
         count = obj.questions.count()
         return f"{count} question{'s' if count != 1 else ''}"
     question_count.short_description = 'Questions'
+
+
+class CMSQuestionModelAdmin(ModelAdmin):
+    """Question admin with image thumbnail in Wagtail admin."""
+    model = CMSQuestion
+    menu_label = 'Questions'
+    menu_icon = 'help'
+    list_display = ('text_preview', 'image_thumbnail', 'test', 'question_type', 'order')
+    list_filter = ('question_type', 'test')
+    search_fields = ('text', 'test__title')
+    ordering = ('test__title', 'order')
+
+    def text_preview(self, obj):
+        """Display truncated question text."""
+        if len(obj.text) > 80:
+            return f"{obj.text[:80]}..."
+        return obj.text
+    text_preview.short_description = 'Question'
+
+    def image_thumbnail(self, obj):
+        """Display a small thumbnail of the question image."""
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-height: 50px; max-width: 80px; border-radius: 3px; object-fit: cover;" />',
+                obj.image.file.url
+            )
+        return "-"
+    image_thumbnail.short_description = 'Image'
 
 
 # Questions and Answers are managed inline within CMSTest
@@ -798,6 +826,7 @@ class LearningGroup(ModelAdminGroup):
         LessonCategoryAdmin,
         LessonAdmin,
         CMSTestAdmin,  # Questions and answers managed inline
+        CMSQuestionModelAdmin,
     )
 
 
