@@ -18,6 +18,9 @@ def _sync_wagtail_image_to_imagefield(cms_image, question):
         try:
             wagtail_file = cms_image.file
             filename = os.path.basename(wagtail_file.name)
+            # Skip copy if the Question already has an image with the same filename
+            if question.image and os.path.basename(question.image.name) == filename:
+                return
             question.image.save(filename, File(wagtail_file), save=True)
         except Exception:
             pass
