@@ -166,6 +166,7 @@ class CMSTestAdmin(ModelAdmin):
     ordering = ('order', 'id')
     button_helper_class = CMSTestButtonHelper
     index_template_name = 'cms/cmstest_index.html'
+    form_view_extra_js = ['cms/js/image-chooser-fix.js']
     
     def get_edit_handler(self):
         from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList, MultiFieldPanel
@@ -229,6 +230,44 @@ class CMSQuestionModelAdmin(ModelAdmin):
     search_fields = ('text', 'test__title')
     ordering = ('test__title', 'order')
 
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('test'),
+                    FieldPanel('image'),
+                    FieldPanel('question_type'),
+                    FieldPanel('order'),
+                    FieldPanel('text'),
+                    FieldPanel('explanation'),
+                ], heading='English'),
+                ObjectList([
+                    FieldPanel('text_ru'),
+                    FieldPanel('explanation_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('text_hy'),
+                    FieldPanel('explanation_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('text_hi'),
+                    FieldPanel('explanation_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('text_es'),
+                    FieldPanel('explanation_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('text_zh'),
+                    FieldPanel('explanation_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    InlinePanel('answers', label="Answer Options"),
+                ], heading='Answers'),
+            ])
+        return self.edit_handler
+
     def text_preview(self, obj):
         """Display truncated question text."""
         if len(obj.text) > 80:
@@ -239,10 +278,13 @@ class CMSQuestionModelAdmin(ModelAdmin):
     def image_thumbnail(self, obj):
         """Display a small thumbnail of the question image."""
         if obj.image:
-            return format_html(
-                '<img src="{}" style="max-height: 50px; max-width: 80px; border-radius: 3px; object-fit: cover;" />',
-                obj.image.file.url
-            )
+            try:
+                return format_html(
+                    '<img src="{}" style="max-height: 50px; max-width: 80px; border-radius: 3px; object-fit: cover;" />',
+                    obj.image.file.url
+                )
+            except Exception:
+                return "-"
         return "-"
     image_thumbnail.short_description = 'Image'
 
