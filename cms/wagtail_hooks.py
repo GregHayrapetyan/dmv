@@ -13,14 +13,17 @@ from wagtail_modeladmin.helpers import PermissionHelper, ButtonHelper
 
 
 class CMSTestButtonHelper(ButtonHelper):
-    """Custom button helper to add import button to CMSTest index."""
+    """Custom button helper to add import/export buttons to CMSTest index."""
     
     def get_buttons_for_obj(self, obj, **kwargs):
-        """Return default buttons for object."""
-        return super().get_buttons_for_obj(obj, **kwargs)
+        """Return default buttons plus per-test import/export buttons."""
+        buttons = super().get_buttons_for_obj(obj, **kwargs)
+        buttons.append(self.export_test_button(obj, **kwargs))
+        buttons.append(self.import_test_button(obj, **kwargs))
+        return buttons
     
     def import_button(self, classnames_add=None, classnames_exclude=None):
-        """Return a button to import questions."""
+        """Return a button to import questions (global)."""
         if classnames_add is None:
             classnames_add = []
         if classnames_exclude is None:
@@ -34,6 +37,40 @@ class CMSTestButtonHelper(ButtonHelper):
             'label': 'Import Questions',
             'classname': cn,
             'title': 'Import questions from JSON file',
+        }
+
+    def export_test_button(self, obj, classnames_add=None, classnames_exclude=None, **kwargs):
+        """Return a button to export questions for a specific test."""
+        if classnames_add is None:
+            classnames_add = []
+        if classnames_exclude is None:
+            classnames_exclude = []
+        
+        classnames = self.edit_button_classnames + classnames_add
+        cn = self.finalise_classname(classnames, classnames_exclude)
+        
+        return {
+            'url': reverse('cms:export_test_questions', args=[obj.pk]),
+            'label': 'Export',
+            'classname': cn,
+            'title': f'Export questions for {obj.title}',
+        }
+
+    def import_test_button(self, obj, classnames_add=None, classnames_exclude=None, **kwargs):
+        """Return a button to import questions into a specific test."""
+        if classnames_add is None:
+            classnames_add = []
+        if classnames_exclude is None:
+            classnames_exclude = []
+        
+        classnames = self.edit_button_classnames + classnames_add
+        cn = self.finalise_classname(classnames, classnames_exclude)
+        
+        return {
+            'url': reverse('cms:import_test_questions', args=[obj.pk]),
+            'label': 'Import',
+            'classname': cn,
+            'title': f'Import questions into {obj.title}',
         }
 
 

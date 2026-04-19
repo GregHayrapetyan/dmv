@@ -219,6 +219,163 @@ def export_questions_view(request):
 
 
 @staff_member_required
+@require_http_methods(["GET"])
+def export_test_questions_view(request, test_id):
+    """Export questions for a specific CMS test as a JSON file."""
+    from django.shortcuts import get_object_or_404
+
+    test = get_object_or_404(
+        CMSTest.objects.prefetch_related('questions__answers'), pk=test_id
+    )
+
+    category = test.title.lower().replace(' ', '_')
+    questions_list = []
+    question_id = 1
+
+    for question in test.questions.all().order_by('order'):
+        answers = list(question.answers.all().order_by('order'))
+        correct_index = None
+        answer_texts = []
+        for idx, ans in enumerate(answers):
+            answer_texts.append(ans.text)
+            if ans.is_correct:
+                correct_index = idx
+
+        image_link = None
+        if question.image:
+            image_link = question.image.file.url
+
+        q_data = {
+            'id': question_id,
+            'question': question.text,
+            'video_link': None,
+            'image_link': image_link,
+            'answers': answer_texts,
+            'correct': correct_index,
+            'category': category,
+            'needs_image': 'yes' if question.image else 'no',
+            'explanation': question.explanation,
+        }
+        questions_list.append(q_data)
+        question_id += 1
+
+    export_data = [
+        {
+            'state': 'California',
+            'questions': questions_list,
+        }
+    ]
+
+    safe_title = test.title.replace(' ', '_').lower()
+    response = HttpResponse(
+        json.dumps(export_data, indent=2, ensure_ascii=False),
+        content_type='application/json',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}_questions_export.json"'
+    return response
+
+
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def import_test_questions_view(request, test_id):
+    """Import questions from a JSON file into a specific CMS test."""
+    from django.shortcuts import get_object_or_404
+
+    test = get_object_or_404(CMSTest, pk=test_id)
+
+    if request.method == "POST":
+        json_file = request.FILES.get('json_file')
+
+        if not json_file:
+            messages.error(request, "Please select a JSON file to upload.")
+            return redirect('cms:import_test_questions', test_id=test.pk)
+
+        try:
+            content = json_file.read().decode('utf-8')
+            data = json.loads(content)
+
+            # Handle both list and single object formats
+            if isinstance(data, list):
+                state_objects = data
+            else:
+                state_objects = [data]
+
+            stats = {
+                'questions_created': 0,
+                'questions_skipped': 0,
+                'answers_created': 0,
+            }
+
+            with transaction.atomic():
+                for state_data in state_objects:
+                    questions_data = state_data.get('questions', [])
+                    for q_data in questions_data:
+                        question_text = q_data.get('question')
+                        if not question_text:
+                            continue
+
+                        # Check for duplicate
+                        if CMSQuestion.objects.filter(test=test, text=question_text).exists():
+                            stats['questions_skipped'] += 1
+                            continue
+
+                        max_order = CMSQuestion.objects.filter(test=test).count()
+                        explanation = q_data.get('explanation', '')
+
+                        question_image = None
+                        image_filename = q_data.get('image')
+                        if image_filename:
+                            question_image = WagtailImage.objects.filter(file=image_filename).first()
+                            if not question_image:
+                                question_image = WagtailImage.objects.filter(title=image_filename).first()
+
+                        question = CMSQuestion.objects.create(
+                            test=test,
+                            text=question_text,
+                            question_type='multiple_choice',
+                            explanation=explanation,
+                            order=max_order + 1,
+                            image=question_image,
+                        )
+                        stats['questions_created'] += 1
+
+                        answers = q_data.get('answers', [])
+                        correct_index = q_data.get('correct')
+                        if not answers:
+                            continue
+
+                        for idx, answer_text in enumerate(answers):
+                            is_correct = (idx == correct_index)
+                            CMSAnswer.objects.create(
+                                question=question,
+                                text=answer_text,
+                                is_correct=is_correct,
+                                order=idx + 1,
+                            )
+                            stats['answers_created'] += 1
+
+            messages.success(
+                request,
+                f"Import into '{test.title}' completed! "
+                f"Questions created: {stats['questions_created']}, "
+                f"Answers created: {stats['answers_created']}, "
+                f"Questions skipped (duplicates): {stats['questions_skipped']}"
+            )
+
+        except json.JSONDecodeError as e:
+            messages.error(request, f"Invalid JSON file: {e}")
+        except Exception as e:
+            messages.error(request, f"Import error: {str(e)}")
+
+        return redirect('cms:import_test_questions', test_id=test.pk)
+
+    return render(request, 'cms/import_test_questions.html', {
+        'title': f'Import Questions into: {test.title}',
+        'test': test,
+    })
+
+
+@staff_member_required
 @require_http_methods(["POST"])
 @csrf_protect
 def reorder_tests_view(request):
