@@ -275,19 +275,34 @@ def export_test_questions_view(request, test_id):
     return response
 
 
+LANGUAGE_CHOICES = [
+    ('en', 'English'),
+    ('ru', 'Russian'),
+    ('hy', 'Armenian'),
+    ('hi', 'Hindi'),
+    ('es', 'Spanish'),
+    ('zh', 'Chinese'),
+]
+
+
 @staff_member_required
 @require_http_methods(["GET", "POST"])
 def import_test_questions_view(request, test_id):
-    """Import questions from a JSON file into a specific CMS test."""
+    """Import questions from a JSON file into a specific CMS test for a specific language."""
     from django.shortcuts import get_object_or_404
 
     test = get_object_or_404(CMSTest, pk=test_id)
 
     if request.method == "POST":
         json_file = request.FILES.get('json_file')
+        language = request.POST.get('language', 'en')
 
         if not json_file:
             messages.error(request, "Please select a JSON file to upload.")
+            return redirect('cms:import_test_questions', test_id=test.pk)
+
+        if language not in dict(LANGUAGE_CHOICES):
+            messages.error(request, "Invalid language selected.")
             return redirect('cms:import_test_questions', test_id=test.pk)
 
         try:
@@ -300,67 +315,33 @@ def import_test_questions_view(request, test_id):
             else:
                 state_objects = [data]
 
-            stats = {
-                'questions_created': 0,
-                'questions_skipped': 0,
-                'answers_created': 0,
-            }
+            # Collect all questions from all state objects
+            all_questions_data = []
+            for state_data in state_objects:
+                all_questions_data.extend(state_data.get('questions', []))
 
-            with transaction.atomic():
-                for state_data in state_objects:
-                    questions_data = state_data.get('questions', [])
-                    for q_data in questions_data:
-                        question_text = q_data.get('question')
-                        if not question_text:
-                            continue
+            if language == 'en':
+                stats = _import_english_questions(test, all_questions_data)
+            else:
+                stats = _import_translated_questions(test, all_questions_data, language)
 
-                        # Check for duplicate
-                        if CMSQuestion.objects.filter(test=test, text=question_text).exists():
-                            stats['questions_skipped'] += 1
-                            continue
-
-                        max_order = CMSQuestion.objects.filter(test=test).count()
-                        explanation = q_data.get('explanation', '')
-
-                        question_image = None
-                        image_filename = q_data.get('image')
-                        if image_filename:
-                            question_image = WagtailImage.objects.filter(file=image_filename).first()
-                            if not question_image:
-                                question_image = WagtailImage.objects.filter(title=image_filename).first()
-
-                        question = CMSQuestion.objects.create(
-                            test=test,
-                            text=question_text,
-                            question_type='multiple_choice',
-                            explanation=explanation,
-                            order=max_order + 1,
-                            image=question_image,
-                        )
-                        stats['questions_created'] += 1
-
-                        answers = q_data.get('answers', [])
-                        correct_index = q_data.get('correct')
-                        if not answers:
-                            continue
-
-                        for idx, answer_text in enumerate(answers):
-                            is_correct = (idx == correct_index)
-                            CMSAnswer.objects.create(
-                                question=question,
-                                text=answer_text,
-                                is_correct=is_correct,
-                                order=idx + 1,
-                            )
-                            stats['answers_created'] += 1
-
-            messages.success(
-                request,
-                f"Import into '{test.title}' completed! "
-                f"Questions created: {stats['questions_created']}, "
-                f"Answers created: {stats['answers_created']}, "
-                f"Questions skipped (duplicates): {stats['questions_skipped']}"
-            )
+            lang_label = dict(LANGUAGE_CHOICES).get(language, language)
+            if language == 'en':
+                messages.success(
+                    request,
+                    f"Import ({lang_label}) into '{test.title}' completed! "
+                    f"Questions created: {stats['questions_created']}, "
+                    f"Answers created: {stats['answers_created']}, "
+                    f"Questions skipped (duplicates): {stats['questions_skipped']}"
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Translation import ({lang_label}) into '{test.title}' completed! "
+                    f"Questions updated: {stats['questions_updated']}, "
+                    f"Answers updated: {stats['answers_updated']}, "
+                    f"Questions skipped (no match): {stats['questions_skipped']}"
+                )
 
         except json.JSONDecodeError as e:
             messages.error(request, f"Invalid JSON file: {e}")
@@ -372,7 +353,115 @@ def import_test_questions_view(request, test_id):
     return render(request, 'cms/import_test_questions.html', {
         'title': f'Import Questions into: {test.title}',
         'test': test,
+        'language_choices': LANGUAGE_CHOICES,
     })
+
+
+def _import_english_questions(test, questions_data):
+    """Import English questions — creates new questions."""
+    stats = {
+        'questions_created': 0,
+        'questions_skipped': 0,
+        'answers_created': 0,
+    }
+
+    with transaction.atomic():
+        for q_data in questions_data:
+            question_text = q_data.get('question')
+            if not question_text:
+                continue
+
+            # Check for duplicate
+            if CMSQuestion.objects.filter(test=test, text=question_text).exists():
+                stats['questions_skipped'] += 1
+                continue
+
+            max_order = CMSQuestion.objects.filter(test=test).count()
+            explanation = q_data.get('explanation', '')
+
+            question_image = None
+            image_filename = q_data.get('image')
+            if image_filename:
+                question_image = WagtailImage.objects.filter(file=image_filename).first()
+                if not question_image:
+                    question_image = WagtailImage.objects.filter(title=image_filename).first()
+
+            question = CMSQuestion.objects.create(
+                test=test,
+                text=question_text,
+                question_type='multiple_choice',
+                explanation=explanation,
+                order=max_order + 1,
+                image=question_image,
+            )
+            stats['questions_created'] += 1
+
+            answers = q_data.get('answers', [])
+            correct_index = q_data.get('correct')
+            if not answers:
+                continue
+
+            for idx, answer_text in enumerate(answers):
+                is_correct = (idx == correct_index)
+                CMSAnswer.objects.create(
+                    question=question,
+                    text=answer_text,
+                    is_correct=is_correct,
+                    order=idx + 1,
+                )
+                stats['answers_created'] += 1
+
+    return stats
+
+
+def _import_translated_questions(test, questions_data, language):
+    """Import translated questions — updates language fields on existing questions matched by order."""
+    stats = {
+        'questions_updated': 0,
+        'questions_skipped': 0,
+        'answers_updated': 0,
+    }
+
+    text_field = f'text_{language}'
+    explanation_field = f'explanation_{language}'
+
+    # Get existing questions ordered by their position
+    existing_questions = list(test.questions.all().order_by('order', 'pk'))
+
+    with transaction.atomic():
+        for idx, q_data in enumerate(questions_data):
+            question_text = q_data.get('question')
+            if not question_text:
+                stats['questions_skipped'] += 1
+                continue
+
+            if idx >= len(existing_questions):
+                stats['questions_skipped'] += 1
+                continue
+
+            question = existing_questions[idx]
+
+            # Update translation fields
+            setattr(question, text_field, question_text)
+            explanation = q_data.get('explanation', '')
+            if explanation:
+                setattr(question, explanation_field, explanation)
+            question.save()
+            stats['questions_updated'] += 1
+
+            # Update answer translations
+            answers_data = q_data.get('answers', [])
+            if answers_data:
+                existing_answers = list(question.answers.all().order_by('order', 'pk'))
+                for ans_idx, answer_text in enumerate(answers_data):
+                    if ans_idx >= len(existing_answers):
+                        break
+                    answer = existing_answers[ans_idx]
+                    setattr(answer, text_field, answer_text)
+                    answer.save()
+                    stats['answers_updated'] += 1
+
+    return stats
 
 
 @staff_member_required
