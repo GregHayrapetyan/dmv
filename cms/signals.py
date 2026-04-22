@@ -12,22 +12,40 @@ from cms.models import CMSTest, CMSQuestion, CMSAnswer
 from learning.models import Test, Question, AnswerOption
 
 
-def _sync_wagtail_image_to_imagefield(cms_image, question):
-    """Copy a Wagtail Image file into the Question.image ImageField."""
+def _sync_filefield(source_field, target_obj, field_name):
+    """Sync a Django FileField from CMS model to target model."""
+    target_field = getattr(target_obj, field_name)
+    if source_field:
+        try:
+            src_name = os.path.basename(source_field.name)
+            # Skip if already the same file
+            if target_field and os.path.basename(target_field.name) == src_name:
+                return
+            target_field.save(src_name, File(source_field), save=True)
+        except Exception:
+            pass
+    else:
+        if target_field:
+            setattr(target_obj, field_name, None)
+            target_obj.save()
+
+
+def _sync_wagtail_image_to_imagefield(cms_image, target_obj):
+    """Copy a Wagtail Image file into a Django ImageField on target_obj."""
     if cms_image:
         try:
             wagtail_file = cms_image.file
             filename = os.path.basename(wagtail_file.name)
-            # Skip copy if the Question already has an image with the same filename
-            if question.image and os.path.basename(question.image.name) == filename:
+            # Skip copy if the target already has an image with the same filename
+            if target_obj.image and os.path.basename(target_obj.image.name) == filename:
                 return
-            question.image.save(filename, File(wagtail_file), save=True)
+            target_obj.image.save(filename, File(wagtail_file), save=True)
         except Exception:
             pass
     else:
-        if question.image:
-            question.image = None
-            question.save()
+        if target_obj.image:
+            target_obj.image = None
+            target_obj.save()
 
 
 @receiver(post_save, sender=CMSTest)
@@ -84,8 +102,8 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
         test.description_zh = instance.description_zh
         test.save()
     
-    # Store the test ID in CMSTest for reference (we'll need to add this field)
-    # For now, we'll use title matching
+    # Sync image from Wagtail Image to Django ImageField
+    _sync_wagtail_image_to_imagefield(instance.image, test)
 
 
 @receiver(post_save, sender=CMSQuestion)
@@ -142,6 +160,9 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
     
     # Sync image from Wagtail Image to Django ImageField
     _sync_wagtail_image_to_imagefield(instance.image, question)
+    
+    # Sync video file
+    _sync_filefield(instance.video, question, 'video')
 
 
 @receiver(post_save, sender=CMSAnswer)

@@ -136,7 +136,7 @@ class CMSQuestionAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ("Question Details", {
-            "fields": ("test", "text", "image", "question_type", "explanation", "order")
+            "fields": ("test", "text", "image", "video", "question_type", "explanation", "order")
         }),
     )
     

@@ -305,6 +305,12 @@ class CMSQuestion(ClusterableModel):
         related_name='+',
         help_text="Optional image for the question"
     )
+    video = models.FileField(
+        upload_to="test_questions/videos/",
+        blank=True,
+        null=True,
+        help_text="Video for the question (if any)",
+    )
     question_type = models.CharField(
         max_length=20,
         choices=QUESTION_TYPES,
@@ -317,6 +323,7 @@ class CMSQuestion(ClusterableModel):
     
     panels = [
         FieldPanel('image'),
+        FieldPanel('video'),
         FieldPanel('question_type'),
         FieldPanel('order'),
         FieldPanel('text'),
