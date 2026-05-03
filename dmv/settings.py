@@ -358,6 +358,12 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 WAGTAIL_SITE_NAME = 'MyTest DMV'
 WAGTAILADMIN_BASE_URL = config('WAGTAILADMIN_BASE_URL', default='http://localhost:8000')
 
+# Max image dimension (px) for question images - images larger than this will be rejected
+IMAGE_MAX_DIMENSION = 800
+
+# Use custom image form that validates max dimensions on upload
+WAGTAILIMAGES_IMAGE_FORM_BASE = 'cms.forms.RestrictedImageForm'
+
 # Use custom User model with Wagtail
 WAGTAIL_USER_EDIT_FORM = 'wagtail.users.forms.UserEditForm'
 WAGTAIL_USER_CREATION_FORM = 'wagtail.users.forms.UserCreationForm'

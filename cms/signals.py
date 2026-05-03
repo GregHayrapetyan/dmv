@@ -2,14 +2,86 @@
 Signals to keep CMSTest in sync with learning.Test model.
 This ensures that tests created in Wagtail CMS are available in the API.
 """
+import io
 import os
 
-from django.core.files.base import File
+from django.conf import settings
+from django.core.files.base import File, ContentFile
 from django.db import models
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from PIL import Image as PILImage
+from wagtail.images.models import Image as WagtailImageModel
+
 from cms.models import CMSTest, CMSQuestion, CMSAnswer
 from learning.models import Test, Question, AnswerOption
+
+MAX_DIMENSION = getattr(settings, 'IMAGE_MAX_DIMENSION', 800)
+
+
+def _resize_image_if_needed(image_file, max_dim=MAX_DIMENSION):
+    """
+    Resize an image so that neither width nor height exceeds max_dim.
+    Returns (resized_content_file, was_resized) or (None, False) on error.
+    """
+    try:
+        img = PILImage.open(image_file)
+        w, h = img.size
+        if w <= max_dim and h <= max_dim:
+            return None, False
+        # Calculate new dimensions preserving aspect ratio
+        ratio = min(max_dim / w, max_dim / h)
+        new_size = (int(w * ratio), int(h * ratio))
+        img = img.resize(new_size, PILImage.LANCZOS)
+        # Save to buffer
+        buf = io.BytesIO()
+        fmt = img.format or 'PNG'
+        if img.mode in ('RGBA', 'P') and fmt == 'JPEG':
+            img = img.convert('RGB')
+        img.save(buf, format=fmt, quality=85)
+        buf.seek(0)
+        return ContentFile(buf.read()), True
+    except Exception:
+        return None, False
+
+
+@receiver(post_save, sender=WagtailImageModel)
+def resize_wagtail_image_on_upload(sender, instance, created, **kwargs):
+    """
+    Auto-resize Wagtail images to max IMAGE_MAX_DIMENSION px on upload.
+    """
+    if not created:
+        return
+    try:
+        file_field = instance.file
+        file_field.open('rb')
+        img = PILImage.open(file_field)
+        w, h = img.size
+        if w <= MAX_DIMENSION and h <= MAX_DIMENSION:
+            return
+        # Resize
+        ratio = min(MAX_DIMENSION / w, MAX_DIMENSION / h)
+        new_size = (int(w * ratio), int(h * ratio))
+        img = img.resize(new_size, PILImage.LANCZOS)
+        buf = io.BytesIO()
+        fmt = img.format or 'PNG'
+        if img.mode in ('RGBA', 'P') and fmt == 'JPEG':
+            img = img.convert('RGB')
+        img.save(buf, format=fmt, quality=85)
+        buf.seek(0)
+        # Save resized image back, disconnect signal to avoid recursion
+        filename = os.path.basename(file_field.name)
+        post_save.disconnect(resize_wagtail_image_on_upload, sender=WagtailImageModel)
+        try:
+            instance.file.save(filename, ContentFile(buf.read()), save=False)
+            instance.width = new_size[0]
+            instance.height = new_size[1]
+            instance.file_size = instance.file.size
+            instance.save()
+        finally:
+            post_save.connect(resize_wagtail_image_on_upload, sender=WagtailImageModel)
+    except Exception:
+        pass
 
 
 def _sync_filefield(source_field, target_obj, field_name):
@@ -31,7 +103,7 @@ def _sync_filefield(source_field, target_obj, field_name):
 
 
 def _sync_wagtail_image_to_imagefield(cms_image, target_obj):
-    """Copy a Wagtail Image file into a Django ImageField on target_obj."""
+    """Copy a Wagtail Image file into a Django ImageField on target_obj, resized to max dimension."""
     if cms_image:
         try:
             wagtail_file = cms_image.file
@@ -39,7 +111,14 @@ def _sync_wagtail_image_to_imagefield(cms_image, target_obj):
             # Skip copy if the target already has an image with the same filename
             if target_obj.image and os.path.basename(target_obj.image.name) == filename:
                 return
-            target_obj.image.save(filename, File(wagtail_file), save=True)
+            # Resize before saving to the target field
+            wagtail_file.open('rb')
+            resized, was_resized = _resize_image_if_needed(wagtail_file)
+            if was_resized and resized:
+                target_obj.image.save(filename, resized, save=True)
+            else:
+                wagtail_file.open('rb')
+                target_obj.image.save(filename, File(wagtail_file), save=True)
         except Exception:
             pass
     else:
