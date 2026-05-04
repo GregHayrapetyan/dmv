@@ -1,10 +1,22 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from PIL import Image
 import os
+
+
+def validate_webp_image(image):
+    """Validate that uploaded image is in WebP format."""
+    if image:
+        name = image.name.lower()
+        if not name.endswith('.webp'):
+            raise ValidationError(
+                'Only WebP images are allowed. '
+                'Please convert your image to .webp format before uploading.'
+            )
 
 
 class LessonCategory(models.Model):
@@ -200,7 +212,8 @@ class Test(models.Model):
         upload_to="test_images/",
         blank=True,
         null=True,
-        help_text="Cover image for the test",
+        help_text="Cover image for the test (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
     )
     time_limit_seconds = models.PositiveIntegerField(
         null=True,
@@ -303,7 +316,8 @@ class Question(models.Model):
         upload_to="test_questions/",
         blank=True,
         null=True,
-        help_text="Image for the question (if any)",
+        help_text="Image for the question (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
     )
     video = models.FileField(
         upload_to="test_questions/videos/",

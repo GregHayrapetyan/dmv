@@ -364,6 +364,9 @@ IMAGE_MAX_DIMENSION = 800
 # Use custom image form that validates max dimensions on upload
 WAGTAILIMAGES_IMAGE_FORM_BASE = 'cms.forms.RestrictedImageForm'
 
+# Only allow WebP image uploads in Wagtail
+WAGTAILIMAGES_EXTENSIONS = ['webp']
+
 # Use custom User model with Wagtail
 WAGTAIL_USER_EDIT_FORM = 'wagtail.users.forms.UserEditForm'
 WAGTAIL_USER_CREATION_FORM = 'wagtail.users.forms.UserCreationForm'
