@@ -144,6 +144,7 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
             'shuffle_answers': instance.shuffle_answers,
             'order': instance.order,
             'is_demo': instance.is_demo,
+            'mixed_question_count': instance.mixed_question_count,
             # Translation fields
             'title_ru': instance.title_ru,
             'description_ru': instance.description_ru,
@@ -168,6 +169,7 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
         test.shuffle_answers = instance.shuffle_answers
         test.order = instance.order
         test.is_demo = instance.is_demo
+        test.mixed_question_count = instance.mixed_question_count
         # Translation fields
         test.title_ru = instance.title_ru
         test.description_ru = instance.description_ru

@@ -76,6 +76,9 @@ class CMSTestAdmin(admin.ModelAdmin):
                 "shuffle_answers",
             )
         }),
+        ("Mixed Screening Test", {
+            "fields": ("mixed_question_count",),
+        }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),
             "classes": ("collapse",)

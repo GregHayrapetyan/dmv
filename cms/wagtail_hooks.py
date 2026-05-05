@@ -243,6 +243,7 @@ class CMSTestAdmin(ModelAdmin):
                     FieldPanel('time_limit_seconds'),
                     FieldPanel('shuffle_questions'),
                     FieldPanel('shuffle_answers'),
+                    FieldPanel('mixed_question_count'),
                 ], heading='Test Settings'),
                 ObjectList([
                     InlinePanel('questions', label="Questions"),
