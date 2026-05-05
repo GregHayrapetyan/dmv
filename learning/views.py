@@ -204,7 +204,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                 name='is_mixed',
                 type=bool,
                 location=OpenApiParameter.QUERY,
-                description='Set to true for mixed test (returns 20 random questions)',
+                description='Set to true for mixed test (returns configured random questions per test)',
                 required=False,
             ),
             OpenApiParameter(
@@ -270,7 +270,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Find tests matching the user's state and vehicle
+            # Find tests matching the user's state and vehicle that contribute to mixed test
             tests = Test.objects.annotate(
                 state_count=Count('states'),
                 vehicle_count=Count('vehicles')
@@ -278,29 +278,40 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                 Q(states=state) | Q(state_count=0)
             ).filter(
                 Q(vehicles=vehicle) | Q(vehicle_count=0)
+            ).filter(
+                mixed_question_count__gt=0
             ).distinct()
             
             if not tests.exists():
                 return APIResponse.error(
-                    message="No tests available for your selected state and vehicle",
+                    message="No tests configured for the mixed screening test",
                     error_code=ErrorCodes.NOT_FOUND,
                     status_code=status.HTTP_404_NOT_FOUND
                 )
             
-            # Get 20 random questions from matching tests
-            all_questions = Question.objects.filter(
-                test__in=tests
-            ).prefetch_related('answer_options').order_by('?')
+            # Pull the configured number of random questions from each test
+            selected_questions = []
+            for test in tests:
+                count = test.mixed_question_count
+                questions = list(
+                    Question.objects.filter(test=test)
+                    .prefetch_related('answer_options')
+                    .order_by('?')[:count]
+                )
+                if len(questions) < count:
+                    logger.warning(
+                        f"Test '{test.title}' (id={test.id}) has {len(questions)} questions "
+                        f"but mixed_question_count is {count}"
+                    )
+                selected_questions.extend(questions)
             
-            if all_questions.count() < 20:
+            if not selected_questions:
                 return APIResponse.error(
-                    message=f"Insufficient questions available. Found {all_questions.count()}, need 20",
+                    message="No questions available for the mixed screening test",
                     error_code=ErrorCodes.VALIDATION_ERROR,
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Select 15 random questions
-            selected_questions = list(all_questions[:20])
             random.shuffle(selected_questions)
             
             # Store question IDs in cache for potential future use

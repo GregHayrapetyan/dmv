@@ -257,6 +257,10 @@ class Test(models.Model):
         default=False,
         help_text="Whether this test is a demo test (accessible without subscription)"
     )
+    mixed_question_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of random questions to pull from this test for the mixed screening test. Set 0 to exclude."
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 

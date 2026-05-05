@@ -47,7 +47,7 @@ class QuestionInline(admin.TabularInline):
 
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'order', 'get_lesson', 'get_vehicles', 'passing_percentage', 'time_limit_seconds',"is_demo", 'created_at')
+    list_display = ('id', 'title', 'order', 'get_lesson', 'get_vehicles', 'passing_percentage', 'time_limit_seconds', "is_demo", 'mixed_question_count', 'created_at')
     list_filter = ('shuffle_questions', 'states', 'vehicles', "is_demo")
     search_fields = ('title', 'lesson__title')
     inlines = [QuestionInline]
@@ -86,6 +86,10 @@ class TestAdmin(admin.ModelAdmin):
         }),
         ('Test Settings', {
             'fields': ('order', 'passing_percentage', 'max_attempts', 'time_limit_seconds', 'is_demo', 'shuffle_questions', 'shuffle_answers')
+        }),
+        ('Mixed Screening Test', {
+            'fields': ('mixed_question_count',),
+            'description': 'Number of random questions to pull from this test for the mixed screening test. Set 0 to exclude.',
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
