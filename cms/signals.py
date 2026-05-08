@@ -7,7 +7,7 @@ import os
 
 from django.conf import settings
 from django.core.files.base import File, ContentFile
-from django.db import models
+from django.db import models, transaction
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from PIL import Image as PILImage
@@ -26,6 +26,7 @@ def _resize_image_if_needed(image_file, max_dim=MAX_DIMENSION):
     """
     try:
         img = PILImage.open(image_file)
+        original_format = img.format or 'PNG'
         w, h = img.size
         if w <= max_dim and h <= max_dim:
             return None, False
@@ -33,12 +34,13 @@ def _resize_image_if_needed(image_file, max_dim=MAX_DIMENSION):
         ratio = min(max_dim / w, max_dim / h)
         new_size = (int(w * ratio), int(h * ratio))
         img = img.resize(new_size, PILImage.LANCZOS)
-        # Save to buffer
+        # Save to buffer using the original format
         buf = io.BytesIO()
-        fmt = img.format or 'PNG'
-        if img.mode in ('RGBA', 'P') and fmt == 'JPEG':
+        if img.mode in ('RGBA', 'P') and original_format == 'JPEG':
             img = img.convert('RGB')
-        img.save(buf, format=fmt, quality=85)
+        elif img.mode == 'P' and original_format == 'WEBP':
+            img = img.convert('RGBA')
+        img.save(buf, format=original_format, quality=85)
         buf.seek(0)
         return ContentFile(buf.read()), True
     except Exception:
@@ -56,28 +58,33 @@ def resize_wagtail_image_on_upload(sender, instance, created, **kwargs):
         file_field = instance.file
         file_field.open('rb')
         img = PILImage.open(file_field)
+        original_format = img.format or 'PNG'
         w, h = img.size
         if w <= MAX_DIMENSION and h <= MAX_DIMENSION:
+            file_field.close()
             return
         # Resize
         ratio = min(MAX_DIMENSION / w, MAX_DIMENSION / h)
         new_size = (int(w * ratio), int(h * ratio))
         img = img.resize(new_size, PILImage.LANCZOS)
         buf = io.BytesIO()
-        fmt = img.format or 'PNG'
-        if img.mode in ('RGBA', 'P') and fmt == 'JPEG':
+        if img.mode in ('RGBA', 'P') and original_format == 'JPEG':
             img = img.convert('RGB')
-        img.save(buf, format=fmt, quality=85)
+        elif img.mode == 'P' and original_format == 'WEBP':
+            img = img.convert('RGBA')
+        img.save(buf, format=original_format, quality=85)
         buf.seek(0)
         # Save resized image back, disconnect signal to avoid recursion
         filename = os.path.basename(file_field.name)
+        file_field.close()
         post_save.disconnect(resize_wagtail_image_on_upload, sender=WagtailImageModel)
         try:
-            instance.file.save(filename, ContentFile(buf.read()), save=False)
-            instance.width = new_size[0]
-            instance.height = new_size[1]
-            instance.file_size = instance.file.size
-            instance.save()
+            with transaction.atomic():
+                instance.file.save(filename, ContentFile(buf.read()), save=False)
+                instance.width = new_size[0]
+                instance.height = new_size[1]
+                instance.file_size = instance.file.size
+                instance.save()
         finally:
             post_save.connect(resize_wagtail_image_on_upload, sender=WagtailImageModel)
     except Exception:

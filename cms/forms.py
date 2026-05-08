@@ -11,7 +11,7 @@ class RestrictedImageForm(BaseImageForm):
     """
 
     def clean_file(self):
-        file = super().clean_file()
+        file = self.cleaned_data.get('file')
         if file and hasattr(file, 'name'):
             if not file.name.lower().endswith('.webp'):
                 raise ValidationError(
