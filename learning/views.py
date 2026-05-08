@@ -319,7 +319,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             cache.set(f'mixed_test_{test_id}', mixed_session, timeout=3600)
             
             # Prepare response with mixed test questions
-            question_serializer = QuestionSerializer(selected_questions, many=True)
+            question_serializer = QuestionSerializer(selected_questions, many=True, context={'request': request})
             
             response_data = {
                 'id': test_id,
