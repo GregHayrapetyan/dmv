@@ -139,35 +139,38 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
     """
     When a CMSTest is created or updated, sync it to the Test model.
     """
-    # Check if corresponding Test exists
-    test, test_created = Test.objects.get_or_create(
-        title=instance.title,
-        defaults={
-            'description': instance.description,
-            'passing_percentage': instance.passing_percentage,
-            'time_limit_seconds': instance.time_limit_seconds,
-            'max_attempts': instance.max_attempts,
-            'shuffle_questions': instance.shuffle_questions,
-            'shuffle_answers': instance.shuffle_answers,
-            'order': instance.order,
-            'is_demo': instance.is_demo,
-            'mixed_question_count': instance.mixed_question_count,
-            # Translation fields
-            'title_ru': instance.title_ru,
-            'description_ru': instance.description_ru,
-            'title_hy': instance.title_hy,
-            'description_hy': instance.description_hy,
-            'title_hi': instance.title_hi,
-            'description_hi': instance.description_hi,
-            'title_es': instance.title_es,
-            'description_es': instance.description_es,
-            'title_zh': instance.title_zh,
-            'description_zh': instance.description_zh,
-        }
-    )
-    
-    # If test already exists, update it
-    if not test_created:
+    # Look up by stable FK link first
+    try:
+        test = Test.objects.get(cms_test=instance)
+    except Test.DoesNotExist:
+        test = None
+
+    if test is None:
+        test = Test.objects.create(
+            cms_test=instance,
+            title=instance.title,
+            description=instance.description,
+            passing_percentage=instance.passing_percentage,
+            time_limit_seconds=instance.time_limit_seconds,
+            max_attempts=instance.max_attempts,
+            shuffle_questions=instance.shuffle_questions,
+            shuffle_answers=instance.shuffle_answers,
+            order=instance.order,
+            is_demo=instance.is_demo,
+            mixed_question_count=instance.mixed_question_count,
+            title_ru=instance.title_ru,
+            description_ru=instance.description_ru,
+            title_hy=instance.title_hy,
+            description_hy=instance.description_hy,
+            title_hi=instance.title_hi,
+            description_hi=instance.description_hi,
+            title_es=instance.title_es,
+            description_es=instance.description_es,
+            title_zh=instance.title_zh,
+            description_zh=instance.description_zh,
+        )
+    else:
+        test.title = instance.title
         test.description = instance.description
         test.passing_percentage = instance.passing_percentage
         test.time_limit_seconds = instance.time_limit_seconds
@@ -177,7 +180,6 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
         test.order = instance.order
         test.is_demo = instance.is_demo
         test.mixed_question_count = instance.mixed_question_count
-        # Translation fields
         test.title_ru = instance.title_ru
         test.description_ru = instance.description_ru
         test.title_hy = instance.title_hy
@@ -199,41 +201,43 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
     """
     When a CMSQuestion is created or updated, sync it to the Question model.
     """
-    # Find the corresponding Test
+    # Find the corresponding Test via stable FK
     try:
-        test = Test.objects.get(title=instance.test.title)
+        test = Test.objects.get(cms_test=instance.test)
     except Test.DoesNotExist:
         return
     
-    # Check if corresponding Question exists
-    # We'll match by test and text (not perfect but workable)
-    question, question_created = Question.objects.get_or_create(
-        test=test,
-        text=instance.text,
-        defaults={
-            'question_type': instance.question_type,
-            'explanation': instance.explanation,
-            'order': instance.order,
-            # Translation fields
-            'text_ru': instance.text_ru,
-            'explanation_ru': instance.explanation_ru,
-            'text_hy': instance.text_hy,
-            'explanation_hy': instance.explanation_hy,
-            'text_hi': instance.text_hi,
-            'explanation_hi': instance.explanation_hi,
-            'text_es': instance.text_es,
-            'explanation_es': instance.explanation_es,
-            'text_zh': instance.text_zh,
-            'explanation_zh': instance.explanation_zh,
-        }
-    )
-    
-    # If question already exists, update it
-    if not question_created:
+    # Look up by stable FK link
+    try:
+        question = Question.objects.get(cms_question=instance)
+    except Question.DoesNotExist:
+        question = None
+
+    if question is None:
+        question = Question.objects.create(
+            cms_question=instance,
+            test=test,
+            text=instance.text,
+            question_type=instance.question_type,
+            explanation=instance.explanation,
+            order=instance.order,
+            text_ru=instance.text_ru,
+            explanation_ru=instance.explanation_ru,
+            text_hy=instance.text_hy,
+            explanation_hy=instance.explanation_hy,
+            text_hi=instance.text_hi,
+            explanation_hi=instance.explanation_hi,
+            text_es=instance.text_es,
+            explanation_es=instance.explanation_es,
+            text_zh=instance.text_zh,
+            explanation_zh=instance.explanation_zh,
+        )
+    else:
+        question.test = test
+        question.text = instance.text
         question.question_type = instance.question_type
         question.explanation = instance.explanation
         question.order = instance.order
-        # Translation fields
         question.text_ru = instance.text_ru
         question.explanation_ru = instance.explanation_ru
         question.text_hy = instance.text_hy
@@ -258,18 +262,19 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
     """
     When a CMSAnswer is created or updated, sync it to the AnswerOption model.
     """
-    # Find the corresponding Question
+    # Find the corresponding Question via stable FK
     try:
-        test = Test.objects.get(title=instance.question.test.title)
-        question = Question.objects.get(test=test, text=instance.question.text)
-    except (Test.DoesNotExist, Question.DoesNotExist):
+        question = Question.objects.get(cms_question=instance.question)
+    except Question.DoesNotExist:
         return
     
-    # First try to find existing answer by question and text
+    # Look up by stable FK link
     try:
-        answer = AnswerOption.objects.get(question=question, text=instance.text)
-        # Update existing answer (order can stay as-is to avoid constraint issues)
+        answer = AnswerOption.objects.get(cms_answer=instance)
+        answer.question = question
+        answer.text = instance.text
         answer.is_correct = instance.is_correct
+        answer.order = instance.order
         answer.text_ru = instance.text_ru
         answer.text_hy = instance.text_hy
         answer.text_hi = instance.text_hi
@@ -277,17 +282,12 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
         answer.text_zh = instance.text_zh
         answer.save()
     except AnswerOption.DoesNotExist:
-        # Create new answer - find next available order to avoid constraint violation
-        max_order = AnswerOption.objects.filter(question=question).aggregate(
-            max_order=models.Max('order')
-        )['max_order']
-        next_order = (max_order or -1) + 1
-        
         AnswerOption.objects.create(
+            cms_answer=instance,
             question=question,
             text=instance.text,
             is_correct=instance.is_correct,
-            order=next_order,
+            order=instance.order,
             text_ru=instance.text_ru,
             text_hy=instance.text_hy,
             text_hi=instance.text_hi,
@@ -301,11 +301,7 @@ def delete_synced_test(sender, instance, **kwargs):
     """
     When a CMSTest is deleted, delete the corresponding Test.
     """
-    try:
-        test = Test.objects.get(title=instance.title)
-        test.delete()
-    except Test.DoesNotExist:
-        pass
+    Test.objects.filter(cms_test=instance).delete()
 
 
 @receiver(post_delete, sender=CMSQuestion)
@@ -313,12 +309,7 @@ def delete_synced_question(sender, instance, **kwargs):
     """
     When a CMSQuestion is deleted, delete the corresponding Question.
     """
-    try:
-        test = Test.objects.get(title=instance.test.title)
-        question = Question.objects.get(test=test, text=instance.text)
-        question.delete()
-    except (Test.DoesNotExist, Question.DoesNotExist):
-        pass
+    Question.objects.filter(cms_question=instance).delete()
 
 
 @receiver(post_delete, sender=CMSAnswer)
@@ -326,10 +317,4 @@ def delete_synced_answer(sender, instance, **kwargs):
     """
     When a CMSAnswer is deleted, delete the corresponding AnswerOption.
     """
-    try:
-        test = Test.objects.get(title=instance.question.test.title)
-        question = Question.objects.get(test=test, text=instance.question.text)
-        answer = AnswerOption.objects.get(question=question, text=instance.text)
-        answer.delete()
-    except (Test.DoesNotExist, Question.DoesNotExist, AnswerOption.DoesNotExist):
-        pass
+    AnswerOption.objects.filter(cms_answer=instance).delete()

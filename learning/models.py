@@ -261,6 +261,14 @@ class Test(models.Model):
         default=0,
         help_text="Number of random questions to pull from this test for the mixed screening test. Set 0 to exclude."
     )
+    cms_test = models.OneToOneField(
+        'cms.CMSTest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='synced_test',
+        help_text="Link to the CMS test this was synced from",
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
@@ -342,6 +350,14 @@ class Question(models.Model):
         default=1,
         help_text="Display order of the question in the test",
     )
+    cms_question = models.OneToOneField(
+        'cms.CMSQuestion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='synced_question',
+        help_text="Link to the CMS question this was synced from",
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
@@ -401,6 +417,14 @@ class AnswerOption(models.Model):
     order = models.PositiveIntegerField(
         default=1,
         help_text="Display order of the answer option",
+    )
+    cms_answer = models.OneToOneField(
+        'cms.CMSAnswer',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='synced_answer',
+        help_text="Link to the CMS answer this was synced from",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
