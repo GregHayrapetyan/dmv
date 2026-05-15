@@ -398,10 +398,11 @@ class LessonInCategorySerializer(TranslatedSerializerMixin, serializers.ModelSer
     name = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     category_id = serializers.IntegerField(source='category.id', read_only=True, allow_null=True)
+    is_viewed = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
-        fields = ('id', 'image', 'name', 'duration', 'order', 'category_id')
+        fields = ('id', 'image', 'name', 'duration', 'order', 'category_id', 'is_viewed')
     
     def get_name(self, obj):
         """Return translated title as name."""
@@ -415,6 +416,16 @@ class LessonInCategorySerializer(TranslatedSerializerMixin, serializers.ModelSer
             duration_seconds = float(obj.duration_minutes) * 60
             return round(duration_seconds)
         return 0
+    
+    def get_is_viewed(self, obj):
+        """Check if the current user has viewed this lesson."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return LessonProgress.objects.filter(
+                user=request.user,
+                lesson=obj
+            ).exists()
+        return False
 
 
 class LessonCategoryListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
