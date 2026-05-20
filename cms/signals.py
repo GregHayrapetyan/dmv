@@ -8,7 +8,7 @@ import os
 from django.conf import settings
 from django.core.files.base import File, ContentFile
 from django.db import models, transaction
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from PIL import Image as PILImage
 from wagtail.images.models import Image as WagtailImageModel
@@ -296,25 +296,37 @@ def sync_cms_answer_to_answer_option(sender, instance, created, **kwargs):
         )
 
 
-@receiver(post_delete, sender=CMSTest)
+@receiver(pre_delete, sender=CMSTest)
 def delete_synced_test(sender, instance, **kwargs):
     """
     When a CMSTest is deleted, delete the corresponding Test.
+
+    Uses pre_delete (not post_delete) because Test.cms_test has
+    on_delete=SET_NULL: by the time post_delete fires, Test.cms_test_id
+    has already been nulled and the filter would match no rows.
     """
     Test.objects.filter(cms_test=instance).delete()
 
 
-@receiver(post_delete, sender=CMSQuestion)
+@receiver(pre_delete, sender=CMSQuestion)
 def delete_synced_question(sender, instance, **kwargs):
     """
     When a CMSQuestion is deleted, delete the corresponding Question.
+
+    Uses pre_delete (not post_delete) because Question.cms_question has
+    on_delete=SET_NULL: by the time post_delete fires, Question.cms_question_id
+    has already been nulled and the filter would match no rows.
     """
     Question.objects.filter(cms_question=instance).delete()
 
 
-@receiver(post_delete, sender=CMSAnswer)
+@receiver(pre_delete, sender=CMSAnswer)
 def delete_synced_answer(sender, instance, **kwargs):
     """
     When a CMSAnswer is deleted, delete the corresponding AnswerOption.
+
+    Uses pre_delete (not post_delete) because AnswerOption.cms_answer has
+    on_delete=SET_NULL: by the time post_delete fires, AnswerOption.cms_answer_id
+    has already been nulled and the filter would match no rows.
     """
     AnswerOption.objects.filter(cms_answer=instance).delete()
