@@ -213,29 +213,34 @@ class CMSTestAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('title'),
                     FieldPanel('description'),
+                    FieldPanel('image'),
                 ], heading='English'),
                 ObjectList([
                     FieldPanel('title_ru'),
                     FieldPanel('description_ru'),
+                    FieldPanel('image_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('title_hy'),
                     FieldPanel('description_hy'),
+                    FieldPanel('image_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('title_hi'),
                     FieldPanel('description_hi'),
+                    FieldPanel('image_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('title_es'),
                     FieldPanel('description_es'),
+                    FieldPanel('image_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('title_zh'),
                     FieldPanel('description_zh'),
+                    FieldPanel('image_zh'),
                 ], heading='Chinese'),
                 ObjectList([
-                    FieldPanel('image'),
                     FieldPanel('order'),
                     FieldPanel('is_demo'),
                     FieldPanel('passing_percentage'),

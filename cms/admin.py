@@ -65,6 +65,26 @@ class CMSTestAdmin(admin.ModelAdmin):
         ("Basic Information", {
             "fields": ("title", "description", "image")
         }),
+        ("Russian Translation", {
+            "fields": ("title_ru", "description_ru", "image_ru"),
+            "classes": ("collapse",)
+        }),
+        ("Armenian Translation", {
+            "fields": ("title_hy", "description_hy", "image_hy"),
+            "classes": ("collapse",)
+        }),
+        ("Hindi Translation", {
+            "fields": ("title_hi", "description_hi", "image_hi"),
+            "classes": ("collapse",)
+        }),
+        ("Spanish Translation", {
+            "fields": ("title_es", "description_es", "image_es"),
+            "classes": ("collapse",)
+        }),
+        ("Chinese Translation", {
+            "fields": ("title_zh", "description_zh", "image_zh"),
+            "classes": ("collapse",)
+        }),
         ("Test Settings", {
             "fields": (
                 "order",

@@ -62,23 +62,23 @@ class TestAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Russian Translation', {
-            'fields': ('title_ru', 'description_ru'),
+            'fields': ('title_ru', 'description_ru', 'image_ru'),
             'classes': ('collapse',)
         }),
         ('Armenian Translation', {
-            'fields': ('title_hy', 'description_hy'),
+            'fields': ('title_hy', 'description_hy', 'image_hy'),
             'classes': ('collapse',)
         }),
         ('Hindi Translation', {
-            'fields': ('title_hi', 'description_hi'),
+            'fields': ('title_hi', 'description_hi', 'image_hi'),
             'classes': ('collapse',)
         }),
         ('Spanish Translation', {
-            'fields': ('title_es', 'description_es'),
+            'fields': ('title_es', 'description_es', 'image_es'),
             'classes': ('collapse',)
         }),
         ('Chinese Translation', {
-            'fields': ('title_zh', 'description_zh'),
+            'fields': ('title_zh', 'description_zh', 'image_zh'),
             'classes': ('collapse',)
         }),
         ('Availability', {

@@ -216,6 +216,46 @@ class CMSTest(ClusterableModel):
         on_delete=models.SET_NULL,
         related_name='+'
     )
+    image_ru = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name="Image (Russian)",
+    )
+    image_hy = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name="Image (Armenian)",
+    )
+    image_hi = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name="Image (Hindi)",
+    )
+    image_es = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name="Image (Spanish)",
+    )
+    image_zh = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name="Image (Chinese)",
+    )
     passing_percentage = models.PositiveIntegerField(
         default=100,
         help_text="Percentage needed to pass (0-100)"

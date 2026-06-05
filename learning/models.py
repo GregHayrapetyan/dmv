@@ -215,6 +215,46 @@ class Test(models.Model):
         help_text="Cover image for the test (WebP only)",
         validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
     )
+    image_ru = models.ImageField(
+        upload_to="test_images/",
+        blank=True,
+        null=True,
+        verbose_name="Image (Russian)",
+        help_text="Cover image for the test - Russian (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
+    )
+    image_hy = models.ImageField(
+        upload_to="test_images/",
+        blank=True,
+        null=True,
+        verbose_name="Image (Armenian)",
+        help_text="Cover image for the test - Armenian (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
+    )
+    image_hi = models.ImageField(
+        upload_to="test_images/",
+        blank=True,
+        null=True,
+        verbose_name="Image (Hindi)",
+        help_text="Cover image for the test - Hindi (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
+    )
+    image_es = models.ImageField(
+        upload_to="test_images/",
+        blank=True,
+        null=True,
+        verbose_name="Image (Spanish)",
+        help_text="Cover image for the test - Spanish (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
+    )
+    image_zh = models.ImageField(
+        upload_to="test_images/",
+        blank=True,
+        null=True,
+        verbose_name="Image (Chinese)",
+        help_text="Cover image for the test - Chinese (WebP only)",
+        validators=[validate_webp_image, FileExtensionValidator(allowed_extensions=['webp'])],
+    )
     time_limit_seconds = models.PositiveIntegerField(
         null=True,
         blank=True,

@@ -109,28 +109,29 @@ def _sync_filefield(source_field, target_obj, field_name):
             target_obj.save()
 
 
-def _sync_wagtail_image_to_imagefield(cms_image, target_obj):
+def _sync_wagtail_image_to_imagefield(cms_image, target_obj, field_name='image'):
     """Copy a Wagtail Image file into a Django ImageField on target_obj, resized to max dimension."""
+    target_field = getattr(target_obj, field_name)
     if cms_image:
         try:
             wagtail_file = cms_image.file
             filename = os.path.basename(wagtail_file.name)
             # Skip copy if the target already has an image with the same filename
-            if target_obj.image and os.path.basename(target_obj.image.name) == filename:
+            if target_field and os.path.basename(target_field.name) == filename:
                 return
             # Resize before saving to the target field
             wagtail_file.open('rb')
             resized, was_resized = _resize_image_if_needed(wagtail_file)
             if was_resized and resized:
-                target_obj.image.save(filename, resized, save=True)
+                target_field.save(filename, resized, save=True)
             else:
                 wagtail_file.open('rb')
-                target_obj.image.save(filename, File(wagtail_file), save=True)
+                target_field.save(filename, File(wagtail_file), save=True)
         except Exception:
             pass
     else:
-        if target_obj.image:
-            target_obj.image = None
+        if target_field:
+            setattr(target_obj, field_name, None)
             target_obj.save()
 
 
@@ -192,8 +193,13 @@ def sync_cms_test_to_test(sender, instance, created, **kwargs):
         test.description_zh = instance.description_zh
         test.save()
     
-    # Sync image from Wagtail Image to Django ImageField
-    _sync_wagtail_image_to_imagefield(instance.image, test)
+    # Sync image from Wagtail Image to Django ImageField (per language)
+    _sync_wagtail_image_to_imagefield(instance.image, test, 'image')
+    _sync_wagtail_image_to_imagefield(instance.image_ru, test, 'image_ru')
+    _sync_wagtail_image_to_imagefield(instance.image_hy, test, 'image_hy')
+    _sync_wagtail_image_to_imagefield(instance.image_hi, test, 'image_hi')
+    _sync_wagtail_image_to_imagefield(instance.image_es, test, 'image_es')
+    _sync_wagtail_image_to_imagefield(instance.image_zh, test, 'image_zh')
 
 
 @receiver(post_save, sender=CMSQuestion)
