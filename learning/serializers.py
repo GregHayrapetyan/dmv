@@ -99,7 +99,7 @@ class QuestionDetailSerializer(TranslatedSerializerMixin, serializers.ModelSeria
 
 class TestListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for listing tests. Supports translations via ?lang= query parameter."""
-    translated_fields = ['title']
+    translated_fields = ['title', 'image']
     lesson_id = serializers.SerializerMethodField()
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
@@ -189,7 +189,7 @@ class TestListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer)
 
 class TestDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for taking a test. Supports translations via ?lang= query parameter."""
-    translated_fields = ['title', 'description']
+    translated_fields = ['title', 'description', 'image']
     questions = QuestionSerializer(many=True, read_only=True)
     lesson_title = serializers.SerializerMethodField()
     lesson_id = serializers.SerializerMethodField()
@@ -310,7 +310,7 @@ class FavoriteLessonSerializer(serializers.ModelSerializer):
 
 class TestStatisticsSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for test statistics showing user's best performance. Supports translations via ?lang= query parameter."""
-    translated_fields = ['title']
+    translated_fields = ['title', 'image']
     question_count = serializers.SerializerMethodField()
     best_percentage = serializers.SerializerMethodField()
     best_correct_answers = serializers.SerializerMethodField()

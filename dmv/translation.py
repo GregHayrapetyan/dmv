@@ -73,8 +73,21 @@ class TranslatedSerializerMixin:
         if lang and lang != 'en' and lang in SUPPORTED_LANGUAGES:
             for field_name in self.translated_fields:
                 if field_name in data:
-                    translated_value = get_translated_value(instance, field_name, lang)
-                    if translated_value is not None:
+                    translated_attr = f"{field_name}_{lang}"
+                    if not hasattr(instance, translated_attr):
+                        continue
+                    translated_value = getattr(instance, translated_attr, None)
+                    if not translated_value:
+                        continue
+                    # Use the corresponding serializer field to properly render
+                    # complex values (e.g. ImageField/FileField -> URL string)
+                    field = self.fields.get(field_name) if hasattr(self, 'fields') else None
+                    if field is not None:
+                        try:
+                            data[field_name] = field.to_representation(translated_value)
+                        except Exception:
+                            data[field_name] = translated_value
+                    else:
                         data[field_name] = translated_value
         
         return data
