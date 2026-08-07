@@ -91,7 +91,8 @@ from cms.models import CMSTest, CMSQuestion
 # Import site_details models
 from site_details.models import (
     PricingPlan, PlanFeature, ClientReview, ContactInfo, Contact, Partner, MainBanner, HowItWorks, HowItWorksStep,
-    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork
+    TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork,
+    FooterColumn, FooterLink
 )
 
 # Import accounts models
@@ -882,6 +883,51 @@ class SocialNetworkCMSAdmin(ModelAdmin):
     ordering = ('order', '-created_at')
 
 
+class FooterColumnCMSAdmin(ModelAdmin):
+    """Footer navigation admin with inline link editing."""
+    model = FooterColumn
+    menu_label = 'Footer Navigation'
+    menu_icon = 'list-ul'
+    list_display = ('title', 'hide', 'is_active', 'order', 'created_at')
+    list_filter = ('hide', 'is_active')
+    search_fields = ('title', 'links__label')
+    ordering = ('order', '-created_at')
+    
+    def get_edit_handler(self):
+        from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+        
+        if not hasattr(self, 'edit_handler') or self.edit_handler is None:
+            self.edit_handler = TabbedInterface([
+                ObjectList([
+                    FieldPanel('title'),
+                ], heading='Content (English)'),
+                ObjectList([
+                    FieldPanel('title_ru'),
+                ], heading='Russian'),
+                ObjectList([
+                    FieldPanel('title_hy'),
+                ], heading='Armenian'),
+                ObjectList([
+                    FieldPanel('title_hi'),
+                ], heading='Hindi'),
+                ObjectList([
+                    FieldPanel('title_es'),
+                ], heading='Spanish'),
+                ObjectList([
+                    FieldPanel('title_zh'),
+                ], heading='Chinese'),
+                ObjectList([
+                    InlinePanel('links', label="Links"),
+                ], heading='Links'),
+                ObjectList([
+                    FieldPanel('hide'),
+                    FieldPanel('order'),
+                    FieldPanel('is_active'),
+                ], heading='Settings'),
+            ])
+        return self.edit_handler
+
+
 # ============================================================================
 # ACCOUNTS - ModelAdmin Classes (for Settings menu)
 # ============================================================================
@@ -931,6 +977,7 @@ class SiteDetailsGroup(ModelAdminGroup):
         ContactAdmin,
         PartnerAdmin,
         SocialNetworkCMSAdmin,
+        FooterColumnCMSAdmin,
     )
 
 

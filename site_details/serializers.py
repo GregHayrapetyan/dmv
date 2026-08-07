@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork
+from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork, FooterColumn, FooterLink
 from dmv.translation import TranslatedSerializerMixin
 
 
@@ -429,3 +429,49 @@ class SocialNetworkSerializer(serializers.ModelSerializer):
             "order",
         ]
         read_only_fields = ["id"]
+
+
+class FooterLinkSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """
+    Serializer for FooterLink model.
+    Returns footer link details including label, URL, and display order.
+    Supports translations via ?lang= query parameter.
+    """
+    translated_fields = ['label']
+    
+    class Meta:
+        model = FooterLink
+        fields = [
+            "id",
+            "label",
+            "url",
+            "order",
+        ]
+        read_only_fields = ["id"]
+
+
+class FooterColumnSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
+    """
+    Serializer for FooterColumn model with nested links.
+    Returns footer column title and its visible links.
+    Supports translations via ?lang= query parameter.
+    """
+    translated_fields = ['title']
+    links = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FooterColumn
+        fields = [
+            "id",
+            "title",
+            "order",
+            "links",
+        ]
+        read_only_fields = ["id"]
+    
+    def get_links(self, obj):
+        """
+        Return only active and non-hidden links with context for translation support.
+        """
+        visible_links = obj.links.filter(is_active=True, hide=False)
+        return FooterLinkSerializer(visible_links, many=True, context=self.context).data

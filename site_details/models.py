@@ -1357,3 +1357,122 @@ class SocialNetwork(models.Model):
     
     def __str__(self):
         return self.name
+
+
+class FooterColumn(ClusterableModel):
+    """
+    Footer navigation column model.
+    Represents a column in the site footer (e.g., 'Navigation', 'Work Process').
+    Each column contains a set of footer links managed inline.
+    The 'hide' field controls whether the column is visible on the frontend.
+    """
+    title = models.CharField(
+        max_length=100,
+        help_text="Column title (e.g., 'Navigation', 'Work Process')",
+    )
+    
+    # Multilingual fields - Russian
+    title_ru = models.CharField(max_length=100, blank=True, verbose_name="Title (Russian)")
+    
+    # Multilingual fields - Armenian
+    title_hy = models.CharField(max_length=100, blank=True, verbose_name="Title (Armenian)")
+    
+    # Multilingual fields - Hindi
+    title_hi = models.CharField(max_length=100, blank=True, verbose_name="Title (Hindi)")
+    
+    # Multilingual fields - Spanish
+    title_es = models.CharField(max_length=100, blank=True, verbose_name="Title (Spanish)")
+    
+    # Multilingual fields - Chinese
+    title_zh = models.CharField(max_length=100, blank=True, verbose_name="Title (Chinese)")
+    
+    hide = models.BooleanField(
+        default=False,
+        help_text="Hide this column from the frontend",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this footer column is available on the site",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ("order", "-created_at")
+        verbose_name = "Footer Column"
+        verbose_name_plural = "Footer Columns"
+    
+    def __str__(self):
+        return self.title
+
+
+class FooterLink(models.Model):
+    """
+    Individual link in a footer column.
+    Each link has a label, URL, and display order.
+    The 'hide' field controls whether the link is visible on the frontend.
+    """
+    column = ParentalKey(
+        FooterColumn,
+        on_delete=models.CASCADE,
+        related_name="links",
+        help_text="The footer column this link belongs to",
+    )
+    
+    label = models.CharField(
+        max_length=200,
+        help_text="Link label (e.g., 'Home', 'About Us', 'Premium')",
+    )
+    
+    # Multilingual fields - Russian
+    label_ru = models.CharField(max_length=200, blank=True, verbose_name="Label (Russian)")
+    
+    # Multilingual fields - Armenian
+    label_hy = models.CharField(max_length=200, blank=True, verbose_name="Label (Armenian)")
+    
+    # Multilingual fields - Hindi
+    label_hi = models.CharField(max_length=200, blank=True, verbose_name="Label (Hindi)")
+    
+    # Multilingual fields - Spanish
+    label_es = models.CharField(max_length=200, blank=True, verbose_name="Label (Spanish)")
+    
+    # Multilingual fields - Chinese
+    label_zh = models.CharField(max_length=200, blank=True, verbose_name="Label (Chinese)")
+    
+    url = models.CharField(
+        max_length=500,
+        help_text="Link URL - can be a relative path (e.g., '/about') or a full URL (e.g., 'https://example.com')",
+    )
+    
+    hide = models.BooleanField(
+        default=False,
+        help_text="Hide this link from the frontend",
+    )
+    
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order (lower numbers appear first)",
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this footer link is available on the site",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ("order", "-created_at")
+        verbose_name = "Footer Link"
+        verbose_name_plural = "Footer Links"
+    
+    def __str__(self):
+        return f"{self.label} ({self.url})"

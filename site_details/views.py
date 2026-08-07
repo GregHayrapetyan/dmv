@@ -4,8 +4,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps, LearningOptions, SocialNetwork
-from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer, LearningOptionsSerializer, SocialNetworkSerializer
+from .models import PricingPlan, ClientReview, Contact, ContactInfo, Partner, MainBanner, HowItWorks, TrustSafety, SuccessSteps, LearningOptions, SocialNetwork, FooterColumn
+from .serializers import PricingPlanSerializer, ClientReviewSerializer, ContactSerializer, ContactInfoSerializer, PartnerSerializer, MainBannerSerializer, HowItWorksSerializer, TrustSafetySerializer, SuccessStepsSerializer, LearningOptionsSerializer, SocialNetworkSerializer, FooterColumnSerializer
 from dmv.api_response import APIResponse
 
 
@@ -591,6 +591,55 @@ class SocialNetworkListAPIView(generics.ListAPIView):
         Return only active and non-hidden social networks, ordered by display order.
         """
         return SocialNetwork.objects.filter(is_active=True, hide=False)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        Override list to use standardized response format.
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return APIResponse.success(data=serializer.data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="List footer navigation columns",
+        description="Retrieve all active and visible footer navigation columns with their links. Supports translations via ?lang= query parameter.",
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Language code for translations (en, ru, hy, hi, es, zh). Defaults to en.',
+                required=False,
+                enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
+            ),
+        ],
+        tags=["Site Details"],
+    )
+)
+class FooterColumnListAPIView(generics.ListAPIView):
+    """
+    API endpoint to retrieve all active footer navigation columns with links.
+    GET /api/site-details/footer-columns/
+    
+    Returns only columns where is_active=True and hide=False,
+    each with its visible links (is_active=True, hide=False).
+    
+    Returns:
+        200: List of visible footer columns with nested links
+    """
+    serializer_class = FooterColumnSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limiting for public data
+    pagination_class = None
+    
+    def get_queryset(self):
+        """
+        Return only active and non-hidden footer columns, ordered by display order.
+        """
+        return FooterColumn.objects.filter(is_active=True, hide=False).prefetch_related("links")
     
     def list(self, request, *args, **kwargs):
         """

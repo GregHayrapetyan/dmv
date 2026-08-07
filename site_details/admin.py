@@ -4,7 +4,8 @@ from .models import (
     ClientReview, Contact, ContactInfo, Partner, MainBanner, 
     HowItWorks, HowItWorksStep, PricingPlan, PlanFeature,
     TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep,
-    LearningOptions, LearningOption, SocialNetwork
+    LearningOptions, LearningOption, SocialNetwork,
+    FooterColumn, FooterLink
 )
 
 
@@ -1018,4 +1019,94 @@ class SocialNetworkAdmin(admin.ModelAdmin):
         return "No icon"
     
     icon_preview.short_description = "Icon Preview"
+
+
+class FooterLinkInline(admin.TabularInline):
+    """
+    Inline admin for footer links within a footer column.
+    """
+    model = FooterLink
+    extra = 1
+    fields = ('label', 'url', 'hide', 'order', 'is_active')
+    ordering = ('order',)
+
+
+@admin.register(FooterColumn)
+class FooterColumnAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing footer navigation columns and their links.
+    """
+    list_display = (
+        "title",
+        "links_count",
+        "hide",
+        "order",
+        "is_active",
+        "created_at",
+    )
+    
+    list_editable = (
+        "hide",
+        "order",
+        "is_active",
+    )
+    
+    list_filter = (
+        "hide",
+        "is_active",
+        "created_at",
+    )
+    
+    search_fields = (
+        "title",
+        "links__label",
+    )
+    
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+    
+    inlines = [FooterLinkInline]
+    
+    fieldsets = (
+        ("Column Information", {
+            "fields": ("title",)
+        }),
+        ("Translations - Russian", {
+            "fields": ("title_ru",),
+            "classes": ("collapse",)
+        }),
+        ("Translations - Armenian", {
+            "fields": ("title_hy",),
+            "classes": ("collapse",)
+        }),
+        ("Translations - Hindi", {
+            "fields": ("title_hi",),
+            "classes": ("collapse",)
+        }),
+        ("Translations - Spanish", {
+            "fields": ("title_es",),
+            "classes": ("collapse",)
+        }),
+        ("Translations - Chinese", {
+            "fields": ("title_zh",),
+            "classes": ("collapse",)
+        }),
+        ("Display Settings", {
+            "fields": ("hide", "order", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def links_count(self, obj):
+        """
+        Display the number of links in this column.
+        """
+        return obj.links.count()
+    
+    links_count.short_description = "Links"
 

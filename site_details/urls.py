@@ -11,6 +11,7 @@ from .views import (
     SuccessStepsRetrieveAPIView,
     LearningOptionsRetrieveAPIView,
     SocialNetworkListAPIView,
+    FooterColumnListAPIView,
 )
 
 urlpatterns = [
@@ -25,4 +26,5 @@ urlpatterns = [
     path("success-steps/", SuccessStepsRetrieveAPIView.as_view(), name="success-steps"),
     path("learning-options/", LearningOptionsRetrieveAPIView.as_view(), name="learning-options"),
     path("social-networks/", SocialNetworkListAPIView.as_view(), name="social-networks-list"),
+    path("footer-columns/", FooterColumnListAPIView.as_view(), name="footer-columns-list"),
 ]
