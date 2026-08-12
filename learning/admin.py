@@ -24,7 +24,7 @@ class LessonAdmin(admin.ModelAdmin):
             'fields': ('title', 'category', 'content')
         }),
         ('Media', {
-            'fields': ('video', 'image')
+            'fields': ('video', 'video_ru', 'video_hy', 'video_hi', 'video_es', 'video_zh', 'image')
         }),
         ('Settings', {
             'fields': ('order', 'is_published', 'duration_minutes', 'test')

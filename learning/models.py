@@ -68,22 +68,27 @@ class Lesson(models.Model):
     # Multilingual fields - Russian
     title_ru = models.CharField(max_length=255, blank=True, verbose_name="Title (Russian)")
     content_ru = models.TextField(blank=True, verbose_name="Content (Russian)")
+    video_ru = models.FileField(upload_to='lessons/videos/', blank=True, null=True, verbose_name="Video (Russian)")
     
     # Multilingual fields - Armenian
     title_hy = models.CharField(max_length=255, blank=True, verbose_name="Title (Armenian)")
     content_hy = models.TextField(blank=True, verbose_name="Content (Armenian)")
+    video_hy = models.FileField(upload_to='lessons/videos/', blank=True, null=True, verbose_name="Video (Armenian)")
     
     # Multilingual fields - Hindi
     title_hi = models.CharField(max_length=255, blank=True, verbose_name="Title (Hindi)")
     content_hi = models.TextField(blank=True, verbose_name="Content (Hindi)")
+    video_hi = models.FileField(upload_to='lessons/videos/', blank=True, null=True, verbose_name="Video (Hindi)")
     
     # Multilingual fields - Spanish
     title_es = models.CharField(max_length=255, blank=True, verbose_name="Title (Spanish)")
     content_es = models.TextField(blank=True, verbose_name="Content (Spanish)")
+    video_es = models.FileField(upload_to='lessons/videos/', blank=True, null=True, verbose_name="Video (Spanish)")
     
     # Multilingual fields - Chinese
     title_zh = models.CharField(max_length=255, blank=True, verbose_name="Title (Chinese)")
     content_zh = models.TextField(blank=True, verbose_name="Content (Chinese)")
+    video_zh = models.FileField(upload_to='lessons/videos/', blank=True, null=True, verbose_name="Video (Chinese)")
     
     category = models.ForeignKey(
         LessonCategory,
