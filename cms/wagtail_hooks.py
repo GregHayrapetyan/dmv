@@ -163,26 +163,31 @@ class LessonAdmin(ModelAdmin):
                     FieldPanel('title_ru'),
                     FieldPanel('content_ru'),
                     FieldPanel('video_ru'),
+                    FieldPanel('image_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('title_hy'),
                     FieldPanel('content_hy'),
                     FieldPanel('video_hy'),
+                    FieldPanel('image_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('title_hi'),
                     FieldPanel('content_hi'),
                     FieldPanel('video_hi'),
+                    FieldPanel('image_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('title_es'),
                     FieldPanel('content_es'),
                     FieldPanel('video_es'),
+                    FieldPanel('image_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('title_zh'),
                     FieldPanel('content_zh'),
                     FieldPanel('video_zh'),
+                    FieldPanel('image_zh'),
                 ], heading='Chinese'),
                 ObjectList([
                     FieldPanel('category'),

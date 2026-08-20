@@ -9,7 +9,7 @@ from dmv.translation import TranslatedSerializerMixin, get_translated_value
 
 class LessonListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for listing lessons (without full content). Supports translations via ?lang= query parameter."""
-    translated_fields = ['title']
+    translated_fields = ['title', 'image']
     state_names = serializers.SerializerMethodField()
     
     class Meta:
@@ -23,7 +23,7 @@ class LessonListSerializer(TranslatedSerializerMixin, serializers.ModelSerialize
 
 class LessonDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for lesson detail view (with full content). Supports translations via ?lang= query parameter."""
-    translated_fields = ['title', 'content', 'video']
+    translated_fields = ['title', 'content', 'video', 'image']
     duration = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
     test_id = serializers.IntegerField(source='test.id', read_only=True, allow_null=True)
