@@ -596,7 +596,8 @@ class AppleLoginView(generics.GenericAPIView):
                     id_token,
                     public_key,
                     algorithms=['RS256'],
-                    audience=settings.APPLE_CLIENT_ID,
+                    audience=settings.APPLE_ALLOWED_AUDIENCES,
+                    issuer='https://appleid.apple.com',
                     options={'verify_exp': True}
                 )
             except jwt.ExpiredSignatureError:

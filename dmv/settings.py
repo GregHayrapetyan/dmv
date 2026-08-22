@@ -254,6 +254,8 @@ GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
 
 # Apple OAuth
 APPLE_CLIENT_ID = config('APPLE_CLIENT_ID', default='')
+APPLE_BUNDLE_ID = config('APPLE_BUNDLE_ID', default='')
+APPLE_ALLOWED_AUDIENCES = [aud for aud in [APPLE_CLIENT_ID, APPLE_BUNDLE_ID] if aud]
 APPLE_TEAM_ID = config('APPLE_TEAM_ID', default='')
 APPLE_KEY_ID = config('APPLE_KEY_ID', default='')
 APPLE_PRIVATE_KEY_PATH = config('APPLE_PRIVATE_KEY_PATH', default=str(BASE_DIR / 'AuthKey_7D2CG73MZW.p8'))
