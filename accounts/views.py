@@ -616,6 +616,7 @@ class AppleLoginView(generics.GenericAPIView):
                 )
             
             # Extract user information from token
+            apple_sub = decoded_token.get('sub')
             email = decoded_token.get('email')
             email_verified = decoded_token.get('email_verified', False)
             
@@ -623,18 +624,9 @@ class AppleLoginView(generics.GenericAPIView):
             if isinstance(email_verified, str):
                 email_verified = email_verified.lower() == 'true'
             
-            if not email:
+            if not apple_sub:
                 return APIResponse.validation_error(
-                    message="Email not provided by Apple."
-                )
-            
-            # Check if email is verified by Apple
-            if not email_verified:
-                logger.warning(f"Unverified email attempted Apple login: {email}")
-                return APIResponse.error(
-                    message="Email not verified by Apple.",
-                    error_code=ErrorCodes.EMAIL_NOT_VERIFIED,
-                    status_code=status.HTTP_400_BAD_REQUEST
+                    message="Apple token missing sub claim."
                 )
             
             # Extract name from user_data (only provided on first sign-in)
@@ -647,22 +639,48 @@ class AppleLoginView(generics.GenericAPIView):
                     first_name = name.get('first_name', '')
                     last_name = name.get('last_name', '')
             
-            # Get or create user
-            user, created = User.objects.get_or_create(
-                email=email,
-                defaults={
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "is_email_verified": True,  # Apple emails are pre-verified
-                    "auth_provider": "apple",
-                }
-            )
+            # Look up user by Apple's stable identifier (sub) first
+            created = False
+            user = User.objects.filter(apple_sub=apple_sub).first()
+            
+            if user is None:
+                # Fall back to email to link an existing account, or create a new one
+                if not email:
+                    return APIResponse.validation_error(
+                        message="Email not provided by Apple."
+                    )
+                
+                # Check if email is verified by Apple
+                if not email_verified:
+                    logger.warning(f"Unverified email attempted Apple login: {email}")
+                    return APIResponse.error(
+                        message="Email not verified by Apple.",
+                        error_code=ErrorCodes.EMAIL_NOT_VERIFIED,
+                        status_code=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                user, created = User.objects.get_or_create(
+                    email=email,
+                    defaults={
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "is_email_verified": True,  # Apple emails are pre-verified
+                        "auth_provider": "apple",
+                        "apple_sub": apple_sub,
+                    }
+                )
+                
+                # Link Apple sub to existing account found by email
+                if not created and not user.apple_sub:
+                    user.apple_sub = apple_sub
+                    user.save(update_fields=["apple_sub"])
+                    logger.info(f"Linked Apple sub to existing user: {email}")
             
             # Update existing user's email verification status if not already verified
             if not created and not user.is_email_verified:
                 user.is_email_verified = True
                 user.save(update_fields=["is_email_verified"])
-                logger.info(f"Email verified via Apple Sign In for existing user: {email}")
+                logger.info(f"Email verified via Apple Sign In for existing user: {user.email}")
             
             if created:
                 logger.info(f"New user created via Apple Sign In: {email}")

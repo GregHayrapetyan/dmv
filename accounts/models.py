@@ -51,6 +51,10 @@ class User(AbstractUser):
         max_length=10, choices=AUTH_PROVIDER_CHOICES, default='email',
         help_text="How the user originally registered"
     )
+    apple_sub = models.CharField(
+        max_length=255, unique=True, null=True, blank=True,
+        help_text="Apple's stable user identifier (sub claim) for Sign in with Apple"
+    )
 
     objects = UserManager()
 
