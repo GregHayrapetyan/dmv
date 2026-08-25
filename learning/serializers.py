@@ -394,7 +394,7 @@ class TestStatisticsWithAggregatesSerializer(serializers.Serializer):
 
 class LessonInCategorySerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for lessons within a category. Supports translations via ?lang= query parameter."""
-    translated_fields = ['title']
+    translated_fields = ['title', 'image']
     name = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     category_id = serializers.IntegerField(source='category.id', read_only=True, allow_null=True)
