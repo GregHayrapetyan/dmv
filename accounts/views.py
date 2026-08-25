@@ -714,6 +714,13 @@ class AppleLoginView(generics.GenericAPIView):
             
             return response
             
+        except jwt.InvalidTokenError as e:
+            logger.error(f"Malformed Apple token: {str(e)}")
+            return APIResponse.error(
+                message="Invalid Apple token.",
+                error_code=ErrorCodes.INVALID_TOKEN,
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
         except requests.RequestException as e:
             logger.error(f"Failed to connect to Apple services: {str(e)}")
             return APIResponse.server_error(
