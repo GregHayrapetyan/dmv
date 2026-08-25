@@ -291,6 +291,7 @@ class CMSQuestionModelAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('test'),
                     FieldPanel('image'),
+                    FieldPanel('video'),
                     FieldPanel('question_type'),
                     FieldPanel('order'),
                     FieldPanel('text'),
@@ -299,22 +300,27 @@ class CMSQuestionModelAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('text_ru'),
                     FieldPanel('explanation_ru'),
+                    FieldPanel('video_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('text_hy'),
                     FieldPanel('explanation_hy'),
+                    FieldPanel('video_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('text_hi'),
                     FieldPanel('explanation_hi'),
+                    FieldPanel('video_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('text_es'),
                     FieldPanel('explanation_es'),
+                    FieldPanel('video_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('text_zh'),
                     FieldPanel('explanation_zh'),
+                    FieldPanel('video_zh'),
                 ], heading='Chinese'),
                 ObjectList([
                     InlinePanel('answers', label="Answer Options"),

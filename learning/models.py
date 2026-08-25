@@ -387,6 +387,11 @@ class Question(models.Model):
         null=True,
         help_text="Video for the question (if any)",
     )
+    video_ru = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Russian)")
+    video_hy = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Armenian)")
+    video_hi = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Hindi)")
+    video_es = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Spanish)")
+    video_zh = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Chinese)")
     question_type = models.CharField(
         max_length=20,
         choices=QuestionType.choices,
