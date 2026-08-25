@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import ClientReview, PricingPlan, PlanFeature, Contact, ContactInfo, Partner, MainBanner, HowItWorks, HowItWorksStep, TrustSafety, TrustSafetyFeature, SuccessSteps, SuccessStep, LearningOptions, LearningOption, SocialNetwork, FooterColumn, FooterLink
-from dmv.translation import TranslatedSerializerMixin
+from dmv.translation import TranslatedSerializerMixin, get_translated_value
 
 
 class ClientReviewSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
@@ -170,7 +170,7 @@ class MainBannerSerializer(TranslatedSerializerMixin, serializers.ModelSerialize
     The 'link' field returns either video URL or button_link based on use_video_as_button_link.
     Supports translations via ?lang= query parameter.
     """
-    translated_fields = ['title', 'title2', 'description', 'stat_text1', 'stat_text2', 'button_name']
+    translated_fields = ['title', 'title2', 'description', 'stat_text1', 'stat_text2', 'button_name', 'image', 'video']
     link = serializers.SerializerMethodField()
     
     class Meta:
@@ -194,12 +194,14 @@ class MainBannerSerializer(TranslatedSerializerMixin, serializers.ModelSerialize
     def get_link(self, obj):
         """
         Return full video URL if use_video_as_button_link is True, otherwise return button_link.
+        Uses the language-specific video when available (falls back to English).
         """
-        if obj.use_video_as_button_link and obj.video:
+        video = get_translated_value(obj, 'video', self.get_language())
+        if obj.use_video_as_button_link and video:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.video.url)
-            return obj.video.url
+                return request.build_absolute_uri(video.url)
+            return video.url
         return obj.button_link
 
 
@@ -279,7 +281,7 @@ class TrustSafetySerializer(TranslatedSerializerMixin, serializers.ModelSerializ
     The 'video_path' field returns the full URL path to the uploaded video file.
     Supports translations via ?lang= query parameter.
     """
-    translated_fields = ['section_header', 'title', 'button_text']
+    translated_fields = ['section_header', 'title', 'button_text', 'image', 'video']
     features = serializers.SerializerMethodField()
     video_path = serializers.SerializerMethodField()
     
@@ -307,12 +309,14 @@ class TrustSafetySerializer(TranslatedSerializerMixin, serializers.ModelSerializ
     def get_video_path(self, obj):
         """
         Return full video URL path if video is uploaded.
+        Uses the language-specific video when available (falls back to English).
         """
-        if obj.video:
+        video = get_translated_value(obj, 'video', self.get_language())
+        if video:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.video.url)
-            return obj.video.url
+                return request.build_absolute_uri(video.url)
+            return video.url
         return None
 
 

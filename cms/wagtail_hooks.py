@@ -162,32 +162,22 @@ class LessonAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('title_ru'),
                     FieldPanel('content_ru'),
-                    FieldPanel('video_ru'),
-                    FieldPanel('image_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('title_hy'),
                     FieldPanel('content_hy'),
-                    FieldPanel('video_hy'),
-                    FieldPanel('image_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('title_hi'),
                     FieldPanel('content_hi'),
-                    FieldPanel('video_hi'),
-                    FieldPanel('image_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('title_es'),
                     FieldPanel('content_es'),
-                    FieldPanel('video_es'),
-                    FieldPanel('image_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('title_zh'),
                     FieldPanel('content_zh'),
-                    FieldPanel('video_zh'),
-                    FieldPanel('image_zh'),
                 ], heading='Chinese'),
                 ObjectList([
                     FieldPanel('category'),
@@ -291,7 +281,6 @@ class CMSQuestionModelAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('test'),
                     FieldPanel('image'),
-                    FieldPanel('video'),
                     FieldPanel('question_type'),
                     FieldPanel('order'),
                     FieldPanel('text'),
@@ -300,27 +289,22 @@ class CMSQuestionModelAdmin(ModelAdmin):
                 ObjectList([
                     FieldPanel('text_ru'),
                     FieldPanel('explanation_ru'),
-                    FieldPanel('video_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('text_hy'),
                     FieldPanel('explanation_hy'),
-                    FieldPanel('video_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('text_hi'),
                     FieldPanel('explanation_hi'),
-                    FieldPanel('video_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('text_es'),
                     FieldPanel('explanation_es'),
-                    FieldPanel('video_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('text_zh'),
                     FieldPanel('explanation_zh'),
-                    FieldPanel('video_zh'),
                 ], heading='Chinese'),
                 ObjectList([
                     InlinePanel('answers', label="Answer Options"),
@@ -598,6 +582,8 @@ class MainBannerAdmin(ModelAdmin):
                     FieldPanel('stat_text1_ru'),
                     FieldPanel('stat_text2_ru'),
                     FieldPanel('button_name_ru'),
+                    FieldPanel('image_ru'),
+                    FieldPanel('video_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('title_hy'),
@@ -606,6 +592,8 @@ class MainBannerAdmin(ModelAdmin):
                     FieldPanel('stat_text1_hy'),
                     FieldPanel('stat_text2_hy'),
                     FieldPanel('button_name_hy'),
+                    FieldPanel('image_hy'),
+                    FieldPanel('video_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('title_hi'),
@@ -614,6 +602,8 @@ class MainBannerAdmin(ModelAdmin):
                     FieldPanel('stat_text1_hi'),
                     FieldPanel('stat_text2_hi'),
                     FieldPanel('button_name_hi'),
+                    FieldPanel('image_hi'),
+                    FieldPanel('video_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('title_es'),
@@ -622,6 +612,8 @@ class MainBannerAdmin(ModelAdmin):
                     FieldPanel('stat_text1_es'),
                     FieldPanel('stat_text2_es'),
                     FieldPanel('button_name_es'),
+                    FieldPanel('image_es'),
+                    FieldPanel('video_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('title_zh'),
@@ -630,6 +622,8 @@ class MainBannerAdmin(ModelAdmin):
                     FieldPanel('stat_text1_zh'),
                     FieldPanel('stat_text2_zh'),
                     FieldPanel('button_name_zh'),
+                    FieldPanel('image_zh'),
+                    FieldPanel('video_zh'),
                 ], heading='Chinese'),
                 ObjectList([
                     FieldPanel('image'),
@@ -732,26 +726,36 @@ class TrustSafetyAdmin(ModelAdmin):
                     FieldPanel('section_header_ru'),
                     FieldPanel('title_ru'),
                     FieldPanel('button_text_ru'),
+                    FieldPanel('image_ru'),
+                    FieldPanel('video_ru'),
                 ], heading='Russian'),
                 ObjectList([
                     FieldPanel('section_header_hy'),
                     FieldPanel('title_hy'),
                     FieldPanel('button_text_hy'),
+                    FieldPanel('image_hy'),
+                    FieldPanel('video_hy'),
                 ], heading='Armenian'),
                 ObjectList([
                     FieldPanel('section_header_hi'),
                     FieldPanel('title_hi'),
                     FieldPanel('button_text_hi'),
+                    FieldPanel('image_hi'),
+                    FieldPanel('video_hi'),
                 ], heading='Hindi'),
                 ObjectList([
                     FieldPanel('section_header_es'),
                     FieldPanel('title_es'),
                     FieldPanel('button_text_es'),
+                    FieldPanel('image_es'),
+                    FieldPanel('video_es'),
                 ], heading='Spanish'),
                 ObjectList([
                     FieldPanel('section_header_zh'),
                     FieldPanel('title_zh'),
                     FieldPanel('button_text_zh'),
+                    FieldPanel('image_zh'),
+                    FieldPanel('video_zh'),
                 ], heading='Chinese'),
                 ObjectList([
                     InlinePanel('features', label="Features"),

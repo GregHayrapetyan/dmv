@@ -625,6 +625,26 @@ class MainBanner(models.Model):
         help_text="Video file - webm only (required if 'Use video as button link' is checked)",
     )
     
+    # Multilingual media - Russian
+    image_ru = models.ImageField(upload_to="main_banner/images/", blank=True, null=True, verbose_name="Image (Russian)")
+    video_ru = models.FileField(upload_to="main_banner/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm'])], verbose_name="Video (Russian)")
+    
+    # Multilingual media - Armenian
+    image_hy = models.ImageField(upload_to="main_banner/images/", blank=True, null=True, verbose_name="Image (Armenian)")
+    video_hy = models.FileField(upload_to="main_banner/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm'])], verbose_name="Video (Armenian)")
+    
+    # Multilingual media - Hindi
+    image_hi = models.ImageField(upload_to="main_banner/images/", blank=True, null=True, verbose_name="Image (Hindi)")
+    video_hi = models.FileField(upload_to="main_banner/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm'])], verbose_name="Video (Hindi)")
+    
+    # Multilingual media - Spanish
+    image_es = models.ImageField(upload_to="main_banner/images/", blank=True, null=True, verbose_name="Image (Spanish)")
+    video_es = models.FileField(upload_to="main_banner/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm'])], verbose_name="Video (Spanish)")
+    
+    # Multilingual media - Chinese
+    image_zh = models.ImageField(upload_to="main_banner/images/", blank=True, null=True, verbose_name="Image (Chinese)")
+    video_zh = models.FileField(upload_to="main_banner/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm'])], verbose_name="Video (Chinese)")
+    
     use_video_as_button_link = models.BooleanField(
         default=False,
         help_text="Check to use video as button link (makes video required). Uncheck to use button link (makes button link required).",
@@ -876,6 +896,26 @@ class TrustSafety(ClusterableModel):
         validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])],
         help_text="Video file - webm or mp4 format",
     )
+    
+    # Multilingual media - Russian
+    image_ru = models.ImageField(upload_to="trust_safety/images/", blank=True, null=True, verbose_name="Image (Russian)")
+    video_ru = models.FileField(upload_to="trust_safety/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])], verbose_name="Video (Russian)")
+    
+    # Multilingual media - Armenian
+    image_hy = models.ImageField(upload_to="trust_safety/images/", blank=True, null=True, verbose_name="Image (Armenian)")
+    video_hy = models.FileField(upload_to="trust_safety/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])], verbose_name="Video (Armenian)")
+    
+    # Multilingual media - Hindi
+    image_hi = models.ImageField(upload_to="trust_safety/images/", blank=True, null=True, verbose_name="Image (Hindi)")
+    video_hi = models.FileField(upload_to="trust_safety/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])], verbose_name="Video (Hindi)")
+    
+    # Multilingual media - Spanish
+    image_es = models.ImageField(upload_to="trust_safety/images/", blank=True, null=True, verbose_name="Image (Spanish)")
+    video_es = models.FileField(upload_to="trust_safety/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])], verbose_name="Video (Spanish)")
+    
+    # Multilingual media - Chinese
+    image_zh = models.ImageField(upload_to="trust_safety/images/", blank=True, null=True, verbose_name="Image (Chinese)")
+    video_zh = models.FileField(upload_to="trust_safety/videos/", blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['webm', 'mp4'])], verbose_name="Video (Chinese)")
     
     # Button
     button_text = models.CharField(

@@ -9,7 +9,7 @@ from dmv.translation import TranslatedSerializerMixin, get_translated_value
 
 class LessonListSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for listing lessons (without full content). Supports translations via ?lang= query parameter."""
-    translated_fields = ['title', 'image']
+    translated_fields = ['title']
     state_names = serializers.SerializerMethodField()
     
     class Meta:
@@ -23,7 +23,7 @@ class LessonListSerializer(TranslatedSerializerMixin, serializers.ModelSerialize
 
 class LessonDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for lesson detail view (with full content). Supports translations via ?lang= query parameter."""
-    translated_fields = ['title', 'content', 'video', 'image']
+    translated_fields = ['title', 'content']
     duration = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
     test_id = serializers.IntegerField(source='test.id', read_only=True, allow_null=True)
@@ -71,12 +71,12 @@ class AnswerOptionDetailSerializer(TranslatedSerializerMixin, serializers.ModelS
 
 class QuestionSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Serializer for questions. Supports translations via ?lang= query parameter."""
-    translated_fields = ['text', 'explanation', 'video']
+    translated_fields = ['text', 'explanation']
     answer_options = serializers.SerializerMethodField()
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'video', 'question_type', 'explanation', 'order', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'explanation', 'order', 'answer_options')
     
     def get_answer_options(self, obj):
         """Pass context to nested serializer for translation support."""
@@ -85,12 +85,12 @@ class QuestionSerializer(TranslatedSerializerMixin, serializers.ModelSerializer)
 
 class QuestionDetailSerializer(TranslatedSerializerMixin, serializers.ModelSerializer):
     """Used after submission to show correct answers. Supports translations via ?lang= query parameter."""
-    translated_fields = ['text', 'explanation', 'video']
+    translated_fields = ['text', 'explanation']
     answer_options = serializers.SerializerMethodField()
     
     class Meta:
         model = Question
-        fields = ('id', 'text', 'image', 'video', 'question_type', 'explanation', 'order', 'answer_options')
+        fields = ('id', 'text', 'image', 'question_type', 'explanation', 'order', 'answer_options')
     
     def get_answer_options(self, obj):
         """Pass context to nested serializer for translation support."""

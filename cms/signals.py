@@ -259,13 +259,8 @@ def sync_cms_question_to_question(sender, instance, created, **kwargs):
     # Sync image from Wagtail Image to Django ImageField
     _sync_wagtail_image_to_imagefield(instance.image, question)
     
-    # Sync video files (per language)
+    # Sync video file
     _sync_filefield(instance.video, question, 'video')
-    _sync_filefield(instance.video_ru, question, 'video_ru')
-    _sync_filefield(instance.video_hy, question, 'video_hy')
-    _sync_filefield(instance.video_hi, question, 'video_hi')
-    _sync_filefield(instance.video_es, question, 'video_es')
-    _sync_filefield(instance.video_zh, question, 'video_zh')
 
 
 @receiver(post_save, sender=CMSAnswer)

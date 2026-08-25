@@ -355,11 +355,6 @@ class CMSQuestion(ClusterableModel):
         null=True,
         help_text="Video for the question (if any)",
     )
-    video_ru = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Russian)")
-    video_hy = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Armenian)")
-    video_hi = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Hindi)")
-    video_es = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Spanish)")
-    video_zh = models.FileField(upload_to="test_questions/videos/", blank=True, null=True, verbose_name="Video (Chinese)")
     question_type = models.CharField(
         max_length=20,
         choices=QUESTION_TYPES,
@@ -379,19 +374,14 @@ class CMSQuestion(ClusterableModel):
         FieldPanel('explanation'),
         FieldPanel('text_ru'),
         FieldPanel('explanation_ru'),
-        FieldPanel('video_ru'),
         FieldPanel('text_hy'),
         FieldPanel('explanation_hy'),
-        FieldPanel('video_hy'),
         FieldPanel('text_hi'),
         FieldPanel('explanation_hi'),
-        FieldPanel('video_hi'),
         FieldPanel('text_es'),
         FieldPanel('explanation_es'),
-        FieldPanel('video_es'),
         FieldPanel('text_zh'),
         FieldPanel('explanation_zh'),
-        FieldPanel('video_zh'),
         InlinePanel('answers', label="Answer Options"),
     ]
     
