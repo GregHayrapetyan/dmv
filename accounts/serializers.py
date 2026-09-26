@@ -347,7 +347,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscription
         fields = (
-            'id', 'status', 'plan_tier', 'access_duration_days',
+            'id', 'status', 'payment_provider', 'plan_tier', 'access_duration_days',
             'current_period_start', 'current_period_end', 'cancel_at_period_end',
             'plan_display_name', 'days_remaining', 'next_payment_date',
             'created_at', 'updated_at'

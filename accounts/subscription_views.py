@@ -115,7 +115,18 @@ class CreateCheckoutSessionView(APIView):
                 error_code=ErrorCodes.VALIDATION_ERROR,
                 status_code=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Cross-platform guard: refuse a new Stripe purchase while an active
+        # subscription bought through Apple exists — it would double-bill. Apple
+        # subscriptions can only be managed through Apple.
+        existing = Subscription.objects.filter(user=request.user).first()
+        if existing and existing.conflicts_with_purchase_on('stripe'):
+            return APIResponse.error(
+                message="You already have an active subscription purchased through Apple. Manage it in the App Store.",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_409_CONFLICT
+            )
+
         try:
             session = StripeService.create_checkout_session(
                 user=request.user,
@@ -682,7 +693,17 @@ class ChangePlanView(APIView):
                 error_code=ErrorCodes.VALIDATION_ERROR,
                 status_code=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Cross-platform guard: an Apple subscription can't be changed through
+        # Stripe (there is no Stripe subscription to modify). Direct to Apple.
+        existing = Subscription.objects.filter(user=request.user).first()
+        if existing and existing.conflicts_with_purchase_on('stripe'):
+            return APIResponse.error(
+                message="You already have an active subscription purchased through Apple. Manage it in the App Store.",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_409_CONFLICT
+            )
+
         try:
             StripeService.change_plan(request.user, new_price_id, new_plan_tier)
             

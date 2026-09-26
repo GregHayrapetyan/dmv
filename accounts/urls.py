@@ -10,6 +10,9 @@ from .subscription_views import (
     SubscriptionDetailView, ReactivateSubscriptionView, ChangePlanView,
     UpdatePaymentMethodView, UpdateBillingInfoView
 )
+from .apple_iap_views import (
+    AppleVerifyPurchaseView, AppleServerNotificationView
+)
 
 
 urlpatterns = [
@@ -38,4 +41,8 @@ urlpatterns = [
     path("subscription/update-payment/", UpdatePaymentMethodView.as_view(), name="subscription-update-payment"),
     path("subscription/update-billing/", UpdateBillingInfoView.as_view(), name="subscription-update-billing"),
     path("subscription/webhook/", StripeWebhookView.as_view(), name="subscription-webhook"),
+
+    # Apple In-App Purchase (iOS) endpoints
+    path("subscription/apple/verify/", AppleVerifyPurchaseView.as_view(), name="subscription-apple-verify"),
+    path("subscription/apple/notifications/", AppleServerNotificationView.as_view(), name="subscription-apple-notifications"),
 ]

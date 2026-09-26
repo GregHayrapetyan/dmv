@@ -161,11 +161,22 @@ class Subscription(models.Model):
         ('standard', 'Standard - 30 Days'),
         ('premium', 'Premium - 90 Days'),
     )
-    
+
+    PAYMENT_PROVIDER_CHOICES = (
+        ('stripe', 'Stripe (Web)'),
+        ('apple', 'Apple In-App Purchase (iOS)'),
+    )
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
         related_name='subscription'
+    )
+    payment_provider = models.CharField(
+        max_length=10,
+        choices=PAYMENT_PROVIDER_CHOICES,
+        default='stripe',
+        help_text="Which payment system owns this subscription: Stripe (web) or Apple IAP (iOS)"
     )
     stripe_customer_id = models.CharField(
         max_length=255,
@@ -186,6 +197,19 @@ class Subscription(models.Model):
         null=True,
         blank=True,
         help_text="Stripe recurring Price ID"
+    )
+    apple_original_transaction_id = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Apple originalTransactionId — stable ID for the IAP subscription across renewals"
+    )
+    apple_product_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Apple IAP product identifier (e.g. com.mytestdmv.standard)"
     )
     plan_tier = models.CharField(
         max_length=20,
@@ -221,6 +245,7 @@ class Subscription(models.Model):
             models.Index(fields=['user', 'status']),
             models.Index(fields=['stripe_customer_id']),
             models.Index(fields=['stripe_subscription_id']),
+            models.Index(fields=['apple_original_transaction_id'], name='acc_sub_apple_otxn_idx'),
         ]
     
     def __str__(self):
@@ -246,7 +271,17 @@ class Subscription(models.Model):
         
         # Active subscription without period_end yet (set via webhook)
         return True
-    
+
+    def conflicts_with_purchase_on(self, provider):
+        """
+        True if this subscription blocks starting a NEW purchase on `provider`.
+        A subscription that is still active but was bought through a DIFFERENT
+        provider (e.g. an active Apple sub when the user tries to buy on the web,
+        or an active Stripe sub when the user tries to buy in the iOS app) would
+        cause cross-platform double-billing, so purchase endpoints must refuse.
+        """
+        return self.payment_provider != provider and self.has_access()
+
     def get_plan_display_name(self):
         """Get friendly display name for the plan."""
         tier_info = {
