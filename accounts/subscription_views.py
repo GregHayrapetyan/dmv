@@ -116,9 +116,7 @@ class CreateCheckoutSessionView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
-        # Cross-platform guard: refuse a new Stripe purchase while an active
-        # subscription bought through Apple exists — it would double-bill. Apple
-        # subscriptions can only be managed through Apple.
+        # Guard: refuse a new Stripe purchase while an active Apple sub exists (would double-bill).
         existing = Subscription.objects.filter(user=request.user).first()
         if existing and existing.conflicts_with_purchase_on('stripe'):
             return APIResponse.error(
@@ -694,8 +692,7 @@ class ChangePlanView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
-        # Cross-platform guard: an Apple subscription can't be changed through
-        # Stripe (there is no Stripe subscription to modify). Direct to Apple.
+        # Guard: an Apple sub can't be changed through Stripe — direct the user to Apple.
         existing = Subscription.objects.filter(user=request.user).first()
         if existing and existing.conflicts_with_purchase_on('stripe'):
             return APIResponse.error(

@@ -1,17 +1,8 @@
 """
-Apple In-App Purchase (StoreKit 2) service.
+Apple In-App Purchase (StoreKit 2) service — the Apple counterpart to StripeService.
 
-This is the Apple counterpart to `stripe_service.StripeService`. It handles the
-iOS payment path required by App Store Guideline 3.1.1:
-
-  * verifying the signed transaction (JWS) the iOS app produces after a purchase,
-  * activating / updating the user's Subscription from it, and
-  * processing App Store Server Notifications (V2) so renewals, cancellations,
-    refunds and expirations stay in sync — the Apple twin of the Stripe webhook.
-
-Verification is done locally by validating the JWS certificate chain (x5c) up to
-Apple's Root CA - G3 and checking the ES256 signature with the leaf certificate.
-No secret is required to verify — the signature proves Apple issued the payload.
+Verifies the iOS app's signed transaction (JWS), activates/updates the Subscription,
+and processes App Store Server Notifications (renew/cancel/refund/expire).
 """
 import base64
 import datetime
@@ -29,9 +20,7 @@ from .models import Subscription
 
 logger = logging.getLogger(__name__)
 
-# SHA-256 fingerprint of "Apple Root CA - G3" (the root that anchors every
-# StoreKit 2 / App Store Server signature). We pin it so a valid-looking chain
-# signed by some *other* root is rejected.
+# Pinned SHA-256 of "Apple Root CA - G3" so a chain signed by any other root is rejected.
 APPLE_ROOT_CA_G3_SHA256 = (
     "63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179"
 )
@@ -56,7 +45,7 @@ class AppleIAPService:
 
     @staticmethod
     def product_to_tier(product_id):
-        """Map an App Store product identifier to one of our plan tiers."""
+        """Map an App Store product identifier to a plan tier."""
         return settings.APPLE_IAP_PRODUCTS.get(product_id)
 
     @staticmethod
@@ -144,31 +133,6 @@ class AppleIAPService:
         except jwt.InvalidTokenError as exc:
             raise AppleIAPError(f"Malformed signed payload: {exc}") from exc
 
-        # DEBUG-only: a local StoreKit configuration file (Xcode simulator
-        # testing) signs transactions with Xcode's own test certificate rather
-        # than Apple Root CA - G3, so the chain check below can never pass. When
-        # explicitly opted in for local dev, trust the decoded claims without
-        # verifying the signature. Gated on DEBUG *and* the flag, so production
-        # (DEBUG=False) always does full verification.
-        if settings.DEBUG and getattr(settings, "APPLE_IAP_ALLOW_UNVERIFIED", False):
-            logger.warning(
-                "APPLE_IAP_ALLOW_UNVERIFIED: decoding Apple JWS without signature "
-                "verification (local StoreKit testing only)."
-            )
-            try:
-                return jwt.decode(
-                    signed_jws,
-                    options={
-                        "verify_signature": False,
-                        "verify_aud": False,
-                        "verify_iss": False,
-                        "verify_exp": False,
-                        "verify_nbf": False,
-                    },
-                )
-            except jwt.InvalidTokenError as exc:
-                raise AppleIAPError(f"Malformed signed payload: {exc}") from exc
-
         public_key_pem = cls._leaf_public_key_pem(header.get("x5c"))
 
         try:
@@ -245,6 +209,17 @@ class AppleIAPService:
         Returns the updated Subscription instance.
         """
         transaction = cls.verify_transaction(signed_transaction)
+
+        # A revoked (refunded/voided) transaction must never grant access — Transaction.updates
+        # delivers these too, so refuse it here; deactivation is handled by REFUND/REVOKE notifications.
+        if transaction.get("revocationDate"):
+            raise AppleIAPError("This purchase has been revoked or refunded.")
+
+        # An already-expired transaction can't grant current access.
+        expires_date = cls._ms_to_datetime(transaction.get("expiresDate"))
+        if expires_date and expires_date <= timezone.now():
+            raise AppleIAPError("This purchase has expired.")
+
         original_txn_id = transaction.get("originalTransactionId")
 
         # Guard: an Apple transaction may only belong to one account.
@@ -256,10 +231,8 @@ class AppleIAPService:
                 "This Apple purchase is already linked to a different account"
             )
 
-        # Cross-platform guard: don't overwrite an active subscription bought on
-        # another provider (e.g. Stripe on the web) with this Apple one — that
-        # would double-bill and lose the original. The iOS client blocks this
-        # before charging; this is the server-side backstop.
+        # Guard: don't overwrite an active other-provider (Stripe) sub — would double-bill.
+        # The iOS client blocks this first; this is the server-side backstop.
         existing = Subscription.objects.filter(user=user).first()
         if existing and existing.conflicts_with_purchase_on("apple"):
             raise AppleIAPError(
@@ -308,7 +281,7 @@ class AppleIAPService:
                 apple_original_transaction_id=original_txn_id
             )
         except Subscription.DoesNotExist:
-            # We only learn about a subscription we activated via the app first.
+            # Only subscriptions first activated via the app are known here.
             logger.warning(
                 "Apple notification %s for unknown transaction %s; ignoring",
                 notification_type, original_txn_id,

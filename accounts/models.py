@@ -274,11 +274,8 @@ class Subscription(models.Model):
 
     def conflicts_with_purchase_on(self, provider):
         """
-        True if this subscription blocks starting a NEW purchase on `provider`.
-        A subscription that is still active but was bought through a DIFFERENT
-        provider (e.g. an active Apple sub when the user tries to buy on the web,
-        or an active Stripe sub when the user tries to buy in the iOS app) would
-        cause cross-platform double-billing, so purchase endpoints must refuse.
+        True if a still-active sub on a DIFFERENT provider should block a new purchase
+        on `provider` (prevents cross-platform double-billing).
         """
         return self.payment_provider != provider and self.has_access()
 

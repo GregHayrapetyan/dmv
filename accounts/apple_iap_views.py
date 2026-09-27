@@ -1,12 +1,7 @@
 """
-Views for the Apple In-App Purchase (iOS) payment path.
-
-These sit alongside the Stripe subscription views and never touch them:
-  * AppleVerifyPurchaseView       — the iOS app posts a signed transaction here
-                                     after a StoreKit purchase; we verify it and
-                                     activate the user's subscription.
-  * AppleServerNotificationView   — Apple posts subscription lifecycle events
-                                     (renew/cancel/refund/expire) here.
+Apple In-App Purchase (iOS) views, alongside the Stripe views: verify a purchased
+transaction (AppleVerifyPurchaseView) and receive Apple's lifecycle notifications
+(AppleServerNotificationView).
 """
 import logging
 
@@ -131,11 +126,8 @@ class AppleVerifyPurchaseView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class AppleServerNotificationView(APIView):
     """
-    Handle App Store Server Notifications (V2).
-
-    Apple POSTs a JSON body `{ "signedPayload": "<JWS>" }`. We verify the JWS and
-    update the matching subscription. Public + unauthenticated (Apple calls it),
-    but every payload is cryptographically verified before it is trusted.
+    Handle App Store Server Notifications (V2). Public + unauthenticated (Apple calls
+    it), but every `signedPayload` JWS is cryptographically verified before it is trusted.
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes = []

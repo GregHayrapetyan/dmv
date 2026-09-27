@@ -221,18 +221,6 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "dmv.exception_handler.custom_exception_handler",
 }
 
-# In local dev every request reaches this API from the Next.js BFF at
-# 127.0.0.1, so the whole app shares a single AnonRateThrottle bucket keyed by
-# that one IP. A WebView reloading during testing burns through 100/hour fast
-# and then throttle-locks the entire app. Raise the ceilings only when DEBUG is
-# on; production (DEBUG=False) keeps the real limits above untouched.
-if DEBUG:
-    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
-        **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],
-        "anon": "100000/hour",
-        "user": "100000/hour",
-    }
-
 
 # DRF Spectacular (OpenAPI) settings
 SPECTACULAR_SETTINGS = {
@@ -278,30 +266,15 @@ STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 
 # Apple In-App Purchase (StoreKit 2) Settings
-# The bundle ID of the iOS app that hosts the IAP. Falls back to the Sign in with
-# Apple bundle ID if a dedicated one isn't set.
+# iOS app bundle ID (falls back to the Sign in with Apple bundle ID).
 APPLE_IAP_BUNDLE_ID = config('APPLE_IAP_BUNDLE_ID', default=APPLE_BUNDLE_ID)
-# 'Production' or 'Sandbox' — the environment we accept transactions from. During
-# development/TestFlight this is 'Sandbox'. Both are usually accepted; this flags
-# the *expected* one for logging/validation.
-APPLE_IAP_ENVIRONMENT = config('APPLE_IAP_ENVIRONMENT', default='Sandbox')
-# Maps each App Store Connect product identifier to one of our plan tiers.
-# Override APPLE_IAP_PRODUCT_* env vars once the real product IDs are created.
+# Maps each App Store Connect product identifier to a plan tier.
+# Override the APPLE_IAP_PRODUCT_* env vars once the real product IDs exist.
 APPLE_IAP_PRODUCTS = {
     config('APPLE_IAP_PRODUCT_STARTER', default='com.mytestdmv.starter'): 'starter',
     config('APPLE_IAP_PRODUCT_STANDARD', default='com.mytestdmv.standard'): 'standard',
     config('APPLE_IAP_PRODUCT_PREMIUM', default='com.mytestdmv.premium'): 'premium',
 }
-# Shared secret used to authenticate App Store Server Notifications (V2). We verify
-# the JWS signature cryptographically; this optional value can add a second check.
-APPLE_IAP_SHARED_SECRET = config('APPLE_IAP_SHARED_SECRET', default='')
-# DEBUG-only escape hatch for *local* StoreKit testing (a .storekit config file
-# in Xcode). Those transactions are signed by Xcode's local test certificate, not
-# Apple Root CA - G3, so real chain verification can't pass. When this is on AND
-# DEBUG is on, the backend trusts the decoded transaction without verifying the
-# signature. It is ignored entirely in production (DEBUG=False), so verification
-# can never be silently skipped there.
-APPLE_IAP_ALLOW_UNVERIFIED = config('APPLE_IAP_ALLOW_UNVERIFIED', default=False, cast=bool)
 
 # JWT Settings
 SIMPLE_JWT = {

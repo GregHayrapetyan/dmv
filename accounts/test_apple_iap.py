@@ -1,10 +1,7 @@
 """
-Tests for the Apple In-App Purchase (iOS) subscription path.
-
-The cryptographic JWS/certificate-chain verification is exercised against Apple's
-real signatures in sandbox; here we mock `decode_signed_jws` and focus on the
-business logic: product->tier mapping, subscription activation, account-clash
-protection, and server-notification handling. The Stripe path is untouched.
+Tests for the Apple IAP (iOS) path. We mock `decode_signed_jws` (real signature
+verification is exercised in sandbox) and focus on business logic: tier mapping,
+activation, account-clash protection, revocation/expiry, and notification handling.
 """
 import datetime
 from datetime import timedelta
@@ -30,9 +27,10 @@ TEST_BUNDLE = 'com.mytestdmv.app'
 
 
 def make_transaction(product='com.mytestdmv.standard', original='1000000000123',
-                     expires_in_days=30, purchased_days_ago=0, bundle=TEST_BUNDLE):
+                     expires_in_days=30, purchased_days_ago=0, bundle=TEST_BUNDLE,
+                     revocation_date_ms=None):
     now = timezone.now()
-    return {
+    txn = {
         'bundleId': bundle,
         'productId': product,
         'originalTransactionId': original,
@@ -40,6 +38,9 @@ def make_transaction(product='com.mytestdmv.standard', original='1000000000123',
         'purchaseDate': int((now - timedelta(days=purchased_days_ago)).timestamp() * 1000),
         'expiresDate': int((now + timedelta(days=expires_in_days)).timestamp() * 1000),
     }
+    if revocation_date_ms is not None:
+        txn['revocationDate'] = revocation_date_ms
+    return txn
 
 
 @override_settings(APPLE_IAP_PRODUCTS=TEST_PRODUCTS, APPLE_IAP_BUNDLE_ID=TEST_BUNDLE)
@@ -98,9 +99,7 @@ class AppleIAPServiceTests(TestCase):
                 AppleIAPService.activate_subscription(self.user, 'signed-jws')
 
     def test_activate_blocked_when_active_subscription_on_another_provider(self):
-        # An ACTIVE Stripe subscription must block a new Apple purchase (it would
-        # double-bill). The iOS client also guards this before charging; this is
-        # the server-side backstop. The Stripe record must NOT be overwritten.
+        # An active Stripe sub must block a new Apple purchase (would double-bill); the Stripe record must survive.
         Subscription.objects.create(
             user=self.user, payment_provider='stripe', status='active',
             stripe_subscription_id='sub_x',
@@ -115,6 +114,23 @@ class AppleIAPServiceTests(TestCase):
         self.assertEqual(sub.payment_provider, 'stripe')
         self.assertEqual(sub.status, 'active')
         self.assertIsNone(sub.apple_original_transaction_id)
+
+    def test_activate_rejects_revoked_transaction(self):
+        # A revoked (refunded) transaction carries revocationDate; activation must refuse it.
+        now_ms = int(timezone.now().timestamp() * 1000)
+        txn = make_transaction(product='com.mytestdmv.standard', revocation_date_ms=now_ms)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.activate_subscription(self.user, 'signed-jws')
+        self.assertFalse(Subscription.objects.filter(user=self.user).exists())
+
+    def test_activate_rejects_already_expired_transaction(self):
+        # An already-expired transaction cannot grant current access.
+        txn = make_transaction(product='com.mytestdmv.standard', expires_in_days=-1)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.activate_subscription(self.user, 'signed-jws')
+        self.assertFalse(Subscription.objects.filter(user=self.user).exists())
 
     def test_verify_rejects_wrong_bundle_id(self):
         txn = make_transaction(bundle='com.evil.app')
