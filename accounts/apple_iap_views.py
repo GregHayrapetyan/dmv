@@ -13,7 +13,6 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from dmv.api_response import APIResponse, ErrorCodes
-from .models import Subscription
 from .serializers import SubscriptionSerializer
 from .apple_iap_service import AppleIAPService, AppleIAPError
 

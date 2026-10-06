@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 APPLE_ROOT_CA_G3_SHA256 = (
     "63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179"
 )
+# Apple marker extensions (same values Apple's app-store-server-library enforces). Only an App Store
+# signing cert issued by an Apple WWDR intermediate may sign transactions — not other Apple-issued
+# certs a developer controls (e.g. Apple Pay).
+APPLE_LEAF_CERT_OID = x509.ObjectIdentifier("1.2.840.113635.100.6.11.1")
+APPLE_INTERMEDIATE_CERT_OID = x509.ObjectIdentifier("1.2.840.113635.100.6.2.1")
 
 # Plan tier -> access window in days (mirrors the Stripe duration_map).
 TIER_DURATION_DAYS = {"starter": 7, "standard": 30, "premium": 90}
@@ -77,14 +82,31 @@ class AppleIAPService:
                 cert.signature_hash_algorithm,
             )
 
+    @staticmethod
+    def _require_extension(cert, oid, message):
+        """Raise AppleIAPError(message) unless `cert` carries the extension `oid`."""
+        try:
+            cert.extensions.get_extension_for_oid(oid)
+        except x509.ExtensionNotFound as exc:
+            raise AppleIAPError(message) from exc
+
     @classmethod
-    def _leaf_public_key_pem(cls, x5c):
+    def _leaf_public_key_pem(cls, x5c, effective_date=None):
         """
         Validate the x5c certificate chain (leaf -> intermediate -> Apple root)
         and return the leaf certificate's public key as PEM bytes.
+
+        Certificate validity is checked at `effective_date` (when Apple signed the payload),
+        falling back to now — same as Apple's SignedDataVerifier without online checks.
+
+        TODO(security): long-term, replace this hand-rolled check with Apple's official
+        `app-store-server-library` (SignedDataVerifier; production first, then sandbox fallback
+        for App Review/TestFlight). Backend-only change: no iOS resubmission needed.
         """
         if not x5c:
             raise AppleIAPError("Signed payload is missing its x5c certificate chain")
+        if len(x5c) != 3:
+            raise AppleIAPError("Certificate chain must be leaf -> intermediate -> Apple root")
 
         try:
             certs = [
@@ -94,11 +116,11 @@ class AppleIAPService:
         except Exception as exc:  # noqa: BLE001
             raise AppleIAPError(f"Could not parse x5c certificates: {exc}") from exc
 
-        now = datetime.datetime.now(datetime.timezone.utc)
+        check_at = effective_date or datetime.datetime.now(datetime.timezone.utc)
         for cert in certs:
             not_before = cert.not_valid_before_utc
             not_after = cert.not_valid_after_utc
-            if not (not_before <= now <= not_after):
+            if not (not_before <= check_at <= not_after):
                 raise AppleIAPError("A certificate in the chain is expired or not yet valid")
 
         # Each cert must be signed by the next one up the chain.
@@ -112,6 +134,18 @@ class AppleIAPService:
         root_fingerprint = certs[-1].fingerprint(hashes.SHA256()).hex()
         if root_fingerprint != APPLE_ROOT_CA_G3_SHA256:
             raise AppleIAPError("Certificate chain is not anchored to Apple Root CA - G3")
+
+        leaf, intermediate, _root = certs
+        cls._require_extension(leaf, APPLE_LEAF_CERT_OID, "Leaf certificate is not an App Store signing certificate")
+        cls._require_extension(
+            intermediate, APPLE_INTERMEDIATE_CERT_OID, "Intermediate certificate is not an Apple WWDR CA"
+        )
+        try:
+            is_ca = intermediate.extensions.get_extension_for_class(x509.BasicConstraints).value.ca
+        except x509.ExtensionNotFound:
+            is_ca = False
+        if not is_ca:
+            raise AppleIAPError("Intermediate certificate is not a certificate authority")
 
         return certs[0].public_key().public_bytes(
             Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
@@ -130,10 +164,22 @@ class AppleIAPService:
 
         try:
             header = jwt.get_unverified_header(signed_jws)
+            unverified = jwt.decode(signed_jws, options={"verify_signature": False})
         except jwt.InvalidTokenError as exc:
             raise AppleIAPError(f"Malformed signed payload: {exc}") from exc
 
-        public_key_pem = cls._leaf_public_key_pem(header.get("x5c"))
+        # Apple rotates its signing cert yearly, so an older (still valid) transaction — e.g. one
+        # returned by Restore — may carry a since-expired leaf. Judge the chain at signing time.
+        # Safe to read unverified: a forged date can't help without Apple's private key.
+        signed_ms = unverified.get("signedDate")
+        if signed_ms is None:
+            signed_ms = unverified.get("receiptCreationDate")
+        try:
+            effective_date = cls._ms_to_datetime(signed_ms)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise AppleIAPError("Malformed signed payload: invalid signedDate") from exc
+
+        public_key_pem = cls._leaf_public_key_pem(header.get("x5c"), effective_date)
 
         try:
             return jwt.decode(
@@ -242,6 +288,9 @@ class AppleIAPService:
 
         subscription, _ = Subscription.objects.get_or_create(user=user)
         subscription.refresh_from_db()
+        if subscription.payment_provider != "apple":
+            # Taking over from a lapsed Stripe sub: drop its cancel-at-period-end flag.
+            subscription.cancel_at_period_end = False
         cls._apply_transaction(subscription, transaction, status="active")
         subscription.save()
 
@@ -285,6 +334,15 @@ class AppleIAPService:
             logger.warning(
                 "Apple notification %s for unknown transaction %s; ignoring",
                 notification_type, original_txn_id,
+            )
+            return
+
+        # The user has since bought on the web, so Stripe owns this row; a late Apple event
+        # (e.g. REFUND/EXPIRED of the old Apple sub) must not overwrite the Stripe subscription.
+        if subscription.payment_provider != "apple":
+            logger.warning(
+                "Apple notification %s for transaction %s ignored: subscription now owned by %s",
+                notification_type, original_txn_id, subscription.payment_provider,
             )
             return
 

@@ -1,9 +1,8 @@
 """
-Tests for the Apple IAP (iOS) path. We mock `decode_signed_jws` (real signature
-verification is exercised in sandbox) and focus on business logic: tier mapping,
-activation, account-clash protection, revocation/expiry, and notification handling.
+Tests for the Apple IAP (iOS) path. We mock `decode_signed_jws` (signature checks are in
+test_apple_jws.py) and focus on business logic: activation, account-clash protection,
+revocation/expiry, and notification handling.
 """
-import datetime
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -50,15 +49,6 @@ class AppleIAPServiceTests(TestCase):
             email='ios@example.com', password='pw12345678', is_email_verified=True
         )
 
-    # -- product mapping -----------------------------------------------------
-
-    def test_product_to_tier_maps_known_products(self):
-        self.assertEqual(AppleIAPService.product_to_tier('com.mytestdmv.standard'), 'standard')
-        self.assertEqual(AppleIAPService.product_to_tier('com.mytestdmv.premium'), 'premium')
-
-    def test_product_to_tier_unknown_returns_none(self):
-        self.assertIsNone(AppleIAPService.product_to_tier('com.mytestdmv.unknown'))
-
     # -- activation ----------------------------------------------------------
 
     def test_activate_creates_apple_subscription(self):
@@ -77,7 +67,8 @@ class AppleIAPServiceTests(TestCase):
     def test_activate_updates_existing_stripe_subscription(self):
         # User already had a (say lapsed) Stripe subscription record.
         Subscription.objects.create(user=self.user, payment_provider='stripe',
-                                    status='expired', stripe_customer_id='cus_x')
+                                    status='expired', stripe_customer_id='cus_x',
+                                    cancel_at_period_end=True)
         txn = make_transaction(product='com.mytestdmv.premium')
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
             sub = AppleIAPService.activate_subscription(self.user, 'signed-jws')
@@ -86,6 +77,7 @@ class AppleIAPServiceTests(TestCase):
         self.assertEqual(sub.payment_provider, 'apple')
         self.assertEqual(sub.plan_tier, 'premium')
         self.assertEqual(sub.status, 'active')
+        self.assertFalse(sub.cancel_at_period_end)
 
     def test_activate_rejects_transaction_owned_by_another_user(self):
         other = User.objects.create_user(email='other@example.com', password='pw12345678')
@@ -196,6 +188,27 @@ class AppleIAPServiceTests(TestCase):
         sub.refresh_from_db()
         self.assertTrue(sub.cancel_at_period_end)
 
+    def test_notification_ignored_after_user_moved_to_stripe(self):
+        # Old Apple sub lapsed, user bought on the web: a late REFUND must not cut off Stripe access.
+        end = timezone.now() + timedelta(days=20)
+        sub = self._existing_apple_sub()
+        sub.payment_provider = 'stripe'
+        sub.stripe_subscription_id = 'sub_new'
+        sub.current_period_end = end
+        sub.save()
+        txn = make_transaction()
+        notification = {
+            'notificationType': 'REFUND', 'subtype': None,
+            'data': {'signedTransactionInfo': 'txn-jws'},
+        }
+        with patch.object(AppleIAPService, 'decode_signed_jws', side_effect=[notification, txn]):
+            AppleIAPService.handle_notification('signed-payload')
+
+        sub.refresh_from_db()
+        self.assertEqual(sub.payment_provider, 'stripe')
+        self.assertEqual(sub.status, 'active')
+        self.assertEqual(sub.current_period_end, end)
+
     def test_notification_for_unknown_transaction_is_ignored(self):
         txn = make_transaction(original='9999999999999')
         notification = {
@@ -246,3 +259,4 @@ class AppleVerifyPurchaseEndpointTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(resp.data['success'])
+
