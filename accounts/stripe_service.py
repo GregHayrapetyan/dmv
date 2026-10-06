@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
+APPLE_MANAGED_MESSAGE = "This subscription was purchased through Apple. Manage it in the App Store."
+
+
 class StripeService:
     """Service class for Stripe operations."""
     
@@ -33,6 +36,28 @@ class StripeService:
             raise
     
     @staticmethod
+    def _is_apple_owned(subscription, source):
+        """
+        True when the row is owned by Apple IAP, so a Stripe update for a stale/old Stripe
+        subscription must not overwrite it (e.g. a late subscription.deleted after the user
+        moved to Apple).
+        """
+        if subscription.payment_provider == 'apple':
+            logger.info(f"Ignoring Stripe {source} for Apple-owned subscription (user {subscription.user_id})")
+            return True
+        return False
+
+    @staticmethod
+    def _claim_for_stripe(subscription):
+        """A new Stripe purchase takes ownership of the (one-per-user) row from Apple."""
+        if subscription.payment_provider == 'stripe':
+            return
+        if subscription.has_access():
+            logger.warning(f"New Stripe subscription replaces an active Apple one (user {subscription.user_id})")
+        subscription.payment_provider = 'stripe'
+        subscription.cancel_at_period_end = False
+
+    @staticmethod
     def sync_subscription_from_stripe(user):
         """
         Sync the local Subscription record with the actual state in Stripe.
@@ -46,7 +71,7 @@ class StripeService:
         except Subscription.DoesNotExist:
             return None
         
-        if not subscription.stripe_customer_id:
+        if subscription.payment_provider == 'apple' or not subscription.stripe_customer_id:
             return None
         
         try:
@@ -215,6 +240,8 @@ class StripeService:
         try:
             subscription = Subscription.objects.get(user=user)
             
+            if subscription.payment_provider == 'apple':
+                raise ValueError(APPLE_MANAGED_MESSAGE)
             if not subscription.stripe_subscription_id:
                 raise ValueError("No active subscription to cancel")
             
@@ -241,6 +268,8 @@ class StripeService:
         try:
             subscription = Subscription.objects.get(user=user)
             
+            if subscription.payment_provider == 'apple':
+                raise ValueError(APPLE_MANAGED_MESSAGE)
             if not subscription.stripe_subscription_id:
                 raise ValueError("No subscription to reactivate")
             
@@ -272,6 +301,8 @@ class StripeService:
         try:
             subscription = Subscription.objects.get(user=user)
             
+            if subscription.payment_provider == 'apple':
+                raise ValueError(APPLE_MANAGED_MESSAGE)
             if not subscription.stripe_subscription_id:
                 raise ValueError("No active subscription to change")
             
@@ -534,6 +565,7 @@ class StripeService:
             subscription = Subscription.objects.get(
                 stripe_customer_id=stripe_subscription['customer']
             )
+            StripeService._claim_for_stripe(subscription)
             subscription.stripe_subscription_id = stripe_subscription['id']
             subscription.status = stripe_subscription['status']
             
@@ -569,6 +601,8 @@ class StripeService:
             subscription = Subscription.objects.get(
                 stripe_subscription_id=stripe_subscription['id']
             )
+            if StripeService._is_apple_owned(subscription, 'subscription.updated'):
+                return
             subscription.status = stripe_subscription['status']
             
             period_start = stripe_subscription.get('current_period_start')
@@ -603,6 +637,8 @@ class StripeService:
             subscription = Subscription.objects.get(
                 stripe_subscription_id=stripe_subscription['id']
             )
+            if StripeService._is_apple_owned(subscription, 'subscription.deleted'):
+                return
             subscription.status = 'canceled'
             subscription.save()
             logger.info(f"Subscription deleted: {subscription.stripe_subscription_id}")
@@ -616,6 +652,8 @@ class StripeService:
         if subscription_id:
             try:
                 subscription = Subscription.objects.get(stripe_subscription_id=subscription_id)
+                if StripeService._is_apple_owned(subscription, 'invoice.payment_succeeded'):
+                    return
                 # Update subscription status if needed
                 if subscription.status != 'active':
                     subscription.status = 'active'
@@ -631,6 +669,8 @@ class StripeService:
         if subscription_id:
             try:
                 subscription = Subscription.objects.get(stripe_subscription_id=subscription_id)
+                if StripeService._is_apple_owned(subscription, 'invoice.payment_failed'):
+                    return
                 subscription.status = 'past_due'
                 subscription.save()
                 logger.warning(f"Payment failed for subscription: {subscription_id}")
@@ -675,6 +715,7 @@ class StripeService:
             # Refresh from DB to pick up any fields set by concurrent webhooks
             subscription.refresh_from_db()
             
+            StripeService._claim_for_stripe(subscription)
             subscription.stripe_subscription_id = session.get('subscription')
             subscription.stripe_price_id = price_id
             subscription.plan_tier = plan_tier
