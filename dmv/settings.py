@@ -264,6 +264,7 @@ APPLE_PRIVATE_KEY_PATH = config('APPLE_PRIVATE_KEY_PATH', default=str(BASE_DIR /
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+STRIPE_TRIAL_PERIOD_DAYS = config('STRIPE_TRIAL_PERIOD_DAYS', default=3, cast=int)
 
 # Apple In-App Purchase (StoreKit 2) Settings
 # iOS app bundle ID (falls back to the Sign in with Apple bundle ID).

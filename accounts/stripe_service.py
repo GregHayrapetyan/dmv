@@ -165,6 +165,17 @@ class StripeService:
             return customer.id
     
     @staticmethod
+    def get_trial_period_days(user):
+        """Return trial days for first-time subscribers, 0 if the user already had a subscription."""
+        trial_days = settings.STRIPE_TRIAL_PERIOD_DAYS
+        if trial_days <= 0:
+            return 0
+        existing = Subscription.objects.filter(user=user).first()
+        if existing and (existing.stripe_subscription_id or existing.apple_original_transaction_id):
+            return 0
+        return trial_days
+
+    @staticmethod
     def create_checkout_session(user, price_id, success_url, cancel_url, plan_tier=None):
         """
         Create a Stripe Checkout session for a recurring subscription.
@@ -180,9 +191,10 @@ class StripeService:
             Checkout session object
         """
         try:
+            trial_days = StripeService.get_trial_period_days(user)
             customer_id = StripeService.get_or_create_customer(user)
             
-            session = stripe.checkout.Session.create(
+            session_params = dict(
                 customer=customer_id,
                 payment_method_types=['card'],
                 line_items=[{
@@ -198,7 +210,11 @@ class StripeService:
                     'price_id': price_id
                 }
             )
-            
+            if trial_days:
+                session_params['subscription_data'] = {'trial_period_days': trial_days}
+
+            session = stripe.checkout.Session.create(**session_params)
+
             logger.info(f"Created subscription checkout session {session.id} for user {user.email}")
             return session
         except stripe.error.StripeError as e:
@@ -654,8 +670,8 @@ class StripeService:
                 subscription = Subscription.objects.get(stripe_subscription_id=subscription_id)
                 if StripeService._is_apple_owned(subscription, 'invoice.payment_succeeded'):
                     return
-                # Update subscription status if needed
-                if subscription.status != 'active':
+                # Skip $0 invoices (e.g. trial start) so 'trialing' is not overwritten
+                if invoice.get('amount_paid', 0) > 0 and subscription.status != 'active':
                     subscription.status = 'active'
                     subscription.save()
                 logger.info(f"Payment succeeded for subscription: {subscription_id}")
@@ -740,6 +756,9 @@ class StripeService:
                     
                     logger.info(f"Stripe sub retrieve: start={period_start}, end={period_end}, status={stripe_sub.get('status')}")
                     
+                    if stripe_sub.get('status'):
+                        subscription.status = stripe_sub.get('status')
+
                     if period_start:
                         subscription.current_period_start = datetime.datetime.fromtimestamp(
                             period_start, tz=datetime.timezone.utc
