@@ -148,6 +148,16 @@ class StripeService:
         """Get existing Stripe customer or create a new one."""
         try:
             subscription = Subscription.objects.get(user=user)
+            if subscription.stripe_customer_id:
+                try:
+                    missing = bool(stripe.Customer.retrieve(subscription.stripe_customer_id).get('deleted'))
+                except stripe.error.InvalidRequestError as e:
+                    if getattr(e, 'code', None) != 'resource_missing':
+                        raise
+                    missing = True
+                if missing:
+                    logger.warning(f"Stored Stripe customer {subscription.stripe_customer_id} not found for {user.email}; creating a new one")
+                    subscription.stripe_customer_id = None
             # If subscription exists but has no stripe_customer_id, create one
             if not subscription.stripe_customer_id:
                 customer = StripeService.create_customer(user)

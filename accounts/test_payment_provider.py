@@ -4,8 +4,9 @@ from a lapsed Apple sub (and vice versa), and late events from the previous prov
 not overwrite it.
 """
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import stripe
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
@@ -104,3 +105,41 @@ class StripeProviderOwnershipTests(TestCase):
         StripeService._handle_subscription_deleted({'id': 'sub_1'})
         sub.refresh_from_db()
         self.assertEqual(sub.status, 'canceled')
+
+
+class StripeCustomerRecoveryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='stale@example.com', password='pw12345678', is_email_verified=True
+        )
+        self.sub = Subscription.objects.create(
+            user=self.user, payment_provider='stripe', status='incomplete', stripe_customer_id='cus_test_mode',
+        )
+
+    @patch('accounts.stripe_service.stripe.Customer.create')
+    @patch('accounts.stripe_service.stripe.Customer.retrieve')
+    def test_recreates_customer_missing_in_current_mode(self, retrieve, create):
+        retrieve.side_effect = stripe.error.InvalidRequestError(
+            "No such customer: 'cus_test_mode'", param='id', code='resource_missing'
+        )
+        create.return_value = MagicMock(id='cus_live')
+
+        self.assertEqual(StripeService.get_or_create_customer(self.user), 'cus_live')
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.stripe_customer_id, 'cus_live')
+
+    @patch('accounts.stripe_service.stripe.Customer.create')
+    @patch('accounts.stripe_service.stripe.Customer.retrieve')
+    def test_recreates_deleted_customer(self, retrieve, create):
+        retrieve.return_value = {'id': 'cus_test_mode', 'deleted': True}
+        create.return_value = MagicMock(id='cus_new')
+
+        self.assertEqual(StripeService.get_or_create_customer(self.user), 'cus_new')
+
+    @patch('accounts.stripe_service.stripe.Customer.create')
+    @patch('accounts.stripe_service.stripe.Customer.retrieve')
+    def test_keeps_existing_valid_customer(self, retrieve, create):
+        retrieve.return_value = {'id': 'cus_test_mode'}
+
+        self.assertEqual(StripeService.get_or_create_customer(self.user), 'cus_test_mode')
+        create.assert_not_called()
