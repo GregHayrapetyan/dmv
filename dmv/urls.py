@@ -15,9 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve as static_serve
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from wagtail.admin import urls as wagtailadmin_urls
@@ -54,7 +55,13 @@ urlpatterns = [
 #     path("", include(wagtail_urls)),  # CMS frontend pages disabled
 # ]
 
-# Serve media files in development
+# Serve MEDIA even when DEBUG=False so the Next.js image optimizer can fetch
+# http://api:8000/media/... on the Docker network. Public browsers still hit
+# host nginx at api.mytestdmv.com/media/ (see docs/DOCKER.md).
+urlpatterns += [
+    re_path(r"^media/(?P<path>.*)$", static_serve, {"document_root": settings.MEDIA_ROOT}),
+]
+
+# Static files via Django only in development (prod uses collectstatic + nginx).
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
