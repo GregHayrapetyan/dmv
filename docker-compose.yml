@@ -1,0 +1,149 @@
+services:
+  db:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dmv_db}
+      POSTGRES_USER: ${DB_USER:-dmv_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dmv_user} -d ${DB_NAME:-dmv_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      DEBUG: ${DEBUG:-False}
+      # Always include Docker DNS names so web→api SSR/BFF Host headers are accepted
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,mytestdmv.com,api.mytestdmv.com},api,nginx
+      DB_NAME: ${DB_NAME:-dmv_db}
+      DB_USER: ${DB_USER:-dmv_user}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_HOST: db
+      DB_PORT: "5432"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1,http://localhost:3000,https://mytestdmv.com,https://www.mytestdmv.com}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost,http://127.0.0.1,https://mytestdmv.com,https://www.mytestdmv.com,https://api.mytestdmv.com}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-False}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mytestdmv.com}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      # Always the in-container path; mount host file at secrets/apple_auth_key.p8
+      APPLE_PRIVATE_KEY_PATH: /run/secrets/apple_auth_key.p8
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_TRIAL_PERIOD_DAYS: ${STRIPE_TRIAL_PERIOD_DAYS:-3}
+      APPLE_IAP_BUNDLE_ID: ${APPLE_IAP_BUNDLE_ID:-}
+      APPLE_IAP_PRODUCT_STARTER: ${APPLE_IAP_PRODUCT_STARTER:-com.mytestdmv.starter}
+      APPLE_IAP_PRODUCT_STANDARD: ${APPLE_IAP_PRODUCT_STANDARD:-com.mytestdmv.standard}
+      APPLE_IAP_PRODUCT_PREMIUM: ${APPLE_IAP_PRODUCT_PREMIUM:-com.mytestdmv.premium}
+      WAGTAILADMIN_BASE_URL: ${WAGTAILADMIN_BASE_URL:-http://localhost/cms}
+      JWT_ACCESS_TOKEN_LIFETIME: ${JWT_ACCESS_TOKEN_LIFETIME:-60}
+      JWT_REFRESH_TOKEN_LIFETIME: ${JWT_REFRESH_TOKEN_LIFETIME:-7}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
+      LOG_TO_FILE: "False"
+    volumes:
+      # Host nginx serves these paths directly (see docker/nginx/host.mytestdmv.com.conf)
+      - ${MEDIA_HOST_PATH:-./data/media}:/app/media
+      - ${STATIC_HOST_PATH:-./data/staticfiles}:/app/staticfiles
+      # Optional: place the Apple AuthKey at secrets/apple_auth_key.p8 (see docs/DOCKER.md)
+      - ./secrets:/run/secrets:ro
+    # Host nginx proxies api.mytestdmv.com → 127.0.0.1:8000
+    ports:
+      - "${API_BIND:-127.0.0.1:8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-http://localhost}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
+        # Fall back to backend OAuth env names already present in .env
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-${GOOGLE_OAUTH_CLIENT_ID:-}}
+        NEXT_PUBLIC_APPLE_CLIENT_ID: ${NEXT_PUBLIC_APPLE_CLIENT_ID:-${APPLE_CLIENT_ID:-}}
+        NEXT_PUBLIC_IAP_PRODUCT_STARTER: ${NEXT_PUBLIC_IAP_PRODUCT_STARTER:-com.mytestdmv.starter}
+        NEXT_PUBLIC_IAP_PRODUCT_STANDARD: ${NEXT_PUBLIC_IAP_PRODUCT_STANDARD:-com.mytestdmv.standard}
+        NEXT_PUBLIC_IAP_PRODUCT_PREMIUM: ${NEXT_PUBLIC_IAP_PRODUCT_PREMIUM:-com.mytestdmv.premium}
+        MEDIA_INTERNAL_ORIGIN: ${MEDIA_INTERNAL_ORIGIN:-http://api:8000}
+        NEXT_PUBLIC_MEDIA_OPTIMIZE_ORIGIN: ${NEXT_PUBLIC_MEDIA_OPTIMIZE_ORIGIN:-http://api:8000}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Server-side calls use the internal Docker network
+      API_URL: ${API_URL:-http://api:8000/api}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
+      NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-http://localhost}
+      # Optional override; otherwise NEXT_PUBLIC_API_URL host is used for /media URLs
+      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-}
+      # false for local HTTP; set true behind HTTPS host nginx
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
+      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-eastus}
+    # Host nginx proxies mytestdmv.com → 127.0.0.1:3000
+    ports:
+      - "${WEB_BIND:-127.0.0.1:3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Optional all-in-one edge for local HTTP (not used on the production VPS —
+  # host nginx terminates TLS and proxies to published 3000/8000).
+  # Start with: docker compose --profile local up -d
+  nginx:
+    profiles: ["local"]
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${MEDIA_HOST_PATH:-./data/media}:/var/www/media:ro
+
+volumes:
+  postgres_data:

@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     # Third-party apps
     "corsheaders",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     
     # Custom apps
@@ -73,6 +74,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -186,6 +188,14 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Media files (User uploaded content)
 MEDIA_URL = "/media/"
@@ -286,16 +296,21 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': True,
 }
 
-# CORS settings (adjust for production)
-CORS_ALLOWED_ORIGINS = [
-    "https://mytestdmv.com",
-    "https://www.mytestdmv.com",
-    "https://api.mytestdmv.com",
-    "https://localhost:3000",
-    "http://localhost:3000",  # Development
-    "http://127.0.0.1:3000",  # Development alternative
-]
-CORS_ALLOW_CREDENTIALS = True
+# CORS settings (comma-separated origins via env; use "*" to allow all)
+_cors_origins = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='https://mytestdmv.com,https://www.mytestdmv.com,https://api.mytestdmv.com,https://localhost:3000,http://localhost:3000,http://127.0.0.1:3000',
+    cast=Csv(),
+)
+if len(_cors_origins) == 1 and _cors_origins[0] == '*':
+    # Browsers reject Access-Control-Allow-Origin: * together with credentials.
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = []
+    CORS_ALLOW_CREDENTIALS = False
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = list(_cors_origins)
+    CORS_ALLOW_CREDENTIALS = True
 
 # Cookie security settings
 SESSION_COOKIE_SECURE = not DEBUG  # HTTPS only in production
@@ -305,15 +320,34 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Trust proxy headers (required for production behind reverse proxy/load balancer)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 
-# CSRF trusted origins for production
-CSRF_TRUSTED_ORIGINS = [
-    "https://mytestdmv.com",
-    "https://www.mytestdmv.com",
-    "https://api.mytestdmv.com",
-]
+# CSRF trusted origins (comma-separated via env)
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://mytestdmv.com,https://www.mytestdmv.com,https://api.mytestdmv.com',
+    cast=Csv(),
+)
 
-# Logging configuration
+# Logging: console by default (containers); optional file via LOG_TO_FILE=True
+LOG_TO_FILE = config('LOG_TO_FILE', default=False, cast=bool)
+_log_handlers = ['console']
+_logging_handlers = {
+    'console': {
+        'level': 'INFO',
+        'class': 'logging.StreamHandler',
+        'formatter': 'verbose',
+    },
+}
+if LOG_TO_FILE:
+    _logging_handlers['file'] = {
+        'level': 'INFO',
+        'class': 'logging.FileHandler',
+        'filename': BASE_DIR / 'debug.log',
+        'formatter': 'verbose',
+    }
+    _log_handlers.append('file')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -323,42 +357,30 @@ LOGGING = {
             'style': '{',
         },
     },
-    'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'debug.log',
-            'formatter': 'verbose',
-        },
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
+    'handlers': _logging_handlers,
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
+            'handlers': _log_handlers,
             'level': 'INFO',
             'propagate': False,
         },
         'accounts': {
-            'handlers': ['file', 'console'],
+            'handlers': _log_handlers,
             'level': 'INFO',
             'propagate': False,
         },
         'onboarding': {
-            'handlers': ['file', 'console'],
+            'handlers': _log_handlers,
             'level': 'INFO',
             'propagate': False,
         },
         'learning': {
-            'handlers': ['file', 'console'],
+            'handlers': _log_handlers,
             'level': 'INFO',
             'propagate': False,
         },
         'dmv': {
-            'handlers': ['file', 'console'],
+            'handlers': _log_handlers,
             'level': 'DEBUG',
             'propagate': False,
         },

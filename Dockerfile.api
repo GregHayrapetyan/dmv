@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.12-slim-bookworm AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      libpq5 \
+      curl \
+      ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      build-essential \
+      libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install -r requirements.txt
+
+FROM base AS runtime
+
+RUN groupadd --system --gid 1000 app \
+    && useradd --system --uid 1000 --gid app --home /app --shell /usr/sbin/nologin app
+
+COPY --from=build /install /usr/local
+
+COPY --chown=app:app manage.py requirements.txt ./
+COPY --chown=app:app dmv/ dmv/
+COPY --chown=app:app accounts/ accounts/
+COPY --chown=app:app onboarding/ onboarding/
+COPY --chown=app:app learning/ learning/
+COPY --chown=app:app site_details/ site_details/
+COPY --chown=app:app cms/ cms/
+COPY --chown=app:app static/ static/
+COPY --chown=app:app questions.json ./questions.json
+COPY --chmod=755 docker/api/entrypoint.sh /entrypoint.sh
+
+RUN mkdir -p /app/media /app/staticfiles \
+    && chown -R app:app /app/media /app/staticfiles
+
+USER app
+
+ENV PORT=8000 \
+    GUNICORN_WORKERS=3 \
+    GUNICORN_THREADS=2 \
+    GUNICORN_TIMEOUT=60
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT}/api/health/" || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

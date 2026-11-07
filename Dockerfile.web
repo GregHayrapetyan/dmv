@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-bookworm-slim AS deps
+
+WORKDIR /app
+
+COPY client/package.json client/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+FROM node:22-bookworm-slim AS build
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY client/ .
+
+# Public build-time vars (baked into the client bundle).
+# Defaults are local-safe; compose/production must pass real values as build-args.
+ARG NEXT_PUBLIC_APP_DOMAIN=http://localhost
+ARG NEXT_PUBLIC_API_URL=http://localhost/api
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+ARG NEXT_PUBLIC_APPLE_CLIENT_ID=
+ARG NEXT_PUBLIC_IAP_PRODUCT_STARTER=com.mytestdmv.starter
+ARG NEXT_PUBLIC_IAP_PRODUCT_STANDARD=com.mytestdmv.standard
+ARG NEXT_PUBLIC_IAP_PRODUCT_PREMIUM=com.mytestdmv.premium
+# Internal origin for next/image (optimizer fetches CMS media on the Docker network)
+ARG MEDIA_INTERNAL_ORIGIN=http://api:8000
+ARG NEXT_PUBLIC_MEDIA_OPTIMIZE_ORIGIN=http://api:8000
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_APP_DOMAIN=$NEXT_PUBLIC_APP_DOMAIN \
+    NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID \
+    NEXT_PUBLIC_APPLE_CLIENT_ID=$NEXT_PUBLIC_APPLE_CLIENT_ID \
+    NEXT_PUBLIC_IAP_PRODUCT_STARTER=$NEXT_PUBLIC_IAP_PRODUCT_STARTER \
+    NEXT_PUBLIC_IAP_PRODUCT_STANDARD=$NEXT_PUBLIC_IAP_PRODUCT_STANDARD \
+    NEXT_PUBLIC_IAP_PRODUCT_PREMIUM=$NEXT_PUBLIC_IAP_PRODUCT_PREMIUM \
+    NEXT_PUBLIC_MEDIA_OPTIMIZE_ORIGIN=$NEXT_PUBLIC_MEDIA_OPTIMIZE_ORIGIN \
+    MEDIA_INTERNAL_ORIGIN=$MEDIA_INTERNAL_ORIGIN
+
+RUN npm run build
+
+FROM node:22-bookworm-slim AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+# node:bookworm-slim already provides uid/gid 1000 as user "node"
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/messages ./messages
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+
+USER node
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "server.js"]

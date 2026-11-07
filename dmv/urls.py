@@ -25,6 +25,8 @@ from wagtail import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
 # from cms.api import api_router  # CMS API disabled
 
+from dmv.health import health
+
 urlpatterns = [
     # Django admin
     path('admin/', admin.site.urls),
@@ -37,6 +39,7 @@ urlpatterns = [
     # path('documents/', include(wagtaildocs_urls)),
     
     # API endpoints
+    path("api/health/", health, name="health"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/accounts/", include("accounts.urls")),
