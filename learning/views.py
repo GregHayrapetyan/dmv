@@ -25,10 +25,18 @@ from .serializers import (
     CategorySerializer, CategoryDetailSerializer,
     MixedTestResponseSerializer, QuestionSerializer
 )
-from accounts.models import Subscription
+from .permissions import APPLE_TRANSACTION_HEADER, premium_access_error
 import logging
 
 logger = logging.getLogger(__name__)
+
+APPLE_TRANSACTION_PARAMETER = OpenApiParameter(
+    name=APPLE_TRANSACTION_HEADER,
+    type=str,
+    location=OpenApiParameter.HEADER,
+    required=False,
+    description='iOS guests without an account: StoreKit 2 signed transaction (JWS) of an active Apple subscription.',
+)
 
 
 class LessonListView(StandardizedResponseMixin, generics.ListAPIView):
@@ -77,7 +85,7 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     """
     queryset = Lesson.objects.all()
     serializer_class = LessonDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = 'pk'
 
     @extend_schema(
@@ -92,6 +100,7 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                 required=False,
                 enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
             ),
+            APPLE_TRANSACTION_PARAMETER,
         ],
         responses={
             200: LessonDetailSerializer,
@@ -102,20 +111,9 @@ class LessonDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
     )
     def get(self, request, *args, **kwargs):
         # Check if user has active subscription
-        try:
-            subscription = Subscription.objects.get(user=request.user)
-            if not subscription.has_access():
-                return APIResponse.error(
-                    message="Active subscription required to access lessons",
-                    error_code=ErrorCodes.FORBIDDEN,
-                    status_code=status.HTTP_403_FORBIDDEN
-                )
-        except Subscription.DoesNotExist:
-            return APIResponse.error(
-                message="Active subscription required to access lessons",
-                error_code=ErrorCodes.FORBIDDEN,
-                status_code=status.HTTP_403_FORBIDDEN
-            )
+        denied = premium_access_error(request, "Active subscription required to access lessons")
+        if denied:
+            return denied
         
         return super().get(request, *args, **kwargs)
 
@@ -215,6 +213,7 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
                 required=False,
                 enum=['en', 'ru', 'hy', 'hi', 'es', 'zh'],
             ),
+            APPLE_TRANSACTION_PARAMETER,
         ],
         responses={
             200: TestDetailSerializer,
@@ -346,27 +345,9 @@ class TestDetailView(StandardizedResponseMixin, generics.RetrieveAPIView):
             )
         
         # Regular test - require authentication and subscription
-        if not request.user.is_authenticated:
-            return APIResponse.error(
-                message="Authentication required",
-                error_code=ErrorCodes.UNAUTHORIZED,
-                status_code=status.HTTP_401_UNAUTHORIZED
-            )
-
-        try:
-            subscription = Subscription.objects.get(user=request.user)
-            if not subscription.has_access():
-                return APIResponse.error(
-                    message="Active subscription required to access this test",
-                    error_code=ErrorCodes.FORBIDDEN,
-                    status_code=status.HTTP_403_FORBIDDEN
-                )
-        except Subscription.DoesNotExist:
-            return APIResponse.error(
-                message="Active subscription required to access this test",
-                error_code=ErrorCodes.FORBIDDEN,
-                status_code=status.HTTP_403_FORBIDDEN
-            )
+        denied = premium_access_error(request, "Active subscription required to access this test")
+        if denied:
+            return denied
 
         return super().get(request, *args, **kwargs)
 
@@ -380,11 +361,12 @@ class TestSubmitView(APIView):
     calculates the score, and returns detailed results including correct answers.
     Enforces max attempts limit if configured.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     @extend_schema(
         summary="Submit test answers",
         description="Submit answers for a test. Returns score, percentage, pass/fail status, and correct answers. Requires authentication.",
+        parameters=[APPLE_TRANSACTION_PARAMETER],
         request=TestSubmissionSerializer,
         examples=[
             OpenApiExample(
@@ -441,23 +423,12 @@ class TestSubmitView(APIView):
         )
         
         # All tests require subscription
-        try:
-            subscription = Subscription.objects.get(user=request.user)
-            if not subscription.has_access():
-                return APIResponse.error(
-                    message="Active subscription required to submit this test",
-                    error_code=ErrorCodes.FORBIDDEN,
-                    status_code=status.HTTP_403_FORBIDDEN
-                )
-        except Subscription.DoesNotExist:
-            return APIResponse.error(
-                message="Active subscription required to submit this test",
-                error_code=ErrorCodes.FORBIDDEN,
-                status_code=status.HTTP_403_FORBIDDEN
-            )
+        denied = premium_access_error(request, "Active subscription required to submit this test")
+        if denied:
+            return denied
         
         # Check max attempts if configured
-        if test.max_attempts:
+        if test.max_attempts and request.user.is_authenticated:
             attempt_count = TestAttempt.objects.filter(user=request.user, test=test).count()
             if attempt_count >= test.max_attempts:
                 return APIResponse.error(
@@ -514,32 +485,35 @@ class TestSubmitView(APIView):
         passed = percentage >= test.passing_percentage
         
         # Create test attempt record
-        test_attempt = TestAttempt.objects.create(
-            user=request.user,
-            test=test,
-            correct_answers=correct_answers,
-            incorrect_answers=incorrect_answers,
-            questions_count=questions_count,
-            percentage=percentage,
-            passed=passed,
-            time_taken_seconds=time_taken,
-            completed_at=timezone.now()
-        )
-        
-        # Create answer records
-        for answer_data in answer_records:
-            TestAnswer.objects.create(
-                attempt=test_attempt,
-                question=answer_data['question'],
-                selected_option=answer_data['selected_option'],
-                is_correct=answer_data['is_correct']
+        attempt_id = None
+        if request.user.is_authenticated:
+            test_attempt = TestAttempt.objects.create(
+                user=request.user,
+                test=test,
+                correct_answers=correct_answers,
+                incorrect_answers=incorrect_answers,
+                questions_count=questions_count,
+                percentage=percentage,
+                passed=passed,
+                time_taken_seconds=time_taken,
+                completed_at=timezone.now()
             )
+
+            # Create answer records
+            for answer_data in answer_records:
+                TestAnswer.objects.create(
+                    attempt=test_attempt,
+                    question=answer_data['question'],
+                    selected_option=answer_data['selected_option'],
+                    is_correct=answer_data['is_correct']
+                )
+            attempt_id = test_attempt.id
         
         # Prepare detailed results
         question_serializer = QuestionDetailSerializer(questions, many=True)
         
         result_data = {
-            'attempt_id': test_attempt.id,
+            'attempt_id': attempt_id,
             'correct_answers': correct_answers,
             'incorrect_answers': incorrect_answers,
             'questions_count': questions_count,
@@ -549,7 +523,8 @@ class TestSubmitView(APIView):
             'user_answers': answers
         }
         
-        logger.info(f"Test {test.id} submitted by {request.user.email}. Correct: {correct_answers}/{questions_count} ({percentage:.2f}%)")
+        submitted_by = request.user.email if request.user.is_authenticated else "Apple guest"
+        logger.info(f"Test {test.id} submitted by {submitted_by}. Correct: {correct_answers}/{questions_count} ({percentage:.2f}%)")
         
         return APIResponse.success(
             data=result_data,

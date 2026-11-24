@@ -122,6 +122,68 @@ class AppleVerifyPurchaseView(APIView):
         )
 
 
+class AppleGuestVerifyView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        summary="Verify Apple purchase (guest, no account)",
+        description=(
+            "For iOS guests without an account: verify a StoreKit 2 signed transaction and return "
+            "the access it grants. Nothing is stored. Premium lesson/test endpoints accept the same "
+            "JWS in the X-Apple-Signed-Transaction header."
+        ),
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "signed_transaction": {
+                        "type": "string",
+                        "description": "StoreKit 2 signed transaction JWS (Transaction.jwsRepresentation)"
+                    }
+                },
+                "required": ["signed_transaction"],
+            }
+        },
+        responses={
+            200: OpenApiResponse(description="Purchase is valid and currently grants access"),
+            400: OpenApiResponse(description="Missing, invalid, expired or refunded transaction"),
+        },
+        tags=["Subscriptions"],
+    )
+    def post(self, request):
+        signed_transaction = request.data.get('signed_transaction')
+
+        if not signed_transaction:
+            return APIResponse.error(
+                message="signed_transaction is required",
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            transaction = AppleIAPService.verify_active_transaction(signed_transaction)
+        except AppleIAPError as e:
+            logger.warning(f"Apple IAP guest verification failed: {str(e)}")
+            return APIResponse.error(
+                message=str(e),
+                error_code=ErrorCodes.VALIDATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        product_id = transaction.get('productId')
+        return APIResponse.success(
+            data={
+                'status': 'active',
+                'plan_tier': AppleIAPService.product_to_tier(product_id),
+                'product_id': product_id,
+                'current_period_start': AppleIAPService._ms_to_datetime(transaction.get('purchaseDate')),
+                'current_period_end': AppleIAPService._ms_to_datetime(transaction.get('expiresDate')),
+                'has_access': True,
+            },
+            message="Purchase verified successfully",
+        )
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class AppleServerNotificationView(APIView):
     """

@@ -13,7 +13,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.apple_iap_service import AppleIAPService, AppleIAPError
-from accounts.models import Subscription
+from accounts.models import AppleRevokedTransaction, Subscription
 
 User = get_user_model()
 
@@ -124,6 +124,34 @@ class AppleIAPServiceTests(TestCase):
                 AppleIAPService.activate_subscription(self.user, 'signed-jws')
         self.assertFalse(Subscription.objects.filter(user=self.user).exists())
 
+    def test_activate_rejects_transaction_refunded_via_notification(self):
+        AppleRevokedTransaction.objects.create(
+            transaction_id='1000000000123', original_transaction_id='1000000000123'
+        )
+        txn = make_transaction(product='com.mytestdmv.standard')
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.activate_subscription(self.user, 'signed-jws')
+        self.assertFalse(Subscription.objects.filter(user=self.user).exists())
+
+    def test_verify_active_transaction_accepts_unexpired_purchase(self):
+        txn = make_transaction(product='com.mytestdmv.premium')
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            self.assertEqual(AppleIAPService.verify_active_transaction('signed-jws'), txn)
+
+    def test_verify_active_transaction_rejects_expired_purchase(self):
+        txn = make_transaction(expires_in_days=-1)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.verify_active_transaction('signed-jws')
+
+    def test_verify_active_transaction_rejects_revoked_purchase(self):
+        now_ms = int(timezone.now().timestamp() * 1000)
+        txn = make_transaction(revocation_date_ms=now_ms)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.verify_active_transaction('signed-jws')
+
     def test_verify_rejects_wrong_bundle_id(self):
         txn = make_transaction(bundle='com.evil.app')
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
@@ -219,6 +247,35 @@ class AppleIAPServiceTests(TestCase):
             # Should not raise even though no subscription matches.
             AppleIAPService.handle_notification('signed-payload')
 
+    def test_notification_refund_for_guest_transaction_blocks_its_jws(self):
+        txn = make_transaction(original='5555555555555')
+        notification = {
+            'notificationType': 'REFUND', 'subtype': None,
+            'data': {'signedTransactionInfo': 'txn-jws'},
+        }
+        with patch.object(AppleIAPService, 'decode_signed_jws', side_effect=[notification, txn]):
+            AppleIAPService.handle_notification('signed-payload')
+
+        self.assertTrue(AppleRevokedTransaction.objects.filter(transaction_id='5555555555555').exists())
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.verify_active_transaction('signed-jws')
+
+    def test_notification_refund_reversed_restores_guest_access(self):
+        AppleRevokedTransaction.objects.create(
+            transaction_id='5555555555555', original_transaction_id='5555555555555'
+        )
+        txn = make_transaction(original='5555555555555')
+        notification = {
+            'notificationType': 'REFUND_REVERSED', 'subtype': None,
+            'data': {'signedTransactionInfo': 'txn-jws'},
+        }
+        with patch.object(AppleIAPService, 'decode_signed_jws', side_effect=[notification, txn]):
+            AppleIAPService.handle_notification('signed-payload')
+
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            self.assertEqual(AppleIAPService.verify_active_transaction('signed-jws'), txn)
+
 
 @override_settings(APPLE_IAP_PRODUCTS=TEST_PRODUCTS, APPLE_IAP_BUNDLE_ID=TEST_BUNDLE)
 class AppleVerifyPurchaseEndpointTests(TestCase):
@@ -259,4 +316,35 @@ class AppleVerifyPurchaseEndpointTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(resp.data['success'])
+
+
+@override_settings(APPLE_IAP_PRODUCTS=TEST_PRODUCTS, APPLE_IAP_BUNDLE_ID=TEST_BUNDLE)
+class AppleGuestVerifyEndpointTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse('subscription-apple-guest-verify')
+
+    def test_valid_purchase_grants_access_without_creating_records(self):
+        users_before = User.objects.count()
+        txn = make_transaction(product='com.mytestdmv.standard')
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            resp = self.client.post(self.url, {'signed_transaction': 'signed-jws'}, format='json')
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['data']['has_access'])
+        self.assertEqual(resp.data['data']['plan_tier'], 'standard')
+        self.assertEqual(User.objects.count(), users_before)
+        self.assertFalse(Subscription.objects.exists())
+
+    def test_expired_purchase_returns_400(self):
+        txn = make_transaction(expires_in_days=-1)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            resp = self.client.post(self.url, {'signed_transaction': 'signed-jws'}, format='json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.data['success'])
+
+    def test_missing_signed_transaction_returns_400(self):
+        resp = self.client.post(self.url, {}, format='json')
+        self.assertEqual(resp.status_code, 400)
 

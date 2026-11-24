@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from django.conf import settings
 from django.utils import timezone
 
-from .models import Subscription
+from .models import AppleRevokedTransaction, Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +221,25 @@ class AppleIAPService:
 
         return transaction
 
+    @staticmethod
+    def _is_revoked(transaction):
+        return bool(transaction.get("revocationDate")) or AppleRevokedTransaction.objects.filter(
+            transaction_id=transaction.get("transactionId")
+        ).exists()
+
+    @classmethod
+    def verify_active_transaction(cls, signed_transaction):
+        transaction = cls.verify_transaction(signed_transaction)
+
+        if cls._is_revoked(transaction):
+            raise AppleIAPError("This purchase has been revoked or refunded.")
+
+        expires_date = cls._ms_to_datetime(transaction.get("expiresDate"))
+        if not expires_date or expires_date <= timezone.now():
+            raise AppleIAPError("This purchase has expired.")
+
+        return transaction
+
     @classmethod
     def _apply_transaction(cls, subscription, transaction, status="active"):
         """Copy fields from a verified transaction onto a Subscription (unsaved)."""
@@ -258,7 +277,7 @@ class AppleIAPService:
 
         # A revoked (refunded/voided) transaction must never grant access — Transaction.updates
         # delivers these too, so refuse it here; deactivation is handled by REFUND/REVOKE notifications.
-        if transaction.get("revocationDate"):
+        if cls._is_revoked(transaction):
             raise AppleIAPError("This purchase has been revoked or refunded.")
 
         # An already-expired transaction can't grant current access.
@@ -324,6 +343,15 @@ class AppleIAPService:
 
         transaction = cls.decode_signed_jws(signed_transaction)
         original_txn_id = transaction.get("originalTransactionId")
+
+        transaction_id = transaction.get("transactionId")
+        if transaction_id and notification_type in ("REFUND", "REVOKE"):
+            AppleRevokedTransaction.objects.get_or_create(
+                transaction_id=transaction_id,
+                defaults={"original_transaction_id": original_txn_id or ""},
+            )
+        elif transaction_id and notification_type == "REFUND_REVERSED":
+            AppleRevokedTransaction.objects.filter(transaction_id=transaction_id).delete()
 
         try:
             subscription = Subscription.objects.get(
