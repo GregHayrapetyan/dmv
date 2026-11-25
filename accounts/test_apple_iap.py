@@ -7,6 +7,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -201,6 +202,20 @@ class AppleIAPServiceTests(TestCase):
         txn = make_transaction(bundle='com.evil.app')
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
             with self.assertRaises(AppleIAPError):
+                AppleIAPService.verify_transaction('signed-jws')
+
+    def test_verify_rejects_transaction_without_bundle_id(self):
+        txn = make_transaction()
+        del txn['bundleId']
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.verify_transaction('signed-jws')
+
+    @override_settings(APPLE_IAP_BUNDLE_ID='')
+    def test_verify_fails_closed_when_bundle_id_not_configured(self):
+        txn = make_transaction(bundle='com.any.app')
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+            with self.assertRaises(ImproperlyConfigured):
                 AppleIAPService.verify_transaction('signed-jws')
 
     def test_verify_rejects_unknown_product(self):
@@ -472,6 +487,13 @@ class AppleGuestLoginEndpointTests(TestCase):
     def test_missing_signed_transaction_returns_400(self):
         resp = self.client.post(self.url, {}, format='json')
         self.assertEqual(resp.status_code, 400)
+
+    @override_settings(APPLE_IAP_BUNDLE_ID='')
+    def test_unconfigured_bundle_id_refuses_guest_login(self):
+        resp = self._login(make_transaction(bundle='com.any.app'))
+
+        self.assertEqual(resp.status_code, 500)
+        self.assertFalse(User.objects.filter(is_guest=True).exists())
 
     def test_refresh_cookie_of_merged_guest_is_rejected(self):
         refresh_cookie = self._login(make_transaction()).cookies['refresh_token'].value

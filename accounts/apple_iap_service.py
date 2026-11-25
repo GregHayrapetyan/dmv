@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, padding
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError, transaction as db_transaction
 from django.utils import timezone
 
@@ -219,11 +220,14 @@ class AppleIAPService:
         Verify a StoreKit 2 signed transaction (JWS) and return its claims after
         sanity-checking the bundle id and product.
         """
+        expected_bundle = settings.APPLE_IAP_BUNDLE_ID
+        if not expected_bundle:
+            raise ImproperlyConfigured("Set APPLE_IAP_BUNDLE_ID (or APPLE_BUNDLE_ID) to verify Apple purchases")
+
         transaction = cls.decode_signed_jws(signed_transaction)
 
-        expected_bundle = settings.APPLE_IAP_BUNDLE_ID
         bundle_id = transaction.get("bundleId")
-        if expected_bundle and bundle_id and bundle_id != expected_bundle:
+        if bundle_id != expected_bundle:
             raise AppleIAPError(
                 f"Transaction bundle id '{bundle_id}' does not match '{expected_bundle}'"
             )

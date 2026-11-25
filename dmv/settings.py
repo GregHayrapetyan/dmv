@@ -278,7 +278,7 @@ STRIPE_TRIAL_PERIOD_DAYS = config('STRIPE_TRIAL_PERIOD_DAYS', default=3, cast=in
 
 # Apple In-App Purchase (StoreKit 2) Settings
 # iOS app bundle ID (falls back to the Sign in with Apple bundle ID).
-APPLE_IAP_BUNDLE_ID = config('APPLE_IAP_BUNDLE_ID', default=APPLE_BUNDLE_ID)
+APPLE_IAP_BUNDLE_ID = config('APPLE_IAP_BUNDLE_ID', default='') or APPLE_BUNDLE_ID
 # Maps each App Store Connect product identifier to a plan tier.
 # Override the APPLE_IAP_PRODUCT_* env vars once the real product IDs exist.
 APPLE_IAP_PRODUCTS = {
