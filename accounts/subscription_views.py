@@ -96,6 +96,13 @@ class CreateCheckoutSessionView(APIView):
         tags=["Subscriptions"],
     )
     def post(self, request):
+        if request.user.is_guest:
+            return APIResponse.error(
+                message="Create an account to subscribe on the web.",
+                error_code=ErrorCodes.FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
         price_id = request.data.get('price_id')
         success_url = request.data.get('success_url')
         cancel_url = request.data.get('cancel_url')

@@ -55,6 +55,10 @@ class User(AbstractUser):
         max_length=255, unique=True, null=True, blank=True,
         help_text="Apple's stable user identifier (sub claim) for Sign in with Apple"
     )
+    is_guest = models.BooleanField(
+        default=False,
+        help_text="Hidden account created for an iOS purchase made without signing up"
+    )
 
     objects = UserManager()
 

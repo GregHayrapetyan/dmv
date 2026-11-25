@@ -5,8 +5,8 @@ from .models import User, EmailOTP, Subscription, PaymentMethod
 
 @admin.register(User)
 class UAdmin(BaseUserAdmin):
-    list_display = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "is_active", "is_staff")
-    list_filter = ("is_email_verified", "is_active", "is_staff", "is_superuser")
+    list_display = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "is_guest", "is_active", "is_staff")
+    list_filter = ("is_guest", "is_email_verified", "is_active", "is_staff", "is_superuser")
     search_fields = ("email", "first_name", "last_name", "phone")
     ordering = ("-date_joined",)
     

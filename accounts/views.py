@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
 from .serializers import (
     LoginSerializer, RegisterSerializer, ConfirmEmailSerializer, RequestPasswordResetSerializer,
@@ -854,7 +854,7 @@ class CookieTokenRefreshView(TokenRefreshView):
             
             try:
                 serializer.is_valid(raise_exception=True)
-            except InvalidToken:
+            except (InvalidToken, TokenError, User.DoesNotExist):
                 return APIResponse.error(
                     message="Invalid or expired refresh token",
                     error_code=ErrorCodes.AUTHENTICATION_FAILED,

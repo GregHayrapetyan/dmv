@@ -10,11 +10,13 @@ from django.utils.decorators import method_decorator
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from dmv.api_response import APIResponse, ErrorCodes
 from .serializers import SubscriptionSerializer
-from .apple_iap_service import AppleIAPService, AppleIAPError
+from .throttling import AuthRateThrottle
+from .apple_iap_service import AppleIAPService, AppleIAPError, ApplePurchaseOwnedByAccountError
 
 logger = logging.getLogger(__name__)
 
@@ -122,15 +124,18 @@ class AppleVerifyPurchaseView(APIView):
         )
 
 
-class AppleGuestVerifyView(APIView):
+class AppleGuestLoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
-        summary="Verify Apple purchase (guest, no account)",
+        summary="Log in with an Apple purchase (guest)",
         description=(
-            "For iOS guests without an account: verify a StoreKit 2 signed transaction and return "
-            "the access it grants. Nothing is stored. Premium lesson/test endpoints accept the same "
-            "JWS in the X-Apple-Signed-Transaction header."
+            "For iOS purchases made without an account: verify a StoreKit 2 signed transaction and log in "
+            "as the guest user that owns its subscription, creating it on first use. Expired purchases "
+            "still log in with has_access=false. Returns the same access token and refresh_token cookie "
+            "as login. 409 if the purchase belongs to a registered account (error contains its masked email)."
         ),
         request={
             "application/json": {
@@ -145,10 +150,11 @@ class AppleGuestVerifyView(APIView):
             }
         },
         responses={
-            200: OpenApiResponse(description="Purchase is valid and currently grants access"),
-            400: OpenApiResponse(description="Missing, invalid, expired or refunded transaction"),
+            200: OpenApiResponse(description="Logged in as the guest that owns the purchase"),
+            400: OpenApiResponse(description="Missing, invalid or refunded transaction"),
+            409: OpenApiResponse(description="Purchase belongs to a registered account"),
         },
-        tags=["Subscriptions"],
+        tags=["Authentication"],
     )
     def post(self, request):
         signed_transaction = request.data.get('signed_transaction')
@@ -161,27 +167,55 @@ class AppleGuestVerifyView(APIView):
             )
 
         try:
-            transaction = AppleIAPService.verify_active_transaction(signed_transaction)
+            subscription = AppleIAPService.guest_login(signed_transaction)
+        except ApplePurchaseOwnedByAccountError as e:
+            return APIResponse.error(
+                message=str(e),
+                error_code=ErrorCodes.CONFLICT,
+                status_code=status.HTTP_409_CONFLICT,
+            )
         except AppleIAPError as e:
-            logger.warning(f"Apple IAP guest verification failed: {str(e)}")
+            logger.warning(f"Apple guest login failed: {str(e)}")
             return APIResponse.error(
                 message=str(e),
                 error_code=ErrorCodes.VALIDATION_ERROR,
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        except Exception as e:
+            logger.error(f"Unexpected error in Apple guest login: {str(e)}", exc_info=True)
+            return APIResponse.error(
+                message="Failed to sign in with this purchase",
+                error_code=ErrorCodes.INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        product_id = transaction.get('productId')
-        return APIResponse.success(
+        user = subscription.user
+        tokens = RefreshToken.for_user(user)
+        response = APIResponse.success(
             data={
-                'status': 'active',
-                'plan_tier': AppleIAPService.product_to_tier(product_id),
-                'product_id': product_id,
-                'current_period_start': AppleIAPService._ms_to_datetime(transaction.get('purchaseDate')),
-                'current_period_end': AppleIAPService._ms_to_datetime(transaction.get('expiresDate')),
-                'has_access': True,
+                "access": str(tokens.access_token),
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "is_email_verified": user.is_email_verified
+                },
+                "is_guest": True,
+                "has_access": subscription.has_access(),
             },
-            message="Purchase verified successfully",
+            message="Guest login successful"
         )
+        response.set_cookie(
+            key='refresh_token',
+            value=str(tokens),
+            httponly=True,
+            secure=True,
+            samesite='None',
+            max_age=7*24*60*60,
+            path='/'
+        )
+        return response
 
 
 @method_decorator(csrf_exempt, name='dispatch')

@@ -7,6 +7,7 @@ and processes App Store Server Notifications (renew/cancel/refund/expire).
 import base64
 import datetime
 import logging
+import uuid
 
 import jwt
 from cryptography import x509
@@ -14,9 +15,10 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, padding
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from django.conf import settings
+from django.db import IntegrityError, transaction as db_transaction
 from django.utils import timezone
 
-from .models import AppleRevokedTransaction, Subscription
+from .models import AppleRevokedTransaction, Subscription, User
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +40,20 @@ _ACTIVE_NOTIFICATIONS = {"SUBSCRIBED", "DID_RENEW", "OFFER_REDEEMED"}
 # Notification types that mean "access has ended".
 _ENDED_NOTIFICATIONS = {"EXPIRED", "GRACE_PERIOD_EXPIRED"}
 
+GUEST_EMAIL_DOMAIN = "guest.invalid"
+
 
 class AppleIAPError(Exception):
     """Raised when an Apple transaction/notification cannot be verified."""
+
+
+class ApplePurchaseOwnedByAccountError(AppleIAPError):
+    pass
+
+
+def mask_email(email):
+    local, _, domain = email.partition("@")
+    return f"{local[:1]}***@{domain}"
 
 
 class AppleIAPService:
@@ -228,17 +241,18 @@ class AppleIAPService:
         ).exists()
 
     @classmethod
-    def verify_active_transaction(cls, signed_transaction):
-        transaction = cls.verify_transaction(signed_transaction)
-
-        if cls._is_revoked(transaction):
-            raise AppleIAPError("This purchase has been revoked or refunded.")
-
+    def _transaction_status(cls, transaction):
         expires_date = cls._ms_to_datetime(transaction.get("expiresDate"))
-        if not expires_date or expires_date <= timezone.now():
-            raise AppleIAPError("This purchase has expired.")
+        return "active" if expires_date and expires_date > timezone.now() else "expired"
 
-        return transaction
+    @staticmethod
+    def _locked_subscription(original_txn_id, exclude_user=None):
+        subscriptions = Subscription.objects.select_for_update(of=("self",)).select_related("user").filter(
+            apple_original_transaction_id=original_txn_id
+        )
+        if exclude_user is not None:
+            subscriptions = subscriptions.exclude(user=exclude_user)
+        return subscriptions.first()
 
     @classmethod
     def _apply_transaction(cls, subscription, transaction, status="active"):
@@ -287,37 +301,107 @@ class AppleIAPService:
 
         original_txn_id = transaction.get("originalTransactionId")
 
-        # Guard: an Apple transaction may only belong to one account.
-        clash = Subscription.objects.filter(
-            apple_original_transaction_id=original_txn_id
-        ).exclude(user=user).first()
-        if clash:
-            raise AppleIAPError(
-                "This Apple purchase is already linked to a different account"
+        with db_transaction.atomic():
+            # Guard: an Apple transaction may only belong to one account.
+            clash = cls._locked_subscription(original_txn_id, exclude_user=user)
+            if clash and not clash.user.is_guest:
+                raise AppleIAPError(
+                    "This Apple purchase is already linked to a different account"
+                )
+
+            # Guard: don't overwrite an active other-provider (Stripe) sub — would double-bill.
+            # The iOS client blocks this first; this is the server-side backstop.
+            existing = Subscription.objects.select_for_update().filter(user=user).first()
+            if existing and existing.conflicts_with_purchase_on("apple"):
+                raise AppleIAPError(
+                    "You already have an active subscription purchased on the web. "
+                    "Cancel it before subscribing through Apple."
+                )
+
+            guest_id = None
+            if clash:
+                if existing and existing.has_access():
+                    raise AppleIAPError("This account already has an active subscription.")
+                guest_id = clash.user_id
+                clash.user.delete()
+
+            subscription, _ = Subscription.objects.get_or_create(user=user)
+            subscription.refresh_from_db()
+            if subscription.payment_provider != "apple":
+                # Taking over from a lapsed Stripe sub: drop its cancel-at-period-end flag.
+                subscription.cancel_at_period_end = False
+            if clash:
+                subscription.cancel_at_period_end = clash.cancel_at_period_end
+            cls._apply_transaction(subscription, transaction, status="active")
+            subscription.save()
+
+        if guest_id:
+            logger.info(
+                "Apple purchase %s moved from guest %s to user %s", original_txn_id, guest_id, user.id
             )
-
-        # Guard: don't overwrite an active other-provider (Stripe) sub — would double-bill.
-        # The iOS client blocks this first; this is the server-side backstop.
-        existing = Subscription.objects.filter(user=user).first()
-        if existing and existing.conflicts_with_purchase_on("apple"):
-            raise AppleIAPError(
-                "You already have an active subscription purchased on the web. "
-                "Cancel it before subscribing through Apple."
-            )
-
-        subscription, _ = Subscription.objects.get_or_create(user=user)
-        subscription.refresh_from_db()
-        if subscription.payment_provider != "apple":
-            # Taking over from a lapsed Stripe sub: drop its cancel-at-period-end flag.
-            subscription.cancel_at_period_end = False
-        cls._apply_transaction(subscription, transaction, status="active")
-        subscription.save()
-
         logger.info(
             "Apple IAP activated for user %s: product=%s tier=%s expires=%s",
             user.email, subscription.apple_product_id, subscription.plan_tier,
             subscription.current_period_end,
         )
+        return subscription
+
+    @classmethod
+    def _create_guest_subscription(cls, transaction):
+        guest = User.objects.create_user(
+            email=f"guest-{uuid.uuid4().hex}@{GUEST_EMAIL_DOMAIN}", is_guest=True
+        )
+        subscription = cls._apply_transaction(
+            Subscription(user=guest), transaction, status=cls._transaction_status(transaction)
+        )
+        subscription.save()
+        logger.info(
+            "Apple guest %s created for original transaction %s",
+            guest.id, subscription.apple_original_transaction_id,
+        )
+        return subscription
+
+    @classmethod
+    def guest_login(cls, signed_transaction):
+        transaction = cls.verify_transaction(signed_transaction)
+        if cls._is_revoked(transaction):
+            raise AppleIAPError("This purchase has been revoked or refunded.")
+
+        original_txn_id = transaction.get("originalTransactionId")
+        if not original_txn_id:
+            raise AppleIAPError("Transaction is missing its originalTransactionId")
+
+        with db_transaction.atomic():
+            subscription = cls._locked_subscription(original_txn_id)
+            if subscription is None:
+                try:
+                    with db_transaction.atomic():
+                        return cls._create_guest_subscription(transaction)
+                except IntegrityError:
+                    subscription = cls._locked_subscription(original_txn_id)
+                    if subscription is None:
+                        raise
+
+            owner = subscription.user
+            if not owner.is_guest:
+                logger.info(
+                    "Apple guest login refused: original transaction %s belongs to user %s",
+                    original_txn_id, owner.id,
+                )
+                raise ApplePurchaseOwnedByAccountError(
+                    f"This purchase belongs to {mask_email(owner.email)}. Please sign in."
+                )
+            if not owner.is_active:
+                raise AppleIAPError("This account is disabled.")
+
+            expires_date = cls._ms_to_datetime(transaction.get("expiresDate"))
+            if expires_date and (
+                subscription.current_period_end is None or expires_date > subscription.current_period_end
+            ):
+                cls._apply_transaction(subscription, transaction, status=cls._transaction_status(transaction))
+                subscription.save()
+
+        logger.info("Apple guest %s logged in (original transaction %s)", owner.id, original_txn_id)
         return subscription
 
     # ------------------------------------------------ server notifications

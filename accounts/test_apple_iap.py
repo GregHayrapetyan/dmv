@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 
 from accounts.apple_iap_service import AppleIAPService, AppleIAPError
 from accounts.models import AppleRevokedTransaction, Subscription
+from onboarding.models import State, Vehicle
 
 User = get_user_model()
 
@@ -134,23 +135,67 @@ class AppleIAPServiceTests(TestCase):
                 AppleIAPService.activate_subscription(self.user, 'signed-jws')
         self.assertFalse(Subscription.objects.filter(user=self.user).exists())
 
-    def test_verify_active_transaction_accepts_unexpired_purchase(self):
+    # -- guest purchase moved onto a real account ------------------------------
+
+    def _guest_with_purchase(self, **kwargs):
+        return AppleIAPService._create_guest_subscription(make_transaction(**kwargs)).user
+
+    def test_activate_moves_guest_purchase_to_user(self):
+        guest = self._guest_with_purchase()
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=make_transaction()):
+            sub = AppleIAPService.activate_subscription(self.user, 'signed-jws')
+
+        self.assertEqual(sub.user, self.user)
+        self.assertEqual(sub.apple_original_transaction_id, '1000000000123')
+        self.assertTrue(sub.has_access())
+        self.assertFalse(User.objects.filter(id=guest.id).exists())
+        self.assertEqual(Subscription.objects.count(), 1)
+
+    def test_activate_moves_guest_purchase_over_users_lapsed_subscription(self):
+        Subscription.objects.create(user=self.user, payment_provider='stripe',
+                                    status='expired', stripe_customer_id='cus_x')
+        guest = self._guest_with_purchase(product='com.mytestdmv.premium')
         txn = make_transaction(product='com.mytestdmv.premium')
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
-            self.assertEqual(AppleIAPService.verify_active_transaction('signed-jws'), txn)
+            AppleIAPService.activate_subscription(self.user, 'signed-jws')
 
-    def test_verify_active_transaction_rejects_expired_purchase(self):
-        txn = make_transaction(expires_in_days=-1)
-        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
-            with self.assertRaises(AppleIAPError):
-                AppleIAPService.verify_active_transaction('signed-jws')
+        sub = Subscription.objects.get(user=self.user)
+        self.assertEqual(sub.payment_provider, 'apple')
+        self.assertEqual(sub.plan_tier, 'premium')
+        self.assertEqual(sub.stripe_customer_id, 'cus_x')
+        self.assertFalse(User.objects.filter(id=guest.id).exists())
 
-    def test_verify_active_transaction_rejects_revoked_purchase(self):
-        now_ms = int(timezone.now().timestamp() * 1000)
-        txn = make_transaction(revocation_date_ms=now_ms)
-        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
+    def test_activate_keeps_users_active_apple_subscription_and_the_guest(self):
+        self._existing_apple_sub(original='2000000000456')
+        guest = self._guest_with_purchase()
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=make_transaction()):
             with self.assertRaises(AppleIAPError):
-                AppleIAPService.verify_active_transaction('signed-jws')
+                AppleIAPService.activate_subscription(self.user, 'signed-jws')
+
+        self.assertEqual(Subscription.objects.get(user=self.user).apple_original_transaction_id, '2000000000456')
+        self.assertEqual(Subscription.objects.get(user=guest).apple_original_transaction_id, '1000000000123')
+
+    def test_activate_keeps_users_active_stripe_subscription_and_the_guest(self):
+        Subscription.objects.create(
+            user=self.user, payment_provider='stripe', status='active',
+            stripe_subscription_id='sub_x',
+            current_period_end=timezone.now() + timedelta(days=15),
+        )
+        guest = self._guest_with_purchase()
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=make_transaction()):
+            with self.assertRaises(AppleIAPError):
+                AppleIAPService.activate_subscription(self.user, 'signed-jws')
+
+        self.assertEqual(Subscription.objects.get(user=self.user).payment_provider, 'stripe')
+        self.assertTrue(User.objects.filter(id=guest.id).exists())
+
+    def test_guest_verify_of_own_purchase_syncs_renewal(self):
+        guest = self._guest_with_purchase(expires_in_days=1)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=make_transaction(expires_in_days=31)):
+            sub = AppleIAPService.activate_subscription(guest, 'signed-jws')
+
+        self.assertEqual(sub.user, guest)
+        self.assertGreater(sub.current_period_end, timezone.now() + timedelta(days=30))
 
     def test_verify_rejects_wrong_bundle_id(self):
         txn = make_transaction(bundle='com.evil.app')
@@ -247,7 +292,7 @@ class AppleIAPServiceTests(TestCase):
             # Should not raise even though no subscription matches.
             AppleIAPService.handle_notification('signed-payload')
 
-    def test_notification_refund_for_guest_transaction_blocks_its_jws(self):
+    def test_notification_refund_for_unknown_transaction_blocks_guest_login(self):
         txn = make_transaction(original='5555555555555')
         notification = {
             'notificationType': 'REFUND', 'subtype': None,
@@ -259,9 +304,10 @@ class AppleIAPServiceTests(TestCase):
         self.assertTrue(AppleRevokedTransaction.objects.filter(transaction_id='5555555555555').exists())
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
             with self.assertRaises(AppleIAPError):
-                AppleIAPService.verify_active_transaction('signed-jws')
+                AppleIAPService.guest_login('signed-jws')
+        self.assertFalse(User.objects.filter(is_guest=True).exists())
 
-    def test_notification_refund_reversed_restores_guest_access(self):
+    def test_notification_refund_reversed_allows_guest_login_again(self):
         AppleRevokedTransaction.objects.create(
             transaction_id='5555555555555', original_transaction_id='5555555555555'
         )
@@ -274,7 +320,9 @@ class AppleIAPServiceTests(TestCase):
             AppleIAPService.handle_notification('signed-payload')
 
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
-            self.assertEqual(AppleIAPService.verify_active_transaction('signed-jws'), txn)
+            sub = AppleIAPService.guest_login('signed-jws')
+        self.assertTrue(sub.user.is_guest)
+        self.assertTrue(sub.has_access())
 
 
 @override_settings(APPLE_IAP_PRODUCTS=TEST_PRODUCTS, APPLE_IAP_BUNDLE_ID=TEST_BUNDLE)
@@ -319,32 +367,143 @@ class AppleVerifyPurchaseEndpointTests(TestCase):
 
 
 @override_settings(APPLE_IAP_PRODUCTS=TEST_PRODUCTS, APPLE_IAP_BUNDLE_ID=TEST_BUNDLE)
-class AppleGuestVerifyEndpointTests(TestCase):
+class AppleGuestLoginEndpointTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.url = reverse('subscription-apple-guest-verify')
+        self.url = reverse('subscription-apple-login')
 
-    def test_valid_purchase_grants_access_without_creating_records(self):
-        users_before = User.objects.count()
-        txn = make_transaction(product='com.mytestdmv.standard')
+    def _login(self, txn, **extra):
         with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
-            resp = self.client.post(self.url, {'signed_transaction': 'signed-jws'}, format='json')
+            return self.client.post(self.url, {'signed_transaction': 'signed-jws'}, format='json', **extra)
+
+    def test_first_purchase_creates_guest_and_logs_in(self):
+        resp = self._login(make_transaction(product='com.mytestdmv.premium'))
 
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.data['data']['has_access'])
-        self.assertEqual(resp.data['data']['plan_tier'], 'standard')
-        self.assertEqual(User.objects.count(), users_before)
-        self.assertFalse(Subscription.objects.exists())
+        data = resp.data['data']
+        self.assertTrue(data['access'])
+        self.assertTrue(data['is_guest'])
+        self.assertTrue(data['has_access'])
+        self.assertTrue(resp.cookies['refresh_token']['httponly'])
+        guest = User.objects.get(id=data['user']['id'])
+        self.assertTrue(guest.is_guest)
+        self.assertFalse(guest.has_usable_password())
+        self.assertFalse(guest.is_email_verified)
+        self.assertEqual(guest.subscription.apple_original_transaction_id, '1000000000123')
+        self.assertEqual(guest.subscription.plan_tier, 'premium')
+        self.assertEqual(guest.subscription.status, 'active')
 
-    def test_expired_purchase_returns_400(self):
-        txn = make_transaction(expires_in_days=-1)
-        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=txn):
-            resp = self.client.post(self.url, {'signed_transaction': 'signed-jws'}, format='json')
+    def test_access_token_opens_me_as_guest(self):
+        access = self._login(make_transaction()).data['data']['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+        resp = self.client.get(reverse('me'))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['data']['is_guest'])
+        self.assertTrue(resp.data['data']['has_active_subscription'])
+
+    def test_repeat_login_reuses_the_same_guest(self):
+        first = self._login(make_transaction()).data['data']['user']['id']
+        second = self._login(make_transaction()).data['data']['user']['id']
+
+        self.assertEqual(first, second)
+        self.assertEqual(User.objects.filter(is_guest=True).count(), 1)
+
+    def test_expired_purchase_logs_in_without_access(self):
+        resp = self._login(make_transaction(expires_in_days=-1))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.data['data']['has_access'])
+        self.assertEqual(Subscription.objects.get().status, 'expired')
+
+    def test_newer_transaction_extends_guest_subscription_and_older_one_is_ignored(self):
+        self._login(make_transaction(expires_in_days=5))
+        renewal = make_transaction(expires_in_days=35)
+        renewal['transactionId'] = '1000000000999'
+        self._login(renewal)
+        renewed_end = Subscription.objects.get().current_period_end
+
+        self._login(make_transaction(expires_in_days=5))
+
+        self.assertGreater(renewed_end, timezone.now() + timedelta(days=30))
+        self.assertEqual(Subscription.objects.get().current_period_end, renewed_end)
+
+    def test_revoked_purchase_is_rejected(self):
+        now_ms = int(timezone.now().timestamp() * 1000)
+        resp = self._login(make_transaction(revocation_date_ms=now_ms))
 
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.data['success'])
+        self.assertFalse(User.objects.filter(is_guest=True).exists())
+
+    def test_purchase_of_registered_account_returns_409_with_masked_email(self):
+        owner = User.objects.create_user(email='alice@gmail.com', password='pw12345678', is_email_verified=True)
+        Subscription.objects.create(user=owner, payment_provider='apple',
+                                    apple_original_transaction_id='1000000000123', status='active')
+
+        resp = self._login(make_transaction())
+
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.data['error'], 'This purchase belongs to a***@gmail.com. Please sign in.')
+        self.assertNotIn('refresh_token', resp.cookies)
+        self.assertFalse(User.objects.filter(is_guest=True).exists())
+
+    def test_concurrent_first_login_reuses_the_guest_created_first(self):
+        existing = AppleIAPService._create_guest_subscription(make_transaction())
+        lookup = AppleIAPService._locked_subscription
+        calls = []
+
+        def miss_first_lookup(*args, **kwargs):
+            calls.append(args)
+            return None if len(calls) == 1 else lookup(*args, **kwargs)
+
+        with patch.object(AppleIAPService, '_locked_subscription', side_effect=miss_first_lookup):
+            resp = self._login(make_transaction())
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['data']['user']['id'], existing.user_id)
+        self.assertEqual(User.objects.filter(is_guest=True).count(), 1)
+
+    def test_stale_authorization_header_does_not_block_login(self):
+        resp = self._login(make_transaction(), HTTP_AUTHORIZATION='Bearer expired-token')
+
+        self.assertEqual(resp.status_code, 200)
 
     def test_missing_signed_transaction_returns_400(self):
         resp = self.client.post(self.url, {}, format='json')
         self.assertEqual(resp.status_code, 400)
+
+    def test_refresh_cookie_of_merged_guest_is_rejected(self):
+        refresh_cookie = self._login(make_transaction()).cookies['refresh_token'].value
+        user = User.objects.create_user(email='real@example.com', password='pw12345678', is_email_verified=True)
+        with patch.object(AppleIAPService, 'decode_signed_jws', return_value=make_transaction()):
+            AppleIAPService.activate_subscription(user, 'signed-jws')
+
+        self.client.cookies['refresh_token'] = refresh_cookie
+        resp = self.client.post(reverse('token-refresh'))
+
+        self.assertEqual(resp.status_code, 401)
+
+    def test_guest_can_set_state_and_vehicle(self):
+        guest = AppleIAPService._create_guest_subscription(make_transaction()).user
+        state = State.objects.create(name='California')
+        vehicle = Vehicle.objects.create(name='Car')
+        self.client.force_authenticate(guest)
+
+        resp = self.client.put(reverse('me'), {'state': state.id, 'vehicle': vehicle.id}, format='json')
+
+        self.assertEqual(resp.status_code, 200)
+        guest.profile.refresh_from_db()
+        self.assertEqual(guest.profile.state, state)
+        self.assertEqual(guest.profile.vehicle, vehicle)
+
+    def test_guest_cannot_start_stripe_checkout(self):
+        guest = AppleIAPService._create_guest_subscription(make_transaction()).user
+        self.client.force_authenticate(guest)
+
+        resp = self.client.post(reverse('subscription-checkout'), {
+            'price_id': 'price_x', 'success_url': 'https://example.com/s', 'cancel_url': 'https://example.com/c',
+        }, format='json')
+
+        self.assertEqual(resp.status_code, 403)
 

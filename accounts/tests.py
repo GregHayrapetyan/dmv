@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.urls import reverse
+from rest_framework.test import APIClient
 
 from accounts.models import Subscription
 from accounts.stripe_service import StripeService
@@ -65,3 +67,13 @@ class StripeTrialTests(TestCase):
     def test_trialing_subscription_has_access(self):
         sub = Subscription.objects.create(user=self.user, status='trialing')
         self.assertTrue(sub.has_access())
+
+
+class CookieTokenRefreshTests(TestCase):
+    def test_invalid_refresh_cookie_returns_401(self):
+        client = APIClient()
+        client.cookies['refresh_token'] = 'not-a-token'
+
+        resp = client.post(reverse('token-refresh'))
+
+        self.assertEqual(resp.status_code, 401)

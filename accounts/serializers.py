@@ -257,8 +257,8 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state", "age", "gender", "vehicle", "auth_provider")
-        read_only_fields = ("id", "email", "is_email_verified", "date_joined", "auth_provider")
+        fields = ("id", "email", "first_name", "last_name", "phone", "is_email_verified", "date_joined", "has_active_subscription", "avatar", "state", "age", "gender", "vehicle", "auth_provider", "is_guest")
+        read_only_fields = ("id", "email", "is_email_verified", "date_joined", "auth_provider", "is_guest")
     
     @extend_schema_field(serializers.BooleanField())
     def get_has_active_subscription(self, obj):

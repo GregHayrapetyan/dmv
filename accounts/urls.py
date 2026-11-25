@@ -11,7 +11,7 @@ from .subscription_views import (
     UpdatePaymentMethodView, UpdateBillingInfoView
 )
 from .apple_iap_views import (
-    AppleVerifyPurchaseView, AppleGuestVerifyView, AppleServerNotificationView
+    AppleVerifyPurchaseView, AppleGuestLoginView, AppleServerNotificationView
 )
 
 
@@ -44,6 +44,6 @@ urlpatterns = [
 
     # Apple In-App Purchase (iOS) endpoints
     path("subscription/apple/verify/", AppleVerifyPurchaseView.as_view(), name="subscription-apple-verify"),
-    path("subscription/apple/guest/verify/", AppleGuestVerifyView.as_view(), name="subscription-apple-guest-verify"),
+    path("subscription/apple/login/", AppleGuestLoginView.as_view(), name="subscription-apple-login"),
     path("subscription/apple/notifications/", AppleServerNotificationView.as_view(), name="subscription-apple-notifications"),
 ]
