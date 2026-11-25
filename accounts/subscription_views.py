@@ -13,12 +13,11 @@ import logging
 import stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-from django.db import models
 from dmv.api_response import APIResponse, ErrorCodes
 from .models import Subscription, PaymentMethod
 from .serializers import SubscriptionSerializer, PaymentMethodSerializer
 from .stripe_service import StripeService
-from site_details.models import PricingPlan
+from .subscription_pricing import resolve_subscription_price_fields
 
 logger = logging.getLogger(__name__)
 
@@ -284,7 +283,9 @@ class SubscriptionStatusView(APIView):
                             "properties": {
                                 "id": {"type": "integer", "description": "Subscription record ID", "example": 1},
                                 "status": {"type": "string", "description": "Subscription status", "enum": ["active", "canceled", "past_due", "incomplete", "trialing"], "example": "active"},
+                                "payment_provider": {"type": "string", "enum": ["stripe", "apple"], "example": "stripe"},
                                 "plan_tier": {"type": "string", "description": "Plan tier", "enum": ["starter", "standard", "premium"], "example": "standard"},
+                                "stripe_price_id": {"type": "string", "nullable": True, "description": "Purchased Stripe Price ID", "example": "price_1ABC"},
                                 "access_duration_days": {"type": "integer", "description": "Billing cycle length in days", "example": 30},
                                 "current_period_start": {"type": "string", "format": "date-time", "description": "Start of current billing period"},
                                 "current_period_end": {"type": "string", "format": "date-time", "description": "End of current billing period"},
@@ -438,7 +439,9 @@ class SubscriptionDetailView(APIView):
                                     "properties": {
                                         "id": {"type": "integer", "example": 1},
                                         "status": {"type": "string", "enum": ["active", "canceled", "past_due", "incomplete", "trialing"], "example": "active"},
+                                        "payment_provider": {"type": "string", "enum": ["stripe", "apple"], "example": "stripe"},
                                         "plan_tier": {"type": "string", "enum": ["starter", "standard", "premium"], "example": "standard"},
+                                        "stripe_price_id": {"type": "string", "nullable": True, "description": "Purchased Stripe Price ID", "example": "price_1ABC"},
                                         "access_duration_days": {"type": "integer", "example": 30},
                                         "current_period_start": {"type": "string", "format": "date-time"},
                                         "current_period_end": {"type": "string", "format": "date-time"},
@@ -448,7 +451,9 @@ class SubscriptionDetailView(APIView):
                                         "next_payment_date": {"type": "string", "format": "date-time", "nullable": True},
                                         "created_at": {"type": "string", "format": "date-time"},
                                         "updated_at": {"type": "string", "format": "date-time"},
-                                        "has_access": {"type": "boolean", "example": True}
+                                        "has_access": {"type": "boolean", "example": True},
+                                        "stripe_price_id_monthly": {"type": "string", "nullable": True, "description": "Matched CMS monthly price ID (falls back to purchased)"},
+                                        "stripe_price_id_one_time": {"type": "string", "nullable": True, "description": "Matched CMS one-time price ID"}
                                     }
                                 },
                                 "billing_info": {
@@ -513,19 +518,13 @@ class SubscriptionDetailView(APIView):
                 default_pm = PaymentMethod.objects.filter(user=request.user).first()
             payment_details = PaymentMethodSerializer(default_pm).data if default_pm else None
             
-            # Look up the active pricing plan matching the subscription's stripe price
-            pricing_plan = PricingPlan.objects.filter(
-                is_active=True,
-            ).filter(
-                models.Q(stripe_price_id_monthly=subscription.stripe_price_id) |
-                models.Q(stripe_price_id_one_time=subscription.stripe_price_id)
-            ).first()
+            monthly, one_time = resolve_subscription_price_fields(subscription)
 
             plan_data = {
                 **serializer.data,
                 'has_access': subscription.has_access(),
-                'stripe_price_id_monthly': pricing_plan.stripe_price_id_monthly if pricing_plan else None,
-                'stripe_price_id_one_time': pricing_plan.stripe_price_id_one_time if pricing_plan else None,
+                'stripe_price_id_monthly': monthly,
+                'stripe_price_id_one_time': one_time,
             }
 
             return APIResponse.success(
